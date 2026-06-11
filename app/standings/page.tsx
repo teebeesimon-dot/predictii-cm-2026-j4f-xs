@@ -92,3 +92,14 @@ function StandingsContent() {
     </div>
   )
 }
+if (users) {
+  console.log("USERS", JSON.stringify(users, null, 2))
+}
+
+if (predictions) {
+  console.log("PREDICTIONS", JSON.stringify(predictions, null, 2))
+}
+
+if (matches) {
+  console.log("MATCHES", JSON.stringify(matches, null, 2))
+}
