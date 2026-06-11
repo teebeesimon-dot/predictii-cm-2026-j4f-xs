@@ -5,13 +5,23 @@ import { AppShell } from '@/components/app-shell'
 import { useMatches, useUsers } from '@/lib/hooks'
 import {
   createMatch,
+  deleteMatch,
   updateMatchResult,
   createUser,
   deleteUser,
   updateUserPassword,
   seedUsersIfEmpty,
+  seedGroupMatchesIfEmpty,
 } from '@/lib/data'
-import { STAGES, isLocked, type Match, type StageId, type AppUser } from '@/lib/types'
+import {
+  STAGES,
+  isLocked,
+  KNOCKOUT_ROUNDS,
+  type Match,
+  type StageId,
+  type KnockoutRound,
+  type AppUser,
+} from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +40,7 @@ import {
   KeyRound,
   UserPlus,
   Users,
+  Download,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -82,9 +93,7 @@ function AdminContent() {
               ))}
             </div>
           ) : (matches?.length ?? 0) === 0 ? (
-            <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-              Niciun meci adăugat. Folosește tab-ul &quot;Adaugă meci&quot;.
-            </p>
+            <SeedMatchesPrompt onSeeded={() => mutate()} />
           ) : (
             <div className="flex flex-col gap-3">
               {[...(matches ?? [])]
@@ -100,10 +109,54 @@ function AdminContent() {
   )
 }
 
+function SeedMatchesPrompt({ onSeeded }: { onSeeded: () => void }) {
+  const [seeding, setSeeding] = useState(false)
+
+  async function handleSeed() {
+    setSeeding(true)
+    try {
+      const count = await seedGroupMatchesIfEmpty()
+      if (count > 0) {
+        toast.success(`${count} meciuri din faza grupelor au fost adăugate!`)
+        onSeeded()
+      } else {
+        toast.info('Există deja meciuri. Nu am suprascris nimic.')
+      }
+    } catch {
+      toast.error('Eroare la generarea meciurilor.')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border py-10 text-center">
+      <Download className="size-8 text-muted-foreground" />
+      <div>
+        <p className="font-medium">Niciun meci adăugat încă</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+          Generează automat toate cele 72 de meciuri din faza grupelor CM 2026
+          (Etapele 1-3). Meciurile din fazele eliminatorii se adaugă manual după
+          stabilirea echipelor calificate.
+        </p>
+      </div>
+      <Button onClick={handleSeed} disabled={seeding}>
+        {seeding ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4" />
+        )}
+        Generează meciurile fazei grupelor
+      </Button>
+    </div>
+  )
+}
+
 function AddMatchForm({ onAdded }: { onAdded: () => void }) {
   const [home, setHome] = useState('')
   const [away, setAway] = useState('')
   const [stage, setStage] = useState<StageId>(1)
+  const [round, setRound] = useState<KnockoutRound>('r16')
   const [kickoff, setKickoff] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -119,6 +172,7 @@ function AddMatchForm({ onAdded }: { onAdded: () => void }) {
         homeTeam: home.trim(),
         awayTeam: away.trim(),
         stage,
+        ...(stage === 5 ? { round } : {}),
         kickoff: new Date(kickoff).toISOString(),
         homeScore: null,
         awayScore: null,
@@ -190,6 +244,24 @@ function AddMatchForm({ onAdded }: { onAdded: () => void }) {
             </div>
           </div>
 
+          {stage === 5 && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="round">Runda eliminatorie (decide termenul limită)</Label>
+              <select
+                id="round"
+                value={round}
+                onChange={(e) => setRound(e.target.value as KnockoutRound)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {KNOCKOUT_ROUNDS.map((r) => (
+                  <option key={r.round} value={r.round}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <Button type="submit" disabled={saving} className="self-start">
             {saving ? (
               <Loader2 className="size-4 animate-spin" />
@@ -235,6 +307,25 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
     return v.replace(/[^0-9]/g, '').slice(0, 2)
   }
 
+  async function handleDelete() {
+    if (
+      !window.confirm(
+        `Ștergi meciul ${match.homeTeam} - ${match.awayTeam}?`,
+      )
+    )
+      return
+    setSaving(true)
+    try {
+      await deleteMatch(match.id)
+      toast.success('Meci șters.')
+      onSaved()
+    } catch {
+      toast.error('Eroare la ștergere.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4">
@@ -247,11 +338,21 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
           </span>
           {locked ? (
             <Badge variant="secondary" className="gap-1">
-              <Lock className="size-3" /> Început
+              <Lock className="size-3" /> Blocat
             </Badge>
           ) : (
-            <Badge className="bg-primary/15 text-primary">Programat</Badge>
+            <Badge className="bg-primary/15 text-primary">Deschis</Badge>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Șterge meci"
+            className="ml-auto size-7 text-destructive hover:text-destructive"
+            disabled={saving}
+            onClick={handleDelete}
+          >
+            <Trash2 className="size-4" />
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">

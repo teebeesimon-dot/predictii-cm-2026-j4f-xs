@@ -9,9 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { STAGES, getActiveStage, getStageDeadline, isLocked, type StageId } from '@/lib/types'
+import { STAGES, getActiveStage, getStageDeadline, isLocked } from '@/lib/types'
 import { computeStandings } from '@/lib/data'
-import { formatKickoff } from '@/lib/utils'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -70,56 +69,69 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Next match */}
+      {/* Current stage + deadline countdown */}
       <Card className="overflow-hidden border-primary/30">
-        <CardHeader className="flex-row items-center gap-2 space-y-0">
-          <CalendarClock className="size-5 text-primary" />
-          <CardTitle className="text-base">Următorul meci</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="size-5 text-primary" />
+            <CardTitle className="text-base">
+              {activeStageInfo?.name ?? 'Etapa curentă'}
+            </CardTitle>
+          </div>
+          <Badge variant="secondary" className="hidden sm:inline-flex">
+            {activeStageInfo?.label}
+          </Badge>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <Skeleton className="h-28 w-full" />
-          ) : next ? (
+            <Skeleton className="h-40 w-full" />
+          ) : (
             <div className="flex flex-col gap-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 text-center">
-                  <p className="font-heading text-lg font-bold sm:text-2xl">
-                    {next.homeTeam}
+              <DeadlineBanner
+                deadline={activeDeadline}
+                label="Pronosticurile se închid în"
+              />
+
+              {stageMatches.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Flag className="size-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Meciurile acestei etape nu au fost adăugate încă.
                   </p>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="font-heading text-sm font-bold text-muted-foreground">
-                    VS
-                  </span>
-                </div>
-                <div className="flex-1 text-center">
-                  <p className="font-heading text-lg font-bold sm:text-2xl">
-                    {next.awayTeam}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="secondary">
-                  {STAGES.find((s) => s.id === next.stage)?.name}
-                </Badge>
-                <span>{formatKickoff(next.kickoff)}</span>
-              </div>
-              <div className="flex justify-center">
-                <Countdown kickoff={next.kickoff} />
-              </div>
+              ) : (
+                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {stageMatches.map((m) => {
+                    const locked = isLocked(m)
+                    return (
+                      <li
+                        key={m.id}
+                        className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                      >
+                        <span className="flex-1 text-right font-medium">
+                          {m.homeTeam}
+                        </span>
+                        <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                          {m.homeScore !== null && m.awayScore !== null
+                            ? `${m.homeScore} - ${m.awayScore}`
+                            : 'vs'}
+                        </span>
+                        <span className="flex-1 font-medium">{m.awayTeam}</span>
+                        {locked && (
+                          <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+
               <Button asChild className="w-full sm:w-auto sm:self-center">
                 <Link href="/predictions">
                   <ListChecks className="size-4" />
-                  Pune pronosticul
+                  Completează pronosticurile
                 </Link>
               </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <Flag className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Nu există meciuri programate momentan.
-              </p>
             </div>
           )}
         </CardContent>
