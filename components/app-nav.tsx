@@ -15,6 +15,7 @@ import {
   X,
   ListOrdered,
   UserCog,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -82,6 +83,12 @@ const NAV: NavItem[] = [
     label: 'Statistici',
     icon: BarChart3,
     match: (p) => p === '/statistics',
+  },
+  {
+    href: '/colleagues',
+    label: 'Colegii',
+    icon: Users,
+    match: (p) => p === '/colleagues',
   },
   {
     href: '/awards',
