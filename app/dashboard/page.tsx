@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { STAGES, getActiveStage, getStageDeadline, isLocked } from '@/lib/types'
@@ -139,12 +139,15 @@ function DashboardContent() {
                 </ul>
               )}
 
-              <Button asChild className="w-full sm:w-auto sm:self-center">
-                <Link href="/predictions">
-                  <ListChecks className="size-4" />
-                  Completează pronosticurile
-                </Link>
-              </Button>
+              <Link
+                href="/predictions"
+                className={buttonVariants({
+                  className: 'w-full sm:w-auto sm:self-center',
+                })}
+              >
+                <ListChecks className="size-4" />
+                Completează pronosticurile
+              </Link>
             </div>
           )}
         </CardContent>
@@ -185,12 +188,13 @@ function DashboardContent() {
               </div>
             </div>
             {remaining > 0 && (
-              <Button asChild className="w-full sm:w-auto">
-                <Link href="/predictions">
-                  <ListChecks className="size-4" />
-                  Completează acum
-                </Link>
-              </Button>
+              <Link
+                href="/predictions"
+                className={buttonVariants({ className: 'w-full sm:w-auto' })}
+              >
+                <ListChecks className="size-4" />
+                Completează acum
+              </Link>
             )}
           </CardContent>
         </Card>

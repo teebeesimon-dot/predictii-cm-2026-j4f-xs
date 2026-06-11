@@ -26,29 +26,29 @@ function roToUtc(local: string): string {
 //  UEFA A → Bosnia și Herțegovina · UEFA B → Suedia · UEFA C → Turcia · UEFA D → Cehia
 //  Interconfederal: RD Congo (Grupa K) · Irak (Grupa I)
 // A: Mexic, Africa de Sud, Coreea de Sud, Cehia (câștigător Baraj UEFA D)
-// B: Canada, Qatar, Elveția, Bosnia și Herțegovina (câștigător Baraj UEFA A)
+// B: Canada, Bosnia și Herțegovina (câștigător Baraj UEFA A), Qatar, Elveția
 // C: Brazilia, Maroc, Haiti, Scoția
 // D: SUA, Paraguay, Australia, Turcia (câștigător Baraj UEFA C)
 // E: Germania, Curaçao, Coasta de Fildeș, Ecuador
-// F: Olanda, Japonia, Tunisia, Suedia (câștigător Baraj UEFA B)
+// F: Olanda, Japonia, Suedia (câștigător Baraj UEFA B), Tunisia
 // G: Belgia, Egipt, Iran, Noua Zeelandă
 // H: Spania, Capul Verde, Arabia Saudită, Uruguay
-// I: Franța, Senegal, Norvegia, Irak (câștigător Baraj interconfederal)
+// I: Franța, Senegal, Irak (câștigător Baraj interconfederal), Norvegia
 // J: Argentina, Algeria, Austria, Iordania
-// K: Portugalia, Uzbekistan, Columbia, RD Congo (câștigător Baraj interconfederal)
+// K: Portugalia, RD Congo (câștigător Baraj interconfederal), Uzbekistan, Columbia
 // L: Anglia, Croația, Ghana, Panama
 
 const A = ['Mexic', 'Africa de Sud', 'Coreea de Sud', 'Cehia']
-const B = ['Canada', 'Qatar', 'Elveția', 'Bosnia și Herțegovina']
+const B = ['Canada', 'Bosnia și Herțegovina', 'Qatar', 'Elveția']
 const C = ['Brazilia', 'Maroc', 'Haiti', 'Scoția']
 const D = ['SUA', 'Paraguay', 'Australia', 'Turcia']
 const E = ['Germania', 'Curaçao', 'Coasta de Fildeș', 'Ecuador']
-const F = ['Olanda', 'Japonia', 'Tunisia', 'Suedia']
+const F = ['Olanda', 'Japonia', 'Suedia', 'Tunisia']
 const G = ['Belgia', 'Egipt', 'Iran', 'Noua Zeelandă']
 const H = ['Spania', 'Capul Verde', 'Arabia Saudită', 'Uruguay']
-const I = ['Franța', 'Senegal', 'Norvegia', 'Irak']
+const I = ['Franța', 'Senegal', 'Irak', 'Norvegia']
 const J = ['Argentina', 'Algeria', 'Austria', 'Iordania']
-const K = ['Portugalia', 'Uzbekistan', 'Columbia', 'RD Congo']
+const K = ['Portugalia', 'RD Congo', 'Uzbekistan', 'Columbia']
 const L = ['Anglia', 'Croația', 'Ghana', 'Panama']
 
 // Pentru fiecare grupă: Runda 1 = (1v2, 3v4), Runda 2 = (1v3, 4v2), Runda 3 = (4v1, 2v3)
@@ -77,7 +77,7 @@ const RAW: SeedMatch[] = [
   // 11 iunie - deschiderea
   { stage: 1, homeTeam: A[0], awayTeam: A[1], kickoffRo: '2026-06-11T22:00' }, // Mexic - Africa de Sud
   // 12 iunie
-  { stage: 1, homeTeam: B[0], awayTeam: B[3], kickoffRo: '2026-06-12T22:00' }, // Canada
+  { stage: 1, homeTeam: B[0], awayTeam: B[1], kickoffRo: '2026-06-12T22:00' }, // Canada - Bosnia și Herțegovina
   { stage: 1, homeTeam: D[0], awayTeam: D[1], kickoffRo: '2026-06-13T04:00' }, // SUA - Paraguay
   // 13 iunie
   { stage: 1, homeTeam: A[2], awayTeam: A[3], kickoffRo: '2026-06-13T19:00' }, // Coreea de Sud
@@ -85,12 +85,12 @@ const RAW: SeedMatch[] = [
   { stage: 1, homeTeam: C[2], awayTeam: C[3], kickoffRo: '2026-06-14T01:00' }, // Haiti - Scoția
   // 14 iunie
   { stage: 1, homeTeam: E[0], awayTeam: E[1], kickoffRo: '2026-06-14T20:00' }, // Germania - Curaçao
-  { stage: 1, homeTeam: B[1], awayTeam: B[2], kickoffRo: '2026-06-14T23:00' }, // Qatar - Elveția
+  { stage: 1, homeTeam: B[2], awayTeam: B[3], kickoffRo: '2026-06-14T23:00' }, // Qatar - Elveția
   { stage: 1, homeTeam: D[2], awayTeam: D[3], kickoffRo: '2026-06-15T02:00' }, // Australia
   // 15 iunie
   { stage: 1, homeTeam: F[0], awayTeam: F[1], kickoffRo: '2026-06-15T19:00' }, // Olanda - Japonia
   { stage: 1, homeTeam: E[2], awayTeam: E[3], kickoffRo: '2026-06-15T22:00' }, // Coasta de Fildeș - Ecuador
-  { stage: 1, homeTeam: F[2], awayTeam: F[3], kickoffRo: '2026-06-16T01:00' }, // Tunisia
+  { stage: 1, homeTeam: F[2], awayTeam: F[3], kickoffRo: '2026-06-16T01:00' }, // Suedia - Tunisia
   // 16 iunie
   { stage: 1, homeTeam: G[0], awayTeam: G[1], kickoffRo: '2026-06-16T19:00' }, // Belgia - Egipt
   { stage: 1, homeTeam: H[0], awayTeam: H[1], kickoffRo: '2026-06-16T22:00' }, // Spania - Capul Verde
@@ -98,11 +98,11 @@ const RAW: SeedMatch[] = [
   // 17 iunie
   { stage: 1, homeTeam: I[0], awayTeam: I[1], kickoffRo: '2026-06-17T19:00' }, // Franța - Senegal
   { stage: 1, homeTeam: H[2], awayTeam: H[3], kickoffRo: '2026-06-17T22:00' }, // Arabia Saudită - Uruguay
-  { stage: 1, homeTeam: I[2], awayTeam: I[3], kickoffRo: '2026-06-18T01:00' }, // Norvegia
+  { stage: 1, homeTeam: I[2], awayTeam: I[3], kickoffRo: '2026-06-18T01:00' }, // Irak - Norvegia
   { stage: 1, homeTeam: J[0], awayTeam: J[1], kickoffRo: '2026-06-17T20:00' }, // Argentina - Algeria
   { stage: 1, homeTeam: J[2], awayTeam: J[3], kickoffRo: '2026-06-17T23:00' }, // Austria - Iordania
-  { stage: 1, homeTeam: K[0], awayTeam: K[1], kickoffRo: '2026-06-18T19:00' }, // Portugalia - Uzbekistan
-  { stage: 1, homeTeam: K[2], awayTeam: K[3], kickoffRo: '2026-06-18T22:00' }, // Columbia
+  { stage: 1, homeTeam: K[0], awayTeam: K[1], kickoffRo: '2026-06-18T19:00' }, // Portugalia - RD Congo
+  { stage: 1, homeTeam: K[2], awayTeam: K[3], kickoffRo: '2026-06-18T22:00' }, // Uzbekistan - Columbia
   { stage: 1, homeTeam: L[0], awayTeam: L[1], kickoffRo: '2026-06-18T20:00' }, // Anglia - Croația
   { stage: 1, homeTeam: L[2], awayTeam: L[3], kickoffRo: '2026-06-18T23:00' }, // Ghana - Panama
 

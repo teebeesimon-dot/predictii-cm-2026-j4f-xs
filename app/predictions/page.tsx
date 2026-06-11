@@ -69,10 +69,13 @@ function PredictionsContent() {
 
   function setEntry(matchId: string, field: 'home' | 'away', value: string) {
     const clean = value.replace(/[^0-9]/g, '').slice(0, 2)
-    setEntries((e) => ({
-      ...e,
-      [matchId]: { home: '', away: '', ...e[matchId], [field]: clean },
-    }))
+    setEntries((e) => {
+      const existing = e[matchId] ?? { home: '', away: '' }
+      return {
+        ...e,
+        [matchId]: { ...existing, [field]: clean },
+      }
+    })
   }
 
   async function handleSave(match: Match) {
