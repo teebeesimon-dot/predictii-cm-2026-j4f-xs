@@ -5,12 +5,14 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   orderBy,
   query,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
 import { scorePrediction, PARTICIPANTS } from '@/lib/types'
+import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 
 export async function getMatches(): Promise<Match[]> {
   const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
@@ -52,6 +54,24 @@ export async function savePrediction(
 export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
   const id = doc(collection(db, 'matches')).id
   await setDoc(doc(db, 'matches', id), data)
+}
+
+export async function deleteMatch(matchId: string): Promise<void> {
+  await deleteDoc(doc(db, 'matches', matchId))
+}
+
+// Seed all 72 group-stage matches if none exist yet. Returns the number added.
+export async function seedGroupMatchesIfEmpty(): Promise<number> {
+  const existing = await getMatches()
+  if (existing.length > 0) return 0
+
+  const batch = writeBatch(db)
+  for (const m of WC2026_GROUP_MATCHES) {
+    const ref = doc(collection(db, 'matches'))
+    batch.set(ref, m)
+  }
+  await batch.commit()
+  return WC2026_GROUP_MATCHES.length
 }
 
 // ---- User management (admin only) ----

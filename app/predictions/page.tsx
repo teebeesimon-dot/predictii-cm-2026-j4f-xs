@@ -5,13 +5,22 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUserPredictions } from '@/lib/hooks'
 import { savePrediction } from '@/lib/data'
-import { STAGES, isLocked, type Match, type StageId } from '@/lib/types'
+import {
+  STAGES,
+  isLocked,
+  STAGE_DEADLINES,
+  KNOCKOUT_ROUNDS,
+  KNOCKOUT_DEADLINES,
+  type Match,
+  type StageId,
+} from '@/lib/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { DeadlineBanner } from '@/components/deadline-banner'
 import { formatKickoff } from '@/lib/utils'
 import { Lock, Save, Loader2, Flag } from 'lucide-react'
 import { toast } from 'sonner'
@@ -90,7 +99,8 @@ function PredictionsContent() {
       <div>
         <h1 className="font-heading text-3xl font-bold">Pronosticuri</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Completează scorurile. Pronosticurile se blochează automat la startul meciului.
+          Completează scorurile. Fiecare etapă se blochează automat la termenul
+          limită afișat (ora României).
         </p>
       </div>
 
@@ -123,15 +133,84 @@ function PredictionsContent() {
             const stageMatches = (byStage.get(s.id as StageId) ?? []).sort(
               (a, b) => +new Date(a.kickoff) - +new Date(b.kickoff),
             )
+            const stageDeadline =
+              s.id === 5 ? null : STAGE_DEADLINES[s.id as 1 | 2 | 3 | 4]
             return (
               <TabsContent key={s.id} value={String(s.id)} className="mt-4">
                 <p className="mb-3 text-sm font-medium text-muted-foreground">
                   {s.label}
                 </p>
+
+                {s.id !== 5 && (
+                  <div className="mb-4">
+                    <DeadlineBanner
+                      deadline={stageDeadline}
+                      label="Completează până la"
+                    />
+                  </div>
+                )}
+
                 {stageMatches.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
                     Niciun meci în această etapă.
                   </p>
+                ) : s.id === 5 ? (
+                  // Etapa 5: grupăm pe runde eliminatorii, fiecare cu termenul ei.
+                  <div className="flex flex-col gap-6">
+                    {KNOCKOUT_ROUNDS.map(({ round, label }) => {
+                      const roundMatches = stageMatches.filter(
+                        (m) => m.round === round,
+                      )
+                      return (
+                        <div key={round} className="flex flex-col gap-3">
+                          <h3 className="font-heading text-base font-bold">
+                            {label}
+                          </h3>
+                          <DeadlineBanner
+                            deadline={KNOCKOUT_DEADLINES[round]}
+                            label="Completează până la"
+                          />
+                          {roundMatches.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
+                              Meciurile vor fi adăugate după stabilirea echipelor
+                              calificate.
+                            </p>
+                          ) : (
+                            roundMatches.map((m) => (
+                              <MatchRow
+                                key={m.id}
+                                match={m}
+                                entry={entries[m.id]}
+                                saving={!!saving[m.id]}
+                                onChange={setEntry}
+                                onSave={handleSave}
+                              />
+                            ))
+                          )}
+                        </div>
+                      )
+                    })}
+                    {/* meciuri din Etapa 5 fără rundă atribuită */}
+                    {stageMatches.filter((m) => !m.round).length > 0 && (
+                      <div className="flex flex-col gap-3">
+                        <h3 className="font-heading text-base font-bold">
+                          Alte meciuri
+                        </h3>
+                        {stageMatches
+                          .filter((m) => !m.round)
+                          .map((m) => (
+                            <MatchRow
+                              key={m.id}
+                              match={m}
+                              entry={entries[m.id]}
+                              saving={!!saving[m.id]}
+                              onChange={setEntry}
+                              onSave={handleSave}
+                            />
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {stageMatches.map((m) => (
