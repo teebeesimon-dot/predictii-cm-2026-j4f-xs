@@ -11,6 +11,7 @@ const dateFmt = new Intl.DateTimeFormat('ro-RO', {
   month: 'short',
   hour: '2-digit',
   minute: '2-digit',
+  timeZone: 'Europe/Bucharest',
 })
 
 export function formatKickoff(iso: string) {
@@ -21,6 +22,7 @@ const dayFmt = new Intl.DateTimeFormat('ro-RO', {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
+  timeZone: 'Europe/Bucharest',
 })
 
 export function formatDay(iso: string) {
