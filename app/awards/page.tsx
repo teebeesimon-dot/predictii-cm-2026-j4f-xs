@@ -1,6 +1,7 @@
 'use client'
 
 import { AppShell } from '@/components/app-shell'
+import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import { computeStandings } from '@/lib/data'
 import { STAGES, type StageId } from '@/lib/types'
@@ -17,16 +18,18 @@ export default function AwardsPage() {
 }
 
 function AwardsContent() {
+  const { user } = useAuth()
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
+  const viewer = { id: user?.id, isAdmin: user?.isAdmin }
 
   function stageWinner(stage?: StageId) {
     if (!ready) return null
-    const rows = computeStandings(users, matches, predictions, stage)
+    const rows = computeStandings(users, matches, predictions, stage, viewer)
     const top = rows[0]
     // a winner only exists if there is at least 1 point scored in that scope
     if (!top || top.points === 0) return null

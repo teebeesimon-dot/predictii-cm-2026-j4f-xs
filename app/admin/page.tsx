@@ -81,7 +81,13 @@ function AdminContent() {
     }
     setExporting(true)
     try {
-      const standings = computeStandings(users, matches, predictions)
+      const standings = computeStandings(
+        users,
+        matches,
+        predictions,
+        undefined,
+        { isAdmin: true },
+      )
       const rows = standings.map((r) => ({
         Pozitie: r.rank,
         Nume: r.name,
