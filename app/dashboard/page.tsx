@@ -5,6 +5,7 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
+import { TeamName } from '@/components/team-name'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,17 +47,18 @@ function DashboardContent() {
     (m) => m.homeScore !== null && m.awayScore !== null,
   ).length
 
-  // Pronosticuri rămase: meciuri care NU au început încă (kickoff > acum)
-  // ȘI pentru care utilizatorul conectat nu are deja un pronostic salvat.
-  const now = Date.now()
+  // Pronosticuri rămase pentru ETAPA ACTIVĂ: meciuri din etapa curentă care nu
+  // sunt încă blocate (termenul nu a trecut) ȘI pentru care utilizatorul nu are
+  // deja un pronostic salvat. Restrângem la etapa activă ca să nu numărăm
+  // meciurile din etapele viitoare (ex. după ce completezi Etapa 1, nu mai
+  // apar cele 48 din etapele 2 și 3).
   const myPredictedMatchIds = new Set(
     (predictions ?? [])
       .filter((p) => p.userId === user?.id)
       .map((p) => p.matchId),
   )
-  const remaining = (matches ?? []).filter(
-    (m) =>
-      new Date(m.kickoff).getTime() > now && !myPredictedMatchIds.has(m.id),
+  const remaining = stageMatches.filter(
+    (m) => !isLocked(m) && !myPredictedMatchIds.has(m.id),
   ).length
 
   return (
@@ -121,15 +123,20 @@ function DashboardContent() {
                         key={m.id}
                         className="flex items-center gap-3 px-3 py-2.5 text-sm"
                       >
-                        <span className="flex-1 text-right font-medium">
-                          {m.homeTeam}
-                        </span>
+                        <TeamName
+                          team={m.homeTeam}
+                          align="right"
+                          className="flex-1 justify-end font-medium"
+                        />
                         <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
                           {m.homeScore !== null && m.awayScore !== null
                             ? `${m.homeScore} - ${m.awayScore}`
                             : 'vs'}
                         </span>
-                        <span className="flex-1 font-medium">{m.awayTeam}</span>
+                        <TeamName
+                          team={m.awayTeam}
+                          className="flex-1 font-medium"
+                        />
                         {locked && (
                           <Lock className="size-3.5 shrink-0 text-muted-foreground" />
                         )}
@@ -177,13 +184,13 @@ function DashboardContent() {
               <div>
                 <p className="font-heading text-lg font-bold">
                   {remaining > 0
-                    ? `Mai ai ${remaining} ${remaining === 1 ? 'pronostic' : 'pronosticuri'} de completat`
-                    : 'Ești la zi cu pronosticurile'}
+                    ? `Mai ai ${remaining} ${remaining === 1 ? 'pronostic' : 'pronosticuri'} de completat la ${activeStageInfo?.name ?? 'etapa curentă'}`
+                    : `Ești la zi cu ${activeStageInfo?.name ?? 'etapa curentă'}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {remaining > 0
-                    ? 'Completează-le înainte să înceapă meciurile.'
-                    : 'Toate meciurile disponibile au pronostic.'}
+                    ? 'Completează-le înainte de termenul limită al etapei.'
+                    : 'Toate meciurile din această etapă au pronostic.'}
                 </p>
               </div>
             </div>

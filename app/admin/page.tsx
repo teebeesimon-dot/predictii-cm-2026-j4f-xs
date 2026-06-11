@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
+import { TeamName } from '@/components/team-name'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
   createMatch,
@@ -552,7 +553,11 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="flex-1 text-right font-semibold">{match.homeTeam}</span>
+          <TeamName
+            team={match.homeTeam}
+            align="right"
+            className="flex-1 justify-end font-semibold"
+          />
           <Input
             inputMode="numeric"
             aria-label={`Scor oficial ${match.homeTeam}`}
@@ -568,7 +573,7 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
             value={away}
             onChange={(e) => setAway(clean(e.target.value))}
           />
-          <span className="flex-1 font-semibold">{match.awayTeam}</span>
+          <TeamName team={match.awayTeam} className="flex-1 font-semibold" />
         </div>
 
         <div className="flex justify-end">

@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DeadlineBanner } from '@/components/deadline-banner'
+import { TeamName } from '@/components/team-name'
 import { formatKickoff } from '@/lib/utils'
 import { Lock, Save, Loader2, Flag } from 'lucide-react'
 import { toast } from 'sonner'
@@ -275,7 +276,11 @@ function MatchRow({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="flex-1 text-right font-semibold">{match.homeTeam}</span>
+          <TeamName
+            team={match.homeTeam}
+            align="right"
+            className="flex-1 justify-end font-semibold"
+          />
           <div className="flex items-center gap-1">
             <Input
               inputMode="numeric"
@@ -295,7 +300,7 @@ function MatchRow({
               onChange={(e) => onChange(match.id, 'away', e.target.value)}
             />
           </div>
-          <span className="flex-1 font-semibold">{match.awayTeam}</span>
+          <TeamName team={match.awayTeam} className="flex-1 font-semibold" />
         </div>
 
         <div className="flex items-center justify-between gap-2">

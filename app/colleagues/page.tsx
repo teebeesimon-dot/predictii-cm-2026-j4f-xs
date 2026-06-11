@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
+import { TeamName } from '@/components/team-name'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
@@ -191,7 +192,11 @@ function MatchPredictions({
         {/* Header meci */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-heading font-bold">{match.homeTeam}</span>
+            <TeamName
+              team={match.homeTeam}
+              align="right"
+              className="font-heading font-bold"
+            />
             {hasResult ? (
               <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
                 {match.homeScore} - {match.awayScore}
@@ -199,7 +204,7 @@ function MatchPredictions({
             ) : (
               <span className="text-muted-foreground">vs</span>
             )}
-            <span className="font-heading font-bold">{match.awayTeam}</span>
+            <TeamName team={match.awayTeam} className="font-heading font-bold" />
           </div>
           <span className="text-xs text-muted-foreground">
             {formatKickoff(match.kickoff)}
