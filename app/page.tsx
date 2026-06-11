@@ -10,9 +10,8 @@ import { Trophy, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
-  const { user, loading, login, register } = useAuth()
+  const { user, loading, login } = useAuth()
   const router = useRouter()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -25,12 +24,9 @@ export default function LoginPage() {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const res =
-        mode === 'login'
-          ? await login(username, password)
-          : await register(username, password)
+      const res = await login(username, password)
       if (res.ok) {
-        toast.success(mode === 'login' ? 'Bine ai revenit!' : 'Cont creat cu succes!')
+        toast.success('Bine ai revenit!')
         router.replace('/dashboard')
       } else {
         toast.error(res.error ?? 'A apărut o eroare.')
@@ -73,32 +69,9 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card/90 p-6 shadow-xl backdrop-blur-sm">
-          <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1">
-            <button
-              type="button"
-              onClick={() => setMode('login')}
-              className={
-                'rounded-md py-2 text-sm font-semibold transition-colors ' +
-                (mode === 'login'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground')
-              }
-            >
-              Autentificare
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('register')}
-              className={
-                'rounded-md py-2 text-sm font-semibold transition-colors ' +
-                (mode === 'register'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground')
-              }
-            >
-              Cont nou
-            </button>
-          </div>
+          <h2 className="mb-5 text-center font-heading text-lg font-bold uppercase tracking-wide">
+            Autentificare
+          </h2>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
@@ -107,7 +80,7 @@ export default function LoginPage() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="ex: ionut"
+                placeholder="ex: simon.tiberiu"
                 autoComplete="username"
                 autoCapitalize="none"
                 required
@@ -121,21 +94,20 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                autoComplete="current-password"
                 required
               />
             </div>
             <Button type="submit" className="mt-1 w-full" disabled={submitting}>
               {submitting && <Loader2 className="size-4 animate-spin" />}
-              {mode === 'login' ? 'Intră în cont' : 'Creează cont'}
+              Intră în cont
             </Button>
           </form>
 
-          {mode === 'register' && (
-            <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
-              Primul cont creat devine automat administrator.
-            </p>
-          )}
+          <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+            Conturile sunt create de administrator. Dacă nu ai date de acces,
+            contactează-l.
+          </p>
         </div>
       </div>
     </main>

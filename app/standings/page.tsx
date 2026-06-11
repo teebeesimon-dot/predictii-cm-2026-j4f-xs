@@ -1,5 +1,6 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
@@ -20,6 +21,13 @@ export default function StandingsPage() {
 
 function StandingsContent() {
   const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const stageParam = searchParams.get('stage')
+  const initialTab =
+    stageParam && ['1', '2', '3', '4', '5'].includes(stageParam)
+      ? stageParam
+      : 'general'
+
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
@@ -32,7 +40,8 @@ function StandingsContent() {
       <div>
         <h1 className="font-heading text-3xl font-bold">Clasamente</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          General și pe fiecare etapă a turneului.
+          General și pe fiecare etapă a turneului. Egalitățile împart aceeași
+          poziție.
         </p>
       </div>
 
@@ -41,7 +50,7 @@ function StandingsContent() {
           {loading || !ready ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <Tabs defaultValue="general">
+            <Tabs key={initialTab} defaultValue={initialTab}>
               <TabsList className="flex w-full flex-wrap">
                 <TabsTrigger value="general" className="flex-1">
                   General

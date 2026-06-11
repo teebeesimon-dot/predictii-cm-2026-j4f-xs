@@ -12,16 +12,17 @@ import {
   getDocs,
   query,
   where,
-  addDoc,
   doc,
   getDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser } from '@/lib/types'
+import { seedUsersIfEmpty } from '@/lib/data'
 
 interface SessionUser {
   id: string
   username: string
+  name: string
   isAdmin: boolean
 }
 
@@ -29,7 +30,6 @@ interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
   login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
-  register: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
 }
 
@@ -63,6 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!uname || !password) {
         return { ok: false, error: 'Completează utilizatorul și parola.' }
       }
+      // Ensure the fixed participants + admin account exist on first ever login.
+      await seedUsersIfEmpty()
       const q = query(collection(db, 'users'), where('username', '==', uname))
       const snap = await getDocs(q)
       if (snap.empty) {
@@ -73,36 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.password !== password) {
         return { ok: false, error: 'Parolă incorectă.' }
       }
-      persist({ id: docSnap.id, username: data.username, isAdmin: !!data.isAdmin })
-      return { ok: true }
-    },
-    [persist],
-  )
-
-  const register = useCallback(
-    async (username: string, password: string) => {
-      const uname = username.trim().toLowerCase()
-      if (uname.length < 3) {
-        return { ok: false, error: 'Utilizatorul trebuie să aibă minim 3 caractere.' }
-      }
-      if (password.length < 4) {
-        return { ok: false, error: 'Parola trebuie să aibă minim 4 caractere.' }
-      }
-      const q = query(collection(db, 'users'), where('username', '==', uname))
-      const snap = await getDocs(q)
-      if (!snap.empty) {
-        return { ok: false, error: 'Acest utilizator există deja.' }
-      }
-      // First ever user becomes admin
-      const allUsers = await getDocs(collection(db, 'users'))
-      const isAdmin = allUsers.empty
-      const ref = await addDoc(collection(db, 'users'), {
-        username: uname,
-        password,
-        isAdmin,
-        createdAt: Date.now(),
+      persist({
+        id: docSnap.id,
+        username: data.username,
+        name: data.name || data.username,
+        isAdmin: !!data.isAdmin,
       })
-      persist({ id: ref.id, username: uname, isAdmin })
       return { ok: true }
     },
     [persist],
@@ -111,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => persist(null), [persist])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

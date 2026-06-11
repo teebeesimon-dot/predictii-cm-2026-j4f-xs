@@ -1,17 +1,38 @@
 // Etapele turneului (tournament rounds)
 export const STAGES = [
-  { id: 1, name: 'Etapa 1', short: 'E1', label: 'Faza grupelor - Etapa 1' },
-  { id: 2, name: 'Etapa 2', short: 'E2', label: 'Faza grupelor - Etapa 2/3' },
-  { id: 3, name: 'Etapa 3', short: 'E3', label: 'Optimi de finală' },
-  { id: 4, name: 'Etapa 4', short: 'E4', label: 'Sferturi de finală' },
-  { id: 5, name: 'Etapa 5', short: 'E5', label: 'Semifinale și Finala' },
+  { id: 1, name: 'Etapa 1', short: 'E1', label: 'Faza grupelor - Runda 1' },
+  { id: 2, name: 'Etapa 2', short: 'E2', label: 'Faza grupelor - Runda 2' },
+  { id: 3, name: 'Etapa 3', short: 'E3', label: 'Faza grupelor - Runda 3' },
+  { id: 4, name: 'Etapa 4', short: 'E4', label: 'Saisprezecimi (Round of 32)' },
+  {
+    id: 5,
+    name: 'Etapa 5',
+    short: 'E5',
+    label: 'Faza eliminatorie (optimi → finală, inclusiv finala mică)',
+  },
 ] as const
 
 export type StageId = 1 | 2 | 3 | 4 | 5
 
+// Participanți fixați ai ligii J4F
+export const PARTICIPANTS = [
+  'Simon Tiberiu',
+  'Danu Claudiu',
+  'Beta Bogdan',
+  'Visan Alex',
+  'Gosav Denis',
+  'Radu Emilian',
+  'Corbu Marius',
+  'Lia Dan',
+  'Bucs David',
+  'Harabagiu Alex',
+] as const
+
 export interface AppUser {
   id: string
   username: string
+  // Full display name (e.g. "Simon Tiberiu")
+  name: string
   password: string
   isAdmin: boolean
   createdAt: number

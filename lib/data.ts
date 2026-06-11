@@ -4,12 +4,13 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
   orderBy,
   query,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
-import { scorePrediction } from '@/lib/types'
+import { scorePrediction, PARTICIPANTS } from '@/lib/types'
 
 export async function getMatches(): Promise<Match[]> {
   const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
@@ -53,6 +54,59 @@ export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
   await setDoc(doc(db, 'matches', id), data)
 }
 
+// ---- User management (admin only) ----
+
+function slugifyUsername(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+}
+
+export async function createUser(
+  name: string,
+  username: string,
+  password: string,
+  isAdmin = false,
+): Promise<void> {
+  const uname = username.trim().toLowerCase()
+  const id = doc(collection(db, 'users')).id
+  await setDoc(doc(db, 'users', id), {
+    name: name.trim(),
+    username: uname,
+    password,
+    isAdmin,
+    createdAt: Date.now(),
+  })
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', userId))
+}
+
+export async function updateUserPassword(
+  userId: string,
+  password: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), { password })
+}
+
+// Seed the fixed participant list + admin account if the collection is empty.
+// Default password for every participant is "cm2026". Admin password: "admin".
+export async function seedUsersIfEmpty(): Promise<boolean> {
+  const existing = await getUsers()
+  if (existing.length > 0) return false
+
+  await createUser('Administrator', 'admin', 'admin', true)
+  for (const fullName of PARTICIPANTS) {
+    await createUser(fullName, slugifyUsername(fullName), 'cm2026', false)
+  }
+  return true
+}
+
 export async function updateMatchResult(
   matchId: string,
   homeScore: number | null,
@@ -68,11 +122,14 @@ export async function updateMatch(matchId: string, data: Partial<Match>): Promis
 export interface StandingRow {
   userId: string
   username: string
+  name: string
   points: number
   exact: number
   correct1x2: number
   played: number // matches with official result AND a prediction
   predicted: number // total predictions on finished matches
+  // shared 1-based position (ties get the same rank)
+  rank: number
 }
 
 // Compute a standings table. If stage is provided, only matches in that stage.
@@ -90,7 +147,7 @@ export function computeStandings(
   )
   const predByKey = new Map(predictions.map((p) => [`${p.userId}_${p.matchId}`, p]))
 
-  const rows: StandingRow[] = users
+  const rows: Omit<StandingRow, 'rank'>[] = users
     .filter((u) => !u.isAdmin)
     .map((u) => {
       let points = 0
@@ -109,6 +166,7 @@ export function computeStandings(
       return {
         userId: u.id,
         username: u.username,
+        name: u.name || u.username,
         points,
         exact,
         correct1x2: correct,
@@ -122,7 +180,21 @@ export function computeStandings(
       b.points - a.points ||
       b.exact - a.exact ||
       b.correct1x2 - a.correct1x2 ||
-      a.username.localeCompare(b.username),
+      a.name.localeCompare(b.name),
   )
-  return rows
+
+  // Assign shared positions: rows tied on points share the same rank.
+  let lastPoints: number | null = null
+  let lastRank = 0
+  return rows.map((row, i) => {
+    let rank: number
+    if (lastPoints !== null && row.points === lastPoints) {
+      rank = lastRank // share position with previous tied row
+    } else {
+      rank = i + 1
+      lastRank = rank
+      lastPoints = row.points
+    }
+    return { ...row, rank }
+  })
 }

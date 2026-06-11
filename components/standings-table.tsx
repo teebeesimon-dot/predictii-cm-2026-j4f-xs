@@ -41,8 +41,8 @@ export function StandingsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, i) => {
-            const rank = i + 1
+          {rows.map((row) => {
+            const rank = row.rank
             const isMe = row.userId === highlightUserId
             return (
               <TableRow
@@ -64,8 +64,8 @@ export function StandingsTable({
                     {rank}
                   </span>
                 </TableCell>
-                <TableCell className="font-medium capitalize">
-                  {row.username}
+                <TableCell className="font-medium">
+                  {row.name}
                   {isMe && (
                     <span className="ml-2 text-xs font-normal text-primary">(tu)</span>
                   )}
