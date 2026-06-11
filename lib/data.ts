@@ -131,45 +131,66 @@ export async function fixPlayoffTeamNames(): Promise<number> {
   return updated
 }
 
-// Re-sincronizează echipele meciurilor existente cu programul oficial corect.
+// Cheie neordonată pentru o pereche de echipe (ignoră gazdă/oaspete și
+// diacriticele), astfel încât un meci să fie identificat unic indiferent de
+// ordinea în care sunt trecute echipele.
+function pairKey(a: string, b: string): string {
+  const norm = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  return [norm(a), norm(b)].sort().join('::')
+}
+
+// Re-sincronizează meciurile existente cu programul OFICIAL corect.
 //
-// IMPORTANT: mapează după (etapă + ora de start). Ora de start NU este unică în
-// tot turneul (multe meciuri din ultima etapă a grupelor încep simultan), deci
-// maparea doar după oră ar suprascrie meciuri diferite între ele. Cheia
-// (etapă + oră) este unică în etapele 1 și 2. Pentru etapa 3, unde mai multe
-// meciuri pot împărți aceeași oră, sărim peste sloturile ambigue ca să nu
-// stricăm datele — acelea se corectează prin re-seed-ul etapei 3 din admin.
-//
-// Actualizează DOAR numele echipelor pe documentele existente, păstrând
-// id-urile, scorurile și pronosticurile.
+// Mapează după PERECHEA de echipe (unică în faza grupelor — fiecare pereche se
+// întâlnește o singură dată), nu după ora de start. Astfel putem corecta și
+// data/ora greșită, nu doar ordinea echipelor. Pentru fiecare meci existent
+// actualizăm `kickoff`, `stage` și orientarea gazdă/oaspete ca să corespundă
+// programului oficial. Id-urile documentelor, scorurile și pronosticurile rămân
+// neatinse (sunt legate de id-ul meciului, nu de oră).
 export async function resyncMatchTeams(): Promise<number> {
   const matches = await getMatches()
 
-  // Grupează programul corect după cheia (etapă + oră).
-  const programByKey = new Map<string, Omit<Match, 'id'>[]>()
+  // Index al programului corect după perechea de echipe.
+  const programByPair = new Map<string, Omit<Match, 'id'>>()
   for (const m of WC2026_GROUP_MATCHES) {
-    const key = `${m.stage}|${m.kickoff}`
-    const arr = programByKey.get(key) ?? []
-    arr.push(m)
-    programByKey.set(key, arr)
+    programByPair.set(pairKey(m.homeTeam, m.awayTeam), m)
   }
 
   const batch = writeBatch(db)
   let updated = 0
   for (const m of matches) {
-    const key = `${m.stage}|${m.kickoff}`
-    const candidates = programByKey.get(key)
-    // Sărim peste sloturi inexistente sau ambigue (mai multe meciuri la aceeași
-    // oră în aceeași etapă) ca să nu suprascriem greșit.
-    if (!candidates || candidates.length !== 1) continue
-    const correct = candidates[0]
-    if (m.homeTeam === correct.homeTeam && m.awayTeam === correct.awayTeam) {
-      continue
-    }
-    batch.update(doc(db, 'matches', m.id), {
+    const correct = programByPair.get(pairKey(m.homeTeam, m.awayTeam))
+    if (!correct) continue
+
+    const sameOrientation = m.homeTeam === correct.homeTeam
+    const needsUpdate =
+      m.kickoff !== correct.kickoff ||
+      m.stage !== correct.stage ||
+      !sameOrientation
+
+    if (!needsUpdate) continue
+
+    const patch: Partial<Match> = {
+      kickoff: correct.kickoff,
+      stage: correct.stage,
       homeTeam: correct.homeTeam,
       awayTeam: correct.awayTeam,
-    })
+    }
+
+    // Dacă ordinea gazdă/oaspete s-a inversat, inversăm și scorul deja salvat
+    // ca să rămână corect față de noua orientare.
+    if (!sameOrientation) {
+      patch.homeScore = m.awayScore
+      patch.awayScore = m.homeScore
+    }
+
+    batch.update(doc(db, 'matches', m.id), patch)
     updated += 1
   }
   if (updated > 0) await batch.commit()

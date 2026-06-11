@@ -433,11 +433,10 @@ function PlayoffFixBanner({
   )
 }
 
-// Banner care detectează meciuri salvate cu ordinea greșită a echipelor în
-// grupă (ex. Portugalia–Uzbekistan în loc de Portugalia–RD Congo) și le
-// re-sincronizează cu programul oficial, mapând după ora de start. Numai
-// numele echipelor sunt actualizate; scorurile și pronosticurile rămân legate
-// de același slot orar.
+// Banner care detectează meciuri salvate cu data/ora, etapa sau ordinea
+// echipelor greșite față de programul oficial și le re-sincronizează. Mapează
+// după perechea de echipe (unică în grupe), așa că poate corecta inclusiv ziua
+// și ora. Scorurile și pronosticurile rămân atașate aceluiași meci.
 function ResyncMatchesBanner({
   matches,
   onResynced,
@@ -447,23 +446,34 @@ function ResyncMatchesBanner({
 }) {
   const [syncing, setSyncing] = useState(false)
 
-  // Index al programului corect după cheia (etapă + oră). Ora singură NU e
-  // unică (multe meciuri din ultima etapă încep simultan), așa că include și
-  // etapa și ignorăm sloturile cu mai multe meciuri la aceeași oră.
-  const correctByKey = new Map<string, (typeof WC2026_GROUP_MATCHES)[number]>()
-  const ambiguous = new Set<string>()
-  for (const m of WC2026_GROUP_MATCHES) {
-    const key = `${m.stage}|${m.kickoff}`
-    if (correctByKey.has(key)) ambiguous.add(key)
-    correctByKey.set(key, m)
+  // Cheie neordonată pentru o pereche de echipe (ignoră ordinea și diacriticele).
+  const pairKey = (a: string, b: string) => {
+    const norm = (s: string) =>
+      s
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    return [norm(a), norm(b)].sort().join('::')
   }
-  // Există vreun meci în baza de date care nu corespunde programului corect?
+
+  // Index al programului corect după perechea de echipe.
+  const correctByPair = new Map<string, (typeof WC2026_GROUP_MATCHES)[number]>()
+  for (const m of WC2026_GROUP_MATCHES) {
+    correctByPair.set(pairKey(m.homeTeam, m.awayTeam), m)
+  }
+
+  // Există vreun meci a cărui dată/oră, etapă sau ordine diferă de program?
   const mismatches = matches.filter((m) => {
-    const key = `${m.stage}|${m.kickoff}`
-    if (ambiguous.has(key)) return false
-    const correct = correctByKey.get(key)
+    const correct = correctByPair.get(pairKey(m.homeTeam, m.awayTeam))
     if (!correct) return false
-    return m.homeTeam !== correct.homeTeam || m.awayTeam !== correct.awayTeam
+    return (
+      m.kickoff !== correct.kickoff ||
+      m.stage !== correct.stage ||
+      m.homeTeam !== correct.homeTeam ||
+      m.awayTeam !== correct.awayTeam
+    )
   })
   if (mismatches.length === 0) return null
 
@@ -472,7 +482,7 @@ function ResyncMatchesBanner({
     try {
       const n = await resyncMatchTeams()
       toast.success(
-        `${n} meciuri re-sincronizate cu programul oficial (ordinea corectată).`,
+        `${n} meciuri re-sincronizate cu programul oficial (dată, oră și ordine corectate).`,
       )
       onResynced()
     } catch {
@@ -485,10 +495,9 @@ function ResyncMatchesBanner({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
-        {mismatches.length} meciuri au echipele în ordinea greșită față de
-        programul oficial (ex. „Portugalia – Uzbekistan" în loc de „Portugalia –
-        RD Congo"). Apasă pentru a le corecta. Scorurile și pronosticurile
-        atașate fiecărui interval orar nu sunt șterse.
+        {mismatches.length} meciuri au data/ora sau ordinea echipelor diferită
+        față de programul oficial. Apasă pentru a le corecta automat. Scorurile
+        și pronosticurile atașate fiecărui meci nu sunt șterse.
       </p>
       <Button
         onClick={handleResync}
