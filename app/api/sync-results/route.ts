@@ -4,10 +4,10 @@ import { runResultsSync } from '@/lib/sync-results'
 // Acest endpoint este apelat de cron-ul extern gratuit (ex. cron-job.org) la
 // fiecare 10 minute, dar și manual din panoul de admin.
 //
-// Securizare: necesită secretul SYNC_SECRET. Îl acceptăm în mai multe forme,
+// Securizare: necesită secretul CRON_SECRET. Îl acceptăm în mai multe forme,
 // ca să fie ușor de configurat în orice serviciu de cron:
 //   - header  x-sync-secret: <secret>
-//   - header  Authorization: Bearer <secret>
+//   - header  Authorization: Bearer <secret>   (formatul folosit și de Vercel Cron)
 //   - query   ?secret=<secret>
 //
 // Rulează pe runtime Node.js (Firestore web SDK are nevoie de el) și nu se
@@ -16,7 +16,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function isAuthorized(req: NextRequest): boolean {
-  const secret = process.env.SYNC_SECRET
+  const secret = process.env.CRON_SECRET
   // Dacă nu e setat un secret, refuzăm (mai sigur decât să fie deschis).
   if (!secret) return false
 

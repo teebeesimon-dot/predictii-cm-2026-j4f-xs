@@ -146,11 +146,11 @@ export function SyncPanel() {
           </p>
           <code className="block overflow-x-auto rounded-lg border border-border bg-muted p-3 text-xs text-foreground">
             {typeof window !== 'undefined'
-              ? `${window.location.origin}/api/sync-results?secret=SYNC_SECRET&includeLive=1`
-              : '/api/sync-results?secret=SYNC_SECRET&includeLive=1'}
+              ? `${window.location.origin}/api/sync-results?secret=CRON_SECRET&includeLive=1`
+              : '/api/sync-results?secret=CRON_SECRET&includeLive=1'}
           </code>
           <p>
-            Înlocuiește <span className="font-medium text-foreground">SYNC_SECRET</span>{' '}
+            Înlocuiește <span className="font-medium text-foreground">CRON_SECRET</span>{' '}
             cu valoarea secretului setat în variabilele de mediu. Poți folosi și
             header-ul <span className="font-mono text-foreground">x-sync-secret</span>{' '}
             în loc de parametrul din URL.
