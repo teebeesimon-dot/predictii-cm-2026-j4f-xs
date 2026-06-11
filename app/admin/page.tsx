@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
-import { useMatches, useUsers } from '@/lib/hooks'
+import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
   createMatch,
   deleteMatch,
@@ -13,6 +13,7 @@ import {
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
+  computeStandings,
 } from '@/lib/data'
 import {
   STAGES,
@@ -42,6 +43,7 @@ import {
   UserPlus,
   Users,
   Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -56,15 +58,69 @@ export default function AdminPage() {
 function AdminContent() {
   const { data: matches, isLoading, mutate } = useMatches()
   const { data: users, isLoading: usersLoading, mutate: mutateUsers } = useUsers()
+  const { data: predictions } = useAllPredictions()
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExport() {
+    if (!users || !matches || !predictions) {
+      toast.error('Datele nu sunt încă încărcate.')
+      return
+    }
+    setExporting(true)
+    try {
+      const standings = computeStandings(users, matches, predictions)
+      const rows = standings.map((r) => ({
+        Pozitie: r.rank,
+        Nume: r.name,
+        Puncte: r.points,
+        'Scoruri exacte': r.exact,
+        '1X2 corecte': r.correct1x2,
+        'Meciuri jucate': r.played,
+      }))
+      const XLSX = await import('xlsx')
+      const ws = XLSX.utils.json_to_sheet(rows)
+      ws['!cols'] = [
+        { wch: 8 },
+        { wch: 24 },
+        { wch: 8 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 14 },
+      ]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Clasament')
+      XLSX.writeFile(wb, 'clasament-j4f.xlsx')
+      toast.success('Clasamentul a fost exportat.')
+    } catch {
+      toast.error('Eroare la exportul Excel.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-3xl font-bold">Administrare</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Adaugă meciuri, introdu rezultatele oficiale și gestionează conturile.
-          Clasamentele se recalculează automat.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold">Administrare</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Adaugă meciuri, introdu rezultatele oficiale și gestionează conturile.
+            Clasamentele se recalculează automat.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleExport}
+          disabled={exporting || !users || !matches || !predictions}
+          className="shrink-0"
+        >
+          {exporting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="size-4" />
+          )}
+          Export Clasament Excel
+        </Button>
       </div>
 
       <Tabs defaultValue="results">

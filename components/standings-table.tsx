@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Trophy } from 'lucide-react'
 
 export function StandingsTable({
@@ -47,7 +48,10 @@ export function StandingsTable({
             return (
               <TableRow
                 key={row.userId}
-                className={cn(isMe && 'bg-primary/10 hover:bg-primary/15')}
+                className={cn(
+                  isMe &&
+                    'border-l-4 border-l-primary bg-primary/15 font-bold hover:bg-primary/20',
+                )}
               >
                 <TableCell className="text-center font-bold tabular-nums">
                   <span className="inline-flex items-center justify-center gap-1">
@@ -64,13 +68,22 @@ export function StandingsTable({
                     {rank}
                   </span>
                 </TableCell>
-                <TableCell className="font-medium">
-                  {row.name}
-                  {isMe && (
-                    <span className="ml-2 text-xs font-normal text-primary">(tu)</span>
-                  )}
+                <TableCell className={cn('font-medium', isMe && 'font-bold')}>
+                  <span className="inline-flex items-center gap-2">
+                    {row.name}
+                    {isMe && (
+                      <Badge className="bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
+                        Tu
+                      </Badge>
+                    )}
+                  </span>
                 </TableCell>
-                <TableCell className="text-center font-heading text-base font-bold">
+                <TableCell
+                  className={cn(
+                    'text-center font-heading text-base font-bold',
+                    isMe && 'text-primary',
+                  )}
+                >
                   {row.points}
                 </TableCell>
                 <TableCell className="hidden text-center tabular-nums sm:table-cell">

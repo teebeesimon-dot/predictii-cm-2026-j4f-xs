@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { STAGES, getActiveStage, getStageDeadline, isLocked } from '@/lib/types'
 import { computeStandings } from '@/lib/data'
-import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock } from 'lucide-react'
+import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList } from 'lucide-react'
 
 export default function DashboardPage() {
   return (
@@ -44,6 +44,19 @@ function DashboardContent() {
   const totalMatches = matches?.length ?? 0
   const playedMatches = (matches ?? []).filter(
     (m) => m.homeScore !== null && m.awayScore !== null,
+  ).length
+
+  // Pronosticuri rămase: meciuri care NU au început încă (kickoff > acum)
+  // ȘI pentru care utilizatorul conectat nu are deja un pronostic salvat.
+  const now = Date.now()
+  const myPredictedMatchIds = new Set(
+    (predictions ?? [])
+      .filter((p) => p.userId === user?.id)
+      .map((p) => p.matchId),
+  )
+  const remaining = (matches ?? []).filter(
+    (m) =>
+      new Date(m.kickoff).getTime() > now && !myPredictedMatchIds.has(m.id),
   ).length
 
   return (
@@ -136,6 +149,52 @@ function DashboardContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pronosticuri rămase */}
+      {!isLoading && totalMatches > 0 && (
+        <Card
+          className={
+            remaining > 0
+              ? 'border-accent/40 bg-accent/5'
+              : 'border-primary/30 bg-primary/5'
+          }
+        >
+          <CardContent className="flex flex-col items-start gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className={
+                  'flex size-11 shrink-0 items-center justify-center rounded-xl ' +
+                  (remaining > 0
+                    ? 'bg-accent/15 text-accent'
+                    : 'bg-primary/15 text-primary')
+                }
+              >
+                <ClipboardList className="size-5" />
+              </div>
+              <div>
+                <p className="font-heading text-lg font-bold">
+                  {remaining > 0
+                    ? `Mai ai ${remaining} ${remaining === 1 ? 'pronostic' : 'pronosticuri'} de completat`
+                    : 'Ești la zi cu pronosticurile'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {remaining > 0
+                    ? 'Completează-le înainte să înceapă meciurile.'
+                    : 'Toate meciurile disponibile au pronostic.'}
+                </p>
+              </div>
+            </div>
+            {remaining > 0 && (
+              <Button asChild className="w-full sm:w-auto">
+                <Link href="/predictions">
+                  <ListChecks className="size-4" />
+                  Completează acum
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

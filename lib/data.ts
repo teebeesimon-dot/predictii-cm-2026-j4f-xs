@@ -1,6 +1,7 @@
 import {
   collection,
   getDocs,
+  getDoc,
   doc,
   setDoc,
   updateDoc,
@@ -35,12 +36,30 @@ export async function getUserPredictions(userId: string): Promise<Prediction[]> 
   return all.filter((p) => p.userId === userId)
 }
 
+export class PredictionLockedError extends Error {
+  constructor(message = 'Meciul a început deja. Pronosticul nu mai poate fi modificat.') {
+    super(message)
+    this.name = 'PredictionLockedError'
+  }
+}
+
 export async function savePrediction(
   userId: string,
   matchId: string,
   homeScore: number,
   awayScore: number,
 ): Promise<void> {
+  // Backend guard: never trust the UI. A prediction cannot be saved or changed
+  // once the match has kicked off (kickoff <= now).
+  const snap = await getDoc(doc(db, 'matches', matchId))
+  if (!snap.exists()) {
+    throw new Error('Meciul nu există.')
+  }
+  const match = snap.data() as Omit<Match, 'id'>
+  if (new Date(match.kickoff).getTime() <= Date.now()) {
+    throw new PredictionLockedError()
+  }
+
   const id = `${userId}_${matchId}`
   await setDoc(doc(db, 'predictions', id), {
     userId,

@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUserPredictions } from '@/lib/hooks'
-import { savePrediction } from '@/lib/data'
+import { savePrediction, PredictionLockedError } from '@/lib/data'
 import {
   STAGES,
   isLocked,
@@ -37,7 +37,7 @@ export default function PredictionsPage() {
 
 function PredictionsContent() {
   const { user } = useAuth()
-  const { data: matches, isLoading } = useMatches()
+  const { data: matches, isLoading, mutate: refreshMatches } = useMatches()
   const { data: predictions, mutate } = useUserPredictions(user?.id)
 
   const [entries, setEntries] = useState<Record<string, Entry>>({})
@@ -87,8 +87,13 @@ function PredictionsContent() {
       await savePrediction(user.id, match.id, Number(entry.home), Number(entry.away))
       await mutate()
       toast.success('Pronostic salvat!')
-    } catch {
-      toast.error('Eroare la salvare.')
+    } catch (err) {
+      if (err instanceof PredictionLockedError) {
+        toast.error(err.message)
+        await refreshMatches()
+      } else {
+        toast.error('Eroare la salvare.')
+      }
     } finally {
       setSaving((s) => ({ ...s, [match.id]: false }))
     }
