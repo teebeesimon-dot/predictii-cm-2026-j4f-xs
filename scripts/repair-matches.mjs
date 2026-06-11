@@ -39,15 +39,11 @@ for (const m of src.matchAll(/const ([A-L]) = \[([^\]]+)\]/g)) {
   groups[m[1]] = m[2].split(',').map((t) => t.trim().replace(/^'|'$/g, ''))
 }
 
-// roTo utc converter (RO = UTC+3 vara)
-function roToUtc(roLocal) {
-  // roLocal e ex "2026-06-12T22:00"
-  const [datePart, timePart] = roLocal.split('T')
-  const [y, mo, d] = datePart.split('-').map(Number)
-  const [h, mi] = timePart.split(':').map(Number)
-  // RO vara = UTC+3 -> UTC = local - 3h
-  const utc = new Date(Date.UTC(y, mo - 1, d, h - 3, mi))
-  return utc.toISOString()
+// roToUtc — replică EXACT logica din lib/wc2026-schedule.ts
+function roToUtc(local) {
+  const d = new Date(local + ':00.000Z')
+  d.setUTCHours(d.getUTCHours() - 3)
+  return d.toISOString()
 }
 
 // RAW matches
