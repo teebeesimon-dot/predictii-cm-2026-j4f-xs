@@ -74,6 +74,35 @@ export async function seedGroupMatchesIfEmpty(): Promise<number> {
   return WC2026_GROUP_MATCHES.length
 }
 
+// Înlocuiește numele-placeholder ale barajelor cu echipele reale calificate,
+// în meciurile DEJA existente (nu atinge scorurile sau pronosticurile).
+const PLAYOFF_NAME_FIXES: Record<string, string> = {
+  'Baraj UEFA A': 'Bosnia și Herțegovina',
+  'Baraj UEFA B': 'Suedia',
+  'Baraj UEFA C': 'Turcia',
+  'Baraj UEFA D': 'Cehia',
+  'Baraj FIFA 1': 'RD Congo',
+  'Baraj FIFA 2': 'Irak',
+}
+
+export async function fixPlayoffTeamNames(): Promise<number> {
+  const matches = await getMatches()
+  const batch = writeBatch(db)
+  let updated = 0
+  for (const m of matches) {
+    const newHome = PLAYOFF_NAME_FIXES[m.homeTeam]
+    const newAway = PLAYOFF_NAME_FIXES[m.awayTeam]
+    if (!newHome && !newAway) continue
+    const patch: Partial<Match> = {}
+    if (newHome) patch.homeTeam = newHome
+    if (newAway) patch.awayTeam = newAway
+    batch.update(doc(db, 'matches', m.id), patch)
+    updated += 1
+  }
+  if (updated > 0) await batch.commit()
+  return updated
+}
+
 // ---- User management (admin only) ----
 
 function slugifyUsername(name: string): string {

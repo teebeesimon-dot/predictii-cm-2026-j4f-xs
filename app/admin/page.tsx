@@ -12,6 +12,7 @@ import {
   updateUserPassword,
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
+  fixPlayoffTeamNames,
 } from '@/lib/data'
 import {
   STAGES,
@@ -96,6 +97,7 @@ function AdminContent() {
             <SeedMatchesPrompt onSeeded={() => mutate()} />
           ) : (
             <div className="flex flex-col gap-3">
+              <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
               {[...(matches ?? [])]
                 .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
                 .map((m) => (
@@ -105,6 +107,51 @@ function AdminContent() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function PlayoffFixBanner({
+  matches,
+  onFixed,
+}: {
+  matches: Match[]
+  onFixed: () => void
+}) {
+  const [fixing, setFixing] = useState(false)
+  const hasPlaceholders = matches.some(
+    (m) => m.homeTeam.startsWith('Baraj ') || m.awayTeam.startsWith('Baraj '),
+  )
+  if (!hasPlaceholders) return null
+
+  async function handleFix() {
+    setFixing(true)
+    try {
+      const n = await fixPlayoffTeamNames()
+      toast.success(`${n} meciuri actualizate cu echipele calificate din baraje.`)
+      onFixed()
+    } catch {
+      toast.error('Eroare la actualizarea echipelor.')
+    } finally {
+      setFixing(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        Unele meciuri au încă echipe-placeholder („Baraj UEFA/FIFA"). Apasă pentru
+        a le înlocui cu echipele reale calificate (Bosnia, Suedia, Turcia, Cehia,
+        RD Congo, Irak). Scorurile și pronosticurile nu sunt afectate.
+      </p>
+      <Button onClick={handleFix} disabled={fixing} className="shrink-0">
+        {fixing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <RefreshCw className="size-4" />
+        )}
+        Actualizează echipele
+      </Button>
     </div>
   )
 }

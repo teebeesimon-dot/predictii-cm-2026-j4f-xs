@@ -22,30 +22,33 @@ function roToUtc(local: string): string {
 }
 
 // ---- Grupele oficiale ----
-// A: Mexic, Africa de Sud, Coreea de Sud, Câștigător Baraj UEFA D
-// B: Canada, Qatar, Elveția, Câștigător Baraj UEFA A
+// Barajele (UEFA + interconfederale) s-au jucat pe 31 martie 2026:
+//  UEFA A → Bosnia și Herțegovina · UEFA B → Suedia · UEFA C → Turcia · UEFA D → Cehia
+//  Interconfederal: RD Congo (Grupa K) · Irak (Grupa I)
+// A: Mexic, Africa de Sud, Coreea de Sud, Cehia (câștigător Baraj UEFA D)
+// B: Canada, Qatar, Elveția, Bosnia și Herțegovina (câștigător Baraj UEFA A)
 // C: Brazilia, Maroc, Haiti, Scoția
-// D: SUA, Paraguay, Australia, Câștigător Baraj UEFA C
+// D: SUA, Paraguay, Australia, Turcia (câștigător Baraj UEFA C)
 // E: Germania, Curaçao, Coasta de Fildeș, Ecuador
-// F: Olanda, Japonia, Tunisia, Câștigător Baraj UEFA B
+// F: Olanda, Japonia, Tunisia, Suedia (câștigător Baraj UEFA B)
 // G: Belgia, Egipt, Iran, Noua Zeelandă
 // H: Spania, Capul Verde, Arabia Saudită, Uruguay
-// I: Franța, Senegal, Norvegia, Câștigător Baraj FIFA 2
+// I: Franța, Senegal, Norvegia, Irak (câștigător Baraj interconfederal)
 // J: Argentina, Algeria, Austria, Iordania
-// K: Portugalia, Uzbekistan, Columbia, Câștigător Baraj FIFA 1
+// K: Portugalia, Uzbekistan, Columbia, RD Congo (câștigător Baraj interconfederal)
 // L: Anglia, Croația, Ghana, Panama
 
-const A = ['Mexic', 'Africa de Sud', 'Coreea de Sud', 'Baraj UEFA D']
-const B = ['Canada', 'Qatar', 'Elveția', 'Baraj UEFA A']
+const A = ['Mexic', 'Africa de Sud', 'Coreea de Sud', 'Cehia']
+const B = ['Canada', 'Qatar', 'Elveția', 'Bosnia și Herțegovina']
 const C = ['Brazilia', 'Maroc', 'Haiti', 'Scoția']
-const D = ['SUA', 'Paraguay', 'Australia', 'Baraj UEFA C']
+const D = ['SUA', 'Paraguay', 'Australia', 'Turcia']
 const E = ['Germania', 'Curaçao', 'Coasta de Fildeș', 'Ecuador']
-const F = ['Olanda', 'Japonia', 'Tunisia', 'Baraj UEFA B']
+const F = ['Olanda', 'Japonia', 'Tunisia', 'Suedia']
 const G = ['Belgia', 'Egipt', 'Iran', 'Noua Zeelandă']
 const H = ['Spania', 'Capul Verde', 'Arabia Saudită', 'Uruguay']
-const I = ['Franța', 'Senegal', 'Norvegia', 'Baraj FIFA 2']
+const I = ['Franța', 'Senegal', 'Norvegia', 'Irak']
 const J = ['Argentina', 'Algeria', 'Austria', 'Iordania']
-const K = ['Portugalia', 'Uzbekistan', 'Columbia', 'Baraj FIFA 1']
+const K = ['Portugalia', 'Uzbekistan', 'Columbia', 'RD Congo']
 const L = ['Anglia', 'Croația', 'Ghana', 'Panama']
 
 // Pentru fiecare grupă: Runda 1 = (1v2, 3v4), Runda 2 = (1v3, 4v2), Runda 3 = (4v1, 2v3)
