@@ -15,6 +15,10 @@ import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
 import { scorePrediction, PARTICIPANTS } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 
+// Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
+// a detecta conturile mai vechi care nu și-au schimbat încă parola.
+export const DEFAULT_PASSWORD = 'cm2026'
+
 export async function getMatches(): Promise<Match[]> {
   const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
   const snap = await getDocs(q)
@@ -148,6 +152,9 @@ export async function createUser(
     password,
     isAdmin,
     createdAt: Date.now(),
+    // Parola inițială este una implicită → utilizatorul trebuie s-o schimbe
+    // la prima autentificare.
+    mustChangePassword: true,
   })
 }
 
@@ -155,11 +162,44 @@ export async function deleteUser(userId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', userId))
 }
 
+// Resetare parolă de către admin: setează noua parolă și forțează utilizatorul
+// să o schimbe la următoarea autentificare.
 export async function updateUserPassword(
   userId: string,
   password: string,
 ): Promise<void> {
-  await updateDoc(doc(db, 'users', userId), { password })
+  await updateDoc(doc(db, 'users', userId), {
+    password,
+    mustChangePassword: true,
+  })
+}
+
+// Schimbarea parolei de către utilizatorul însuși: verifică parola curentă și,
+// dacă e corectă, o înlocuiește și dezactivează forțarea schimbării.
+export async function changeOwnPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const snap = await getDoc(doc(db, 'users', userId))
+  if (!snap.exists()) {
+    return { ok: false, error: 'Cont inexistent.' }
+  }
+  const data = snap.data() as Omit<AppUser, 'id'>
+  if (data.password !== currentPassword) {
+    return { ok: false, error: 'Parola curentă este incorectă.' }
+  }
+  if (newPassword.length < 4) {
+    return { ok: false, error: 'Noua parolă trebuie să aibă minim 4 caractere.' }
+  }
+  if (newPassword === currentPassword) {
+    return { ok: false, error: 'Noua parolă trebuie să fie diferită de cea curentă.' }
+  }
+  await updateDoc(doc(db, 'users', userId), {
+    password: newPassword,
+    mustChangePassword: false,
+  })
+  return { ok: true }
 }
 
 // Seed the fixed participant list + admin account if the collection is empty.
@@ -170,7 +210,7 @@ export async function seedUsersIfEmpty(): Promise<boolean> {
 
   await createUser('Administrator', 'admin', 'admin', true)
   for (const fullName of PARTICIPANTS) {
-    await createUser(fullName, slugifyUsername(fullName), 'cm2026', false)
+    await createUser(fullName, slugifyUsername(fullName), DEFAULT_PASSWORD, false)
   }
   return true
 }

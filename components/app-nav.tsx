@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   ListOrdered,
+  UserCog,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -100,6 +101,12 @@ export function AppNav() {
 
   const items: NavItem[] = [
     ...NAV,
+    {
+      href: '/account',
+      label: 'Contul meu',
+      icon: UserCog,
+      match: (p: string) => p === '/account',
+    },
     ...(user?.isAdmin
       ? [
           {

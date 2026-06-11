@@ -66,6 +66,9 @@ export interface AppUser {
   isAdmin?: boolean
   role?: 'user' | 'admin'
   createdAt?: number
+  // True când utilizatorul trebuie să-și schimbe parola (prima logare sau
+  // după ce adminul i-a resetat parola). Forțează ecranul de schimbare parolă.
+  mustChangePassword?: boolean
 }
 
 // Resolve admin status from either the boolean flag or the role string.

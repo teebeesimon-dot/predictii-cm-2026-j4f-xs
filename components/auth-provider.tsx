@@ -18,13 +18,14 @@ import {
 import { db } from '@/lib/firebase'
 import type { AppUser } from '@/lib/types'
 import { isUserAdmin } from '@/lib/types'
-import { seedUsersIfEmpty } from '@/lib/data'
+import { seedUsersIfEmpty, DEFAULT_PASSWORD } from '@/lib/data'
 
 interface SessionUser {
   id: string
   username: string
   name: string
   isAdmin: boolean
+  mustChangePassword: boolean
 }
 
 interface AuthContextValue {
@@ -32,11 +33,25 @@ interface AuthContextValue {
   loading: boolean
   login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
+  // Reîncarcă datele contului din Firestore (ex. după schimbarea parolei).
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const STORAGE_KEY = 'cm2026_session'
+
+// Decide dacă utilizatorul trebuie forțat să-și schimbe parola: fie flag-ul
+// explicit este setat, fie (pentru conturi mai vechi fără flag) parola este
+// încă cea implicită. Adminul dedicat ("admin") nu este forțat.
+function needsPasswordChange(data: AppUser): boolean {
+  if (data.username === 'admin') return false
+  if (data.mustChangePassword === true) return true
+  if (data.mustChangePassword === undefined && data.password === DEFAULT_PASSWORD) {
+    return true
+  }
+  return false
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
@@ -81,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username: data.username,
         name: data.name || data.username,
         isAdmin: isUserAdmin(data),
+        mustChangePassword: needsPasswordChange(data),
       })
       return { ok: true }
     },
@@ -89,8 +105,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => persist(null), [persist])
 
+  // Reîncarcă datele contului curent din Firestore și actualizează sesiunea.
+  const refreshSession = useCallback(async () => {
+    setUser((current) => {
+      if (!current) return current
+      // Reîncărcare asincronă; actualizăm după ce sosesc datele.
+      void (async () => {
+        const ref = doc(db, 'users', current.id)
+        const snap = await getDoc(ref)
+        if (!snap.exists()) return
+        const data = snap.data() as AppUser
+        persist({
+          id: current.id,
+          username: data.username,
+          name: data.name || data.username,
+          isAdmin: isUserAdmin(data),
+          mustChangePassword: needsPasswordChange(data),
+        })
+      })()
+      return current
+    })
+  }, [persist])
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   )

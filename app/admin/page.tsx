@@ -680,7 +680,7 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
     setBusy(true)
     try {
       await updateUserPassword(user.id, pwd)
-      toast.success('Parolă actualizată.')
+      toast.success('Parolă resetată. Utilizatorul o va schimba la următoarea logare.')
       onChanged()
     } catch {
       toast.error('Eroare la actualizare.')
