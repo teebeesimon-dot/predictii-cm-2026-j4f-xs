@@ -32,7 +32,7 @@ function roToUtc(local: string): string {
 // H: Spania, Capul Verde, Arabia Saudită, Uruguay
 // I: Franța, Senegal, Norvegia, Câștigător Baraj FIFA 2
 // J: Argentina, Algeria, Austria, Iordania
-// K: Portugalia, Uzbekistan, Columbia, Câștigător Baraj FIFA 1
+// K: Portugalia, Câștigător Baraj FIFA 1, Uzbekistan, Columbia
 // L: Anglia, Croația, Ghana, Panama
 
 const A = ['Mexic', 'Africa de Sud', 'Coreea de Sud', 'Baraj UEFA D']
@@ -45,7 +45,7 @@ const G = ['Belgia', 'Egipt', 'Iran', 'Noua Zeelandă']
 const H = ['Spania', 'Capul Verde', 'Arabia Saudită', 'Uruguay']
 const I = ['Franța', 'Senegal', 'Norvegia', 'Baraj FIFA 2']
 const J = ['Argentina', 'Algeria', 'Austria', 'Iordania']
-const K = ['Portugalia', 'Uzbekistan', 'Columbia', 'Baraj FIFA 1']
+const K = ['Portugalia', 'Baraj FIFA 1', 'Uzbekistan', 'Columbia']
 const L = ['Anglia', 'Croația', 'Ghana', 'Panama']
 
 // Pentru fiecare grupă: Runda 1 = (1v2, 3v4), Runda 2 = (1v3, 4v2), Runda 3 = (4v1, 2v3)
@@ -98,8 +98,8 @@ const RAW: SeedMatch[] = [
   { stage: 1, homeTeam: I[2], awayTeam: I[3], kickoffRo: '2026-06-18T01:00' }, // Norvegia
   { stage: 1, homeTeam: J[0], awayTeam: J[1], kickoffRo: '2026-06-17T20:00' }, // Argentina - Algeria
   { stage: 1, homeTeam: J[2], awayTeam: J[3], kickoffRo: '2026-06-17T23:00' }, // Austria - Iordania
-  { stage: 1, homeTeam: K[0], awayTeam: K[1], kickoffRo: '2026-06-18T19:00' }, // Portugalia - Uzbekistan
-  { stage: 1, homeTeam: K[2], awayTeam: K[3], kickoffRo: '2026-06-18T22:00' }, // Columbia
+  { stage: 1, homeTeam: K[0], awayTeam: K[1], kickoffRo: '2026-06-18T19:00' }, // Portugalia - Baraj FIFA 1
+  { stage: 1, homeTeam: K[2], awayTeam: K[3], kickoffRo: '2026-06-18T22:00' }, // Uzbekistan - Columbia
   { stage: 1, homeTeam: L[0], awayTeam: L[1], kickoffRo: '2026-06-18T20:00' }, // Anglia - Croația
   { stage: 1, homeTeam: L[2], awayTeam: L[3], kickoffRo: '2026-06-18T23:00' }, // Ghana - Panama
 
