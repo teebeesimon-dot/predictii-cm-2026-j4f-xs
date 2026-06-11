@@ -126,7 +126,40 @@ export async function fixPlayoffTeamNames(): Promise<number> {
   return updated
 }
 
-// ---- User management (admin only) ----
+// Re-sincronizează echipele meciurilor existente cu programul oficial corect,
+// mapând după ora de start (unică în tot turneul). Actualizează DOAR numele
+// echipelor (homeTeam/awayTeam) pe documentele existente — păstrează id-urile,
+// scorurile și pronosticurile atașate slotului orar respectiv.
+//
+// Necesară pentru că meciurile au fost salvate cândva cu ordinea greșită a
+// pozițiilor în grupe (ex. Portugalia–Uzbekistan în loc de Portugalia–RD Congo),
+// iar simpla corectare a programului în cod nu rescrie documentele deja create.
+export async function resyncMatchTeams(): Promise<number> {
+  const matches = await getMatches()
+
+  // Index programul corect după ora de start (ISO).
+  const byKickoff = new Map<string, Omit<Match, 'id'>>()
+  for (const m of WC2026_GROUP_MATCHES) {
+    byKickoff.set(m.kickoff, m)
+  }
+
+  const batch = writeBatch(db)
+  let updated = 0
+  for (const m of matches) {
+    const correct = byKickoff.get(m.kickoff)
+    if (!correct) continue
+    if (m.homeTeam === correct.homeTeam && m.awayTeam === correct.awayTeam) {
+      continue
+    }
+    batch.update(doc(db, 'matches', m.id), {
+      homeTeam: correct.homeTeam,
+      awayTeam: correct.awayTeam,
+    })
+    updated += 1
+  }
+  if (updated > 0) await batch.commit()
+  return updated
+}
 
 function slugifyUsername(name: string): string {
   return name

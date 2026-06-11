@@ -13,8 +13,10 @@ import {
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
+  resyncMatchTeams,
   computeStandings,
 } from '@/lib/data'
+import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
   isLocked,
@@ -137,6 +139,10 @@ function AdminContent() {
               onSeeded={() => mutate()}
             />
             <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
+            <ResyncMatchesBanner
+              matches={matches ?? []}
+              onResynced={() => mutate()}
+            />
             <AddMatchForm onAdded={() => mutate()} />
           </div>
         </TabsContent>
@@ -216,6 +222,72 @@ function PlayoffFixBanner({
           <RefreshCw className="size-4" />
         )}
         Actualizează echipele
+      </Button>
+    </div>
+  )
+}
+
+// Banner care detectează meciuri salvate cu ordinea greșită a echipelor în
+// grupă (ex. Portugalia–Uzbekistan în loc de Portugalia–RD Congo) și le
+// re-sincronizează cu programul oficial, mapând după ora de start. Numai
+// numele echipelor sunt actualizate; scorurile și pronosticurile rămân legate
+// de același slot orar.
+function ResyncMatchesBanner({
+  matches,
+  onResynced,
+}: {
+  matches: Match[]
+  onResynced: () => void
+}) {
+  const [syncing, setSyncing] = useState(false)
+
+  // Construim un index al programului corect după ora de start.
+  const correctByKickoff = new Map(
+    WC2026_GROUP_MATCHES.map((m) => [m.kickoff, m]),
+  )
+  // Există vreun meci în baza de date care nu corespunde programului corect?
+  const mismatches = matches.filter((m) => {
+    const correct = correctByKickoff.get(m.kickoff)
+    if (!correct) return false
+    return m.homeTeam !== correct.homeTeam || m.awayTeam !== correct.awayTeam
+  })
+  if (mismatches.length === 0) return null
+
+  async function handleResync() {
+    setSyncing(true)
+    try {
+      const n = await resyncMatchTeams()
+      toast.success(
+        `${n} meciuri re-sincronizate cu programul oficial (ordinea corectată).`,
+      )
+      onResynced()
+    } catch {
+      toast.error('Eroare la re-sincronizarea meciurilor.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted-foreground">
+        {mismatches.length} meciuri au echipele în ordinea greșită față de
+        programul oficial (ex. „Portugalia – Uzbekistan" în loc de „Portugalia –
+        RD Congo"). Apasă pentru a le corecta. Scorurile și pronosticurile
+        atașate fiecărui interval orar nu sunt șterse.
+      </p>
+      <Button
+        onClick={handleResync}
+        disabled={syncing}
+        variant="destructive"
+        className="shrink-0"
+      >
+        {syncing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <RefreshCw className="size-4" />
+        )}
+        Corectează meciurile
       </Button>
     </div>
   )
