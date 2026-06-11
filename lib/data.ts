@@ -126,38 +126,28 @@ export async function fixPlayoffTeamNames(): Promise<number> {
   return updated
 }
 
-// Re-sincronizează echipele meciurilor existente cu programul oficial corect.
+// Re-sincronizează echipele meciurilor existente cu programul oficial corect,
+// mapând după ora de start (unică în tot turneul). Actualizează DOAR numele
+// echipelor (homeTeam/awayTeam) pe documentele existente — păstrează id-urile,
+// scorurile și pronosticurile atașate slotului orar respectiv.
 //
-// IMPORTANT: mapează după (etapă + ora de start). Ora de start NU este unică în
-// tot turneul (multe meciuri din ultima etapă a grupelor încep simultan), deci
-// maparea doar după oră ar suprascrie meciuri diferite între ele. Cheia
-// (etapă + oră) este unică în etapele 1 și 2. Pentru etapa 3, unde mai multe
-// meciuri pot împărți aceeași oră, sărim peste sloturile ambigue ca să nu
-// stricăm datele — acelea se corectează prin re-seed-ul etapei 3 din admin.
-//
-// Actualizează DOAR numele echipelor pe documentele existente, păstrând
-// id-urile, scorurile și pronosticurile.
+// Necesară pentru că meciurile au fost salvate cândva cu ordinea greșită a
+// pozițiilor în grupe (ex. Portugalia–Uzbekistan în loc de Portugalia–RD Congo),
+// iar simpla corectare a programului în cod nu rescrie documentele deja create.
 export async function resyncMatchTeams(): Promise<number> {
   const matches = await getMatches()
 
-  // Grupează programul corect după cheia (etapă + oră).
-  const programByKey = new Map<string, Omit<Match, 'id'>[]>()
+  // Index programul corect după ora de start (ISO).
+  const byKickoff = new Map<string, Omit<Match, 'id'>>()
   for (const m of WC2026_GROUP_MATCHES) {
-    const key = `${m.stage}|${m.kickoff}`
-    const arr = programByKey.get(key) ?? []
-    arr.push(m)
-    programByKey.set(key, arr)
+    byKickoff.set(m.kickoff, m)
   }
 
   const batch = writeBatch(db)
   let updated = 0
   for (const m of matches) {
-    const key = `${m.stage}|${m.kickoff}`
-    const candidates = programByKey.get(key)
-    // Sărim peste sloturi inexistente sau ambigue (mai multe meciuri la aceeași
-    // oră în aceeași etapă) ca să nu suprascriem greșit.
-    if (!candidates || candidates.length !== 1) continue
-    const correct = candidates[0]
+    const correct = byKickoff.get(m.kickoff)
+    if (!correct) continue
     if (m.homeTeam === correct.homeTeam && m.awayTeam === correct.awayTeam) {
       continue
     }
