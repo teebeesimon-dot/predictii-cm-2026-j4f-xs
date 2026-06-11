@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
-import { scorePrediction, PARTICIPANTS } from '@/lib/types'
+import { scorePrediction, PARTICIPANTS, isViewOnly } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 
 // Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
@@ -53,6 +53,11 @@ export async function savePrediction(
   homeScore: number,
   awayScore: number,
 ): Promise<void> {
+  // Backend guard: conturile de supraveghere nu pot trimite pronosticuri.
+  const userSnap = await getDoc(doc(db, 'users', userId))
+  if (userSnap.exists() && isViewOnly(userSnap.data() as Omit<AppUser, 'id'>)) {
+    throw new Error('Contul de supraveghere nu poate trimite pronosticuri.')
+  }
   // Backend guard: never trust the UI. A prediction cannot be saved or changed
   // once the match has kicked off (kickoff <= now).
   const snap = await getDoc(doc(db, 'matches', matchId))
@@ -205,6 +210,16 @@ export async function deleteUser(userId: string): Promise<void> {
   await deleteDoc(doc(db, 'users', userId))
 }
 
+// Actualizează drepturile de acces / vizibilitatea unui utilizator (setate de
+// admin): cont de supraveghere (viewOnly) și/sau ascuns din clasamente
+// (hideFromStandings).
+export async function updateUserAccess(
+  userId: string,
+  access: { viewOnly?: boolean; hideFromStandings?: boolean },
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), access)
+}
+
 // Resetare parolă de către admin: setează noua parolă și forțează utilizatorul
 // să o schimbe la următoarea autentificare.
 export async function updateUserPassword(
@@ -284,11 +299,17 @@ export interface StandingRow {
 }
 
 // Compute a standings table. If stage is provided, only matches in that stage.
+//
+// `viewer` controlează vizibilitatea jucătorilor ascunși (hideFromStandings):
+// un astfel de jucător apare DOAR pentru el însuși și pentru admini. Pentru
+// ceilalți este complet eliminat, iar pozițiile se recalculează curat.
+// Conturile de supraveghere (viewOnly) și adminul dedicat nu apar niciodată.
 export function computeStandings(
   users: AppUser[],
   matches: Match[],
   predictions: Prediction[],
   stage?: StageId,
+  viewer?: { id?: string; isAdmin?: boolean },
 ): StandingRow[] {
   const relevant = matches.filter(
     (m) =>
@@ -305,8 +326,13 @@ export function computeStandings(
   const isDedicatedAdmin = (u: AppUser) =>
     u.username === 'admin' || (u.name ?? '').toLowerCase() === 'administrator'
 
+  // Un jucător ascuns e vizibil doar pentru sine și pentru admini.
+  const canSeeHidden = (u: AppUser) =>
+    viewer?.isAdmin === true || viewer?.id === u.id
+
   const rows: Omit<StandingRow, 'rank'>[] = users
-    .filter((u) => !isDedicatedAdmin(u))
+    .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
+    .filter((u) => !u.hideFromStandings || canSeeHidden(u))
     .map((u) => {
       let points = 0
       let exact = 0

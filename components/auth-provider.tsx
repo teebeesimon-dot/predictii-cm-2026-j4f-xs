@@ -26,6 +26,10 @@ interface SessionUser {
   name: string
   isAdmin: boolean
   mustChangePassword: boolean
+  // Cont de supraveghere: nu poate trimite pronosticuri.
+  viewOnly: boolean
+  // Ascuns din clasamente pentru ceilalți (dar se vede pe sine).
+  hideFromStandings: boolean
 }
 
 interface AuthContextValue {
@@ -97,6 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: data.name || data.username,
         isAdmin: isUserAdmin(data),
         mustChangePassword: needsPasswordChange(data),
+        viewOnly: data.viewOnly === true,
+        hideFromStandings: data.hideFromStandings === true,
       })
       return { ok: true }
     },
@@ -121,6 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: data.name || data.username,
           isAdmin: isUserAdmin(data),
           mustChangePassword: needsPasswordChange(data),
+          viewOnly: data.viewOnly === true,
+          hideFromStandings: data.hideFromStandings === true,
         })
       })()
       return current

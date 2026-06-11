@@ -37,7 +37,10 @@ function DashboardContent() {
 
   const standings =
     users && matches && predictions
-      ? computeStandings(users, matches, predictions)
+      ? computeStandings(users, matches, predictions, undefined, {
+          id: user?.id,
+          isAdmin: user?.isAdmin,
+        })
       : []
   const myRow = standings.find((r) => r.userId === user?.id)
   const myRank = myRow?.rank ?? -1

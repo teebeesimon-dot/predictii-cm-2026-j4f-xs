@@ -69,11 +69,22 @@ export interface AppUser {
   // True când utilizatorul trebuie să-și schimbe parola (prima logare sau
   // după ce adminul i-a resetat parola). Forțează ecranul de schimbare parolă.
   mustChangePassword?: boolean
+  // Cont de supraveghere: poate vedea totul, dar NU poate trimite pronosticuri
+  // și nu apare nicăieri (clasamente, colegi). Tipic pentru un admin observator.
+  viewOnly?: boolean
+  // Jucător ascuns din clasamente pentru ceilalți participanți. Rămâne vizibil
+  // în pagina „Colegii" și se vede pe sine (plus adminii îl văd) în clasamente.
+  hideFromStandings?: boolean
 }
 
 // Resolve admin status from either the boolean flag or the role string.
 export function isUserAdmin(u: Pick<AppUser, 'isAdmin' | 'role'>): boolean {
   return u.isAdmin === true || u.role === 'admin'
+}
+
+// Cont de supraveghere (observator): nu pronostichează și e ascuns peste tot.
+export function isViewOnly(u: Pick<AppUser, 'viewOnly'>): boolean {
+  return u.viewOnly === true
 }
 
 export interface Match {

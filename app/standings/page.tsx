@@ -34,6 +34,7 @@ function StandingsContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
+  const viewer = { id: user?.id, isAdmin: user?.isAdmin }
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,7 +65,13 @@ function StandingsContent() {
 
               <TabsContent value="general" className="mt-4">
                 <StandingsTable
-                  rows={computeStandings(users, matches, predictions)}
+                  rows={computeStandings(
+                    users,
+                    matches,
+                    predictions,
+                    undefined,
+                    viewer,
+                  )}
                   highlightUserId={user?.id}
                 />
               </TabsContent>
@@ -80,6 +87,7 @@ function StandingsContent() {
                       matches,
                       predictions,
                       s.id as StageId,
+                      viewer,
                     )}
                     highlightUserId={user?.id}
                   />
