@@ -23,27 +23,27 @@ function roToUtc(local: string): string {
 
 // ---- Grupele oficiale ----
 // A: Mexic, Africa de Sud, Coreea de Sud, Câștigător Baraj UEFA D
-// B: Canada, Qatar, Elveția, Câștigător Baraj UEFA A
+// B: Canada, Câștigător Baraj UEFA A, Qatar, Elveția
 // C: Brazilia, Maroc, Haiti, Scoția
 // D: SUA, Paraguay, Australia, Câștigător Baraj UEFA C
 // E: Germania, Curaçao, Coasta de Fildeș, Ecuador
-// F: Olanda, Japonia, Tunisia, Câștigător Baraj UEFA B
+// F: Olanda, Japonia, Câștigător Baraj UEFA B, Tunisia
 // G: Belgia, Egipt, Iran, Noua Zeelandă
 // H: Spania, Capul Verde, Arabia Saudită, Uruguay
-// I: Franța, Senegal, Norvegia, Câștigător Baraj FIFA 2
+// I: Franța, Senegal, Câștigător Baraj FIFA 2, Norvegia
 // J: Argentina, Algeria, Austria, Iordania
 // K: Portugalia, Câștigător Baraj FIFA 1, Uzbekistan, Columbia
 // L: Anglia, Croația, Ghana, Panama
 
 const A = ['Mexic', 'Africa de Sud', 'Coreea de Sud', 'Baraj UEFA D']
-const B = ['Canada', 'Qatar', 'Elveția', 'Baraj UEFA A']
+const B = ['Canada', 'Baraj UEFA A', 'Qatar', 'Elveția']
 const C = ['Brazilia', 'Maroc', 'Haiti', 'Scoția']
 const D = ['SUA', 'Paraguay', 'Australia', 'Baraj UEFA C']
 const E = ['Germania', 'Curaçao', 'Coasta de Fildeș', 'Ecuador']
-const F = ['Olanda', 'Japonia', 'Tunisia', 'Baraj UEFA B']
+const F = ['Olanda', 'Japonia', 'Baraj UEFA B', 'Tunisia']
 const G = ['Belgia', 'Egipt', 'Iran', 'Noua Zeelandă']
 const H = ['Spania', 'Capul Verde', 'Arabia Saudită', 'Uruguay']
-const I = ['Franța', 'Senegal', 'Norvegia', 'Baraj FIFA 2']
+const I = ['Franța', 'Senegal', 'Baraj FIFA 2', 'Norvegia']
 const J = ['Argentina', 'Algeria', 'Austria', 'Iordania']
 const K = ['Portugalia', 'Baraj FIFA 1', 'Uzbekistan', 'Columbia']
 const L = ['Anglia', 'Croația', 'Ghana', 'Panama']
@@ -74,7 +74,7 @@ const RAW: SeedMatch[] = [
   // 11 iunie - deschiderea
   { stage: 1, homeTeam: A[0], awayTeam: A[1], kickoffRo: '2026-06-11T22:00' }, // Mexic - Africa de Sud
   // 12 iunie
-  { stage: 1, homeTeam: B[0], awayTeam: B[3], kickoffRo: '2026-06-12T22:00' }, // Canada
+  { stage: 1, homeTeam: B[0], awayTeam: B[1], kickoffRo: '2026-06-12T22:00' }, // Canada - Baraj UEFA A
   { stage: 1, homeTeam: D[0], awayTeam: D[1], kickoffRo: '2026-06-13T04:00' }, // SUA - Paraguay
   // 13 iunie
   { stage: 1, homeTeam: A[2], awayTeam: A[3], kickoffRo: '2026-06-13T19:00' }, // Coreea de Sud
@@ -82,7 +82,7 @@ const RAW: SeedMatch[] = [
   { stage: 1, homeTeam: C[2], awayTeam: C[3], kickoffRo: '2026-06-14T01:00' }, // Haiti - Scoția
   // 14 iunie
   { stage: 1, homeTeam: E[0], awayTeam: E[1], kickoffRo: '2026-06-14T20:00' }, // Germania - Curaçao
-  { stage: 1, homeTeam: B[1], awayTeam: B[2], kickoffRo: '2026-06-14T23:00' }, // Qatar - Elveția
+  { stage: 1, homeTeam: B[2], awayTeam: B[3], kickoffRo: '2026-06-14T23:00' }, // Qatar - Elveția
   { stage: 1, homeTeam: D[2], awayTeam: D[3], kickoffRo: '2026-06-15T02:00' }, // Australia
   // 15 iunie
   { stage: 1, homeTeam: F[0], awayTeam: F[1], kickoffRo: '2026-06-15T19:00' }, // Olanda - Japonia
