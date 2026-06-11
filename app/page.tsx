@@ -68,46 +68,54 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card/90 p-6 shadow-xl backdrop-blur-sm">
-          <h2 className="mb-5 text-center font-heading text-lg font-bold uppercase tracking-wide">
-            Autentificare
-          </h2>
+        <div className="overflow-hidden rounded-2xl border border-border bg-card/90 shadow-xl backdrop-blur-sm">
+          {/* Romanian flag accent strip */}
+          <div className="flex h-1.5 w-full">
+            <div className="flex-1 bg-[#002B7F]" />
+            <div className="flex-1 bg-[#FCD116]" />
+            <div className="flex-1 bg-[#CE1126]" />
+          </div>
+          <div className="p-6">
+            <h2 className="mb-5 text-center font-heading text-lg font-bold uppercase tracking-wide">
+              Autentificare
+            </h2>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="username">Utilizator</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="ex: simon.tiberiu"
-                autoComplete="username"
-                autoCapitalize="none"
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Parolă</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            <Button type="submit" className="mt-1 w-full" disabled={submitting}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
-              Intră în cont
-            </Button>
-          </form>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="username">Utilizator</Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="ex: simon.tiberiu"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password">Parolă</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+              <Button type="submit" className="mt-1 w-full" disabled={submitting}>
+                {submitting && <Loader2 className="size-4 animate-spin" />}
+                Intră în cont
+              </Button>
+            </form>
 
-          <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
-            Conturile sunt create de administrator. Dacă nu ai date de acces,
-            contactează-l.
-          </p>
+            <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+              Conturile sunt create de administrator. Dacă nu ai date de acces,
+              contactează-l.
+            </p>
+          </div>
         </div>
       </div>
     </main>
