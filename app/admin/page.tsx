@@ -75,7 +75,14 @@ function AdminContent() {
         </TabsList>
 
         <TabsContent value="add" className="mt-4">
-          <AddMatchForm onAdded={() => mutate()} />
+          <div className="flex flex-col gap-4">
+            <SeedMatchesPrompt
+              hasMatches={(matches?.length ?? 0) > 0}
+              onSeeded={() => mutate()}
+            />
+            <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
+            <AddMatchForm onAdded={() => mutate()} />
+          </div>
         </TabsContent>
 
         <TabsContent value="users" className="mt-4">
@@ -94,10 +101,12 @@ function AdminContent() {
               ))}
             </div>
           ) : (matches?.length ?? 0) === 0 ? (
-            <SeedMatchesPrompt onSeeded={() => mutate()} />
+            <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+              Niciun meci încărcat. Adaugă sau generează meciurile din tab-ul
+              &quot;Adaugă meci&quot;.
+            </p>
           ) : (
             <div className="flex flex-col gap-3">
-              <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
               {[...(matches ?? [])]
                 .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
                 .map((m) => (
@@ -156,7 +165,13 @@ function PlayoffFixBanner({
   )
 }
 
-function SeedMatchesPrompt({ onSeeded }: { onSeeded: () => void }) {
+function SeedMatchesPrompt({
+  hasMatches,
+  onSeeded,
+}: {
+  hasMatches: boolean
+  onSeeded: () => void
+}) {
   const [seeding, setSeeding] = useState(false)
 
   async function handleSeed() {
@@ -177,23 +192,29 @@ function SeedMatchesPrompt({ onSeeded }: { onSeeded: () => void }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border py-10 text-center">
-      <Download className="size-8 text-muted-foreground" />
-      <div>
-        <p className="font-medium">Niciun meci adăugat încă</p>
-        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Generează automat toate cele 72 de meciuri din faza grupelor CM 2026
-          (Etapele 1-3). Meciurile din fazele eliminatorii se adaugă manual după
-          stabilirea echipelor calificate.
-        </p>
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Download className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium">Generează faza grupelor</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Adaugă automat toate cele 72 de meciuri din faza grupelor CM 2026
+            (Etapele 1-3). Meciurile din fazele eliminatorii se adaugă manual,
+            după stabilirea echipelor calificate.
+          </p>
+        </div>
       </div>
-      <Button onClick={handleSeed} disabled={seeding}>
+      <Button
+        onClick={handleSeed}
+        disabled={seeding || hasMatches}
+        className="shrink-0"
+      >
         {seeding ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <Download className="size-4" />
         )}
-        Generează meciurile fazei grupelor
+        {hasMatches ? 'Meciuri deja generate' : 'Generează meciurile'}
       </Button>
     </div>
   )
