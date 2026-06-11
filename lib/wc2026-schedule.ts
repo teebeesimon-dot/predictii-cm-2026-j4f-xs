@@ -167,3 +167,54 @@ export const WC2026_GROUP_MATCHES: Omit<Match, 'id'>[] = RAW.map((m) => ({
   homeScore: null,
   awayScore: null,
 }))
+
+// Componența oficială a grupelor (folosită pentru re-sincronizarea meciurilor
+// existente cu programul corect, fără a recrea documentele).
+export const WC2026_GROUPS: Record<string, string[]> = {
+  A,
+  B,
+  C,
+  D,
+  E,
+  F,
+  G,
+  H,
+  I,
+  J,
+  K,
+  L,
+}
+
+// Mapează fiecare echipă (inclusiv numele de baraj) la litera grupei sale.
+export const TEAM_TO_GROUP: Record<string, string> = Object.fromEntries(
+  Object.entries(WC2026_GROUPS).flatMap(([g, teams]) =>
+    teams.map((t) => [t, g]),
+  ),
+)
+
+// Numele de baraj <-> echipa reală, pentru a recunoaște meciuri vechi care
+// folosesc încă placeholderele.
+const PLAYOFF_ALIASES: Record<string, string> = {
+  'Bosnia și Herțegovina': 'Baraj UEFA A',
+  Suedia: 'Baraj UEFA B',
+  Turcia: 'Baraj UEFA C',
+  Cehia: 'Baraj UEFA D',
+  'RD Congo': 'Baraj FIFA 1',
+  Irak: 'Baraj FIFA 2',
+}
+
+// Normalizează un nume de echipă: dacă e un placeholder de baraj, întoarce
+// echipa reală; altfel întoarce numele neschimbat.
+export function normalizeTeamName(name: string): string {
+  const reverse: Record<string, string> = {
+    'Baraj UEFA A': 'Bosnia și Herțegovina',
+    'Baraj UEFA B': 'Suedia',
+    'Baraj UEFA C': 'Turcia',
+    'Baraj UEFA D': 'Cehia',
+    'Baraj FIFA 1': 'RD Congo',
+    'Baraj FIFA 2': 'Irak',
+  }
+  return reverse[name] ?? name
+}
+
+void PLAYOFF_ALIASES
