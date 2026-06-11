@@ -21,11 +21,14 @@ import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
   isLocked,
+  isUserAdmin,
+  getActiveStage,
   KNOCKOUT_ROUNDS,
   type Match,
   type StageId,
   type KnockoutRound,
   type AppUser,
+  type Prediction,
 } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,6 +50,8 @@ import {
   Users,
   Download,
   FileSpreadsheet,
+  CheckCircle2,
+  CircleDashed,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -129,6 +134,7 @@ function AdminContent() {
       <Tabs defaultValue="results">
         <TabsList>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
+          <TabsTrigger value="completion">Completare</TabsTrigger>
           <TabsTrigger value="add">Adaugă meci</TabsTrigger>
           <TabsTrigger value="users">Participanți</TabsTrigger>
         </TabsList>
@@ -156,6 +162,15 @@ function AdminContent() {
           />
         </TabsContent>
 
+        <TabsContent value="completion" className="mt-4">
+          <CompletionOverview
+            users={users}
+            matches={matches}
+            predictions={predictions}
+            loading={isLoading || usersLoading}
+          />
+        </TabsContent>
+
         <TabsContent value="results" className="mt-4">
           {isLoading ? (
             <div className="flex flex-col gap-3">
@@ -179,6 +194,177 @@ function AdminContent() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+// Vedere de ansamblu pentru admin: cât a completat fiecare participant din
+// fiecare etapă cu meciuri. Arată un tabel cu numărul de pronosticuri pe etapă
+// și o stare generală, ca să se vadă cine a rămas în urmă.
+function CompletionOverview({
+  users,
+  matches,
+  predictions,
+  loading,
+}: {
+  users: AppUser[] | undefined
+  matches: Match[] | undefined
+  predictions: Prediction[] | undefined
+  loading: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    )
+  }
+
+  const participants = (users ?? []).filter((u) => !isUserAdmin(u))
+  const allMatches = matches ?? []
+  const allPreds = predictions ?? []
+
+  // Etapele care au cel puțin un meci încărcat (ignorăm etapele goale).
+  const stagesWithMatches = STAGES.filter((s) =>
+    allMatches.some((m) => m.stage === s.id),
+  )
+
+  // Câte meciuri are fiecare etapă.
+  const matchesPerStage = new Map<StageId, number>()
+  for (const s of stagesWithMatches) {
+    matchesPerStage.set(
+      s.id as StageId,
+      allMatches.filter((m) => m.stage === s.id).length,
+    )
+  }
+  const totalMatches = allMatches.length
+
+  // matchId -> stage, pentru a clasifica rapid fiecare pronostic.
+  const matchStage = new Map<string, StageId>()
+  for (const m of allMatches) matchStage.set(m.id, m.stage)
+
+  // userId -> stageId -> număr de pronosticuri completate.
+  const byUser = new Map<string, Map<StageId, number>>()
+  for (const p of allPreds) {
+    const stage = matchStage.get(p.matchId)
+    if (stage === undefined) continue
+    if (!byUser.has(p.userId)) byUser.set(p.userId, new Map())
+    const m = byUser.get(p.userId)!
+    m.set(stage, (m.get(stage) ?? 0) + 1)
+  }
+
+  const activeStage = getActiveStage()
+
+  if (participants.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+        Niciun participant înregistrat.
+      </p>
+    )
+  }
+  if (totalMatches === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+        Niciun meci încărcat încă, deci nu există pronosticuri de urmărit.
+      </p>
+    )
+  }
+
+  // Sortăm participanții descrescător după totalul de pronosticuri completate.
+  const rows = participants
+    .map((u) => {
+      const perStage = byUser.get(u.id) ?? new Map<StageId, number>()
+      const total = [...perStage.values()].reduce((a, b) => a + b, 0)
+      return { user: u, perStage, total }
+    })
+    .sort((a, b) => b.total - a.total || a.user.name.localeCompare(b.user.name))
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-secondary/40 p-4">
+        <Users className="size-5 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          {participants.length} participanți · {totalMatches} meciuri în total.
+          Coloana evidențiată este etapa activă acum.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-secondary/60 text-left">
+              <th className="px-3 py-2.5 font-heading font-bold">Participant</th>
+              {stagesWithMatches.map((s) => (
+                <th
+                  key={s.id}
+                  className={`px-3 py-2.5 text-center font-heading font-bold ${
+                    s.id === activeStage ? 'bg-primary/10 text-primary' : ''
+                  }`}
+                >
+                  {s.short}
+                </th>
+              ))}
+              <th className="px-3 py-2.5 text-center font-heading font-bold">
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ user, perStage, total }) => {
+              const complete = total >= totalMatches
+              return (
+                <tr
+                  key={user.id}
+                  className="border-b border-border last:border-0"
+                >
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      {complete ? (
+                        <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                      ) : (
+                        <CircleDashed className="size-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="font-medium">{user.name}</span>
+                    </div>
+                  </td>
+                  {stagesWithMatches.map((s) => {
+                    const done = perStage.get(s.id as StageId) ?? 0
+                    const need = matchesPerStage.get(s.id as StageId) ?? 0
+                    const full = need > 0 && done >= need
+                    return (
+                      <td
+                        key={s.id}
+                        className={`px-3 py-2.5 text-center tabular-nums ${
+                          s.id === activeStage ? 'bg-primary/5' : ''
+                        }`}
+                      >
+                        <span
+                          className={
+                            full
+                              ? 'font-semibold text-primary'
+                              : done === 0
+                                ? 'text-muted-foreground'
+                                : 'font-medium text-foreground'
+                          }
+                        >
+                          {done}/{need}
+                        </span>
+                      </td>
+                    )
+                  })}
+                  <td className="px-3 py-2.5 text-center">
+                    <Badge variant={complete ? 'default' : 'secondary'}>
+                      {total}/{totalMatches}
+                    </Badge>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
