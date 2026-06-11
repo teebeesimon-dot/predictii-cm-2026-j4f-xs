@@ -241,13 +241,21 @@ function ResyncMatchesBanner({
 }) {
   const [syncing, setSyncing] = useState(false)
 
-  // Construim un index al programului corect după ora de start.
-  const correctByKickoff = new Map(
-    WC2026_GROUP_MATCHES.map((m) => [m.kickoff, m]),
-  )
+  // Index al programului corect după cheia (etapă + oră). Ora singură NU e
+  // unică (multe meciuri din ultima etapă încep simultan), așa că include și
+  // etapa și ignorăm sloturile cu mai multe meciuri la aceeași oră.
+  const correctByKey = new Map<string, (typeof WC2026_GROUP_MATCHES)[number]>()
+  const ambiguous = new Set<string>()
+  for (const m of WC2026_GROUP_MATCHES) {
+    const key = `${m.stage}|${m.kickoff}`
+    if (correctByKey.has(key)) ambiguous.add(key)
+    correctByKey.set(key, m)
+  }
   // Există vreun meci în baza de date care nu corespunde programului corect?
   const mismatches = matches.filter((m) => {
-    const correct = correctByKickoff.get(m.kickoff)
+    const key = `${m.stage}|${m.kickoff}`
+    if (ambiguous.has(key)) return false
+    const correct = correctByKey.get(key)
     if (!correct) return false
     return m.homeTeam !== correct.homeTeam || m.awayTeam !== correct.awayTeam
   })
