@@ -148,7 +148,8 @@ export function computeStandings(
   const predByKey = new Map(predictions.map((p) => [`${p.userId}_${p.matchId}`, p]))
 
   const rows: Omit<StandingRow, 'rank'>[] = users
-  .map((u) => {
+    .filter((u) => !u.isAdmin)
+    .map((u) => {
       let points = 0
       let exact = 0
       let correct = 0

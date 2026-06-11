@@ -34,18 +34,12 @@ function DashboardContent() {
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
   const next = upcoming[0]
 
-  const myRank =
+  const standings =
     users && matches && predictions
-      ? computeStandings(users, matches, predictions).findIndex(
-          (r) => r.userId === user?.id,
-        )
-      : -1
-  const myRow =
-    users && matches && predictions
-      ? computeStandings(users, matches, predictions).find(
-          (r) => r.userId === user?.id,
-        )
-      : undefined
+      ? computeStandings(users, matches, predictions)
+      : []
+  const myRow = standings.find((r) => r.userId === user?.id)
+  const myRank = myRow?.rank ?? -1
 
   const totalMatches = matches?.length ?? 0
   const playedMatches = (matches ?? []).filter(
@@ -54,16 +48,25 @@ function DashboardContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm font-medium uppercase tracking-widest text-accent">
-          Bun venit
-        </p>
-        <h1 className="font-heading text-3xl font-bold capitalize text-foreground">
-          {user?.username}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Iată ce urmează în Campionatul Mondial 2026.
-        </p>
+      {/* Hero welcome banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-border">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/stadium-night.png')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+        <div className="relative flex flex-col gap-1 p-6 sm:p-8">
+          <p className="text-sm font-medium uppercase tracking-widest text-accent">
+            Bun venit
+          </p>
+          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+            {user?.name ?? user?.username}
+          </h1>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Iată ce urmează în Campionatul Mondial 2026. Pune-ți pronosticurile
+            și urcă în clasament.
+          </p>
+        </div>
       </div>
 
       {/* Next match */}
@@ -125,7 +128,7 @@ function DashboardContent() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Locul tău"
-          value={myRank >= 0 ? `#${myRank + 1}` : '-'}
+          value={myRank > 0 ? `#${myRank}` : '-'}
           icon={Trophy}
         />
         <StatCard

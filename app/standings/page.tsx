@@ -34,16 +34,7 @@ function StandingsContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
-console.log("USERS", users)
-console.log("MATCHES", matches)
-console.log("PREDICTIONS", predictions)
 
-if (users && matches && predictions) {
-  console.log(
-    "STANDINGS",
-    computeStandings(users, matches, predictions)
-  )
-}
   return (
     <div className="flex flex-col gap-6">
       <div>

@@ -2,9 +2,16 @@
 
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
-import { useMatches } from '@/lib/hooks'
-import { createMatch, updateMatchResult } from '@/lib/data'
-import { STAGES, isLocked, type Match, type StageId } from '@/lib/types'
+import { useMatches, useUsers } from '@/lib/hooks'
+import {
+  createMatch,
+  updateMatchResult,
+  createUser,
+  deleteUser,
+  updateUserPassword,
+  seedUsersIfEmpty,
+} from '@/lib/data'
+import { STAGES, isLocked, type Match, type StageId, type AppUser } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +20,17 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { formatKickoff } from '@/lib/utils'
-import { PlusCircle, Save, Loader2, Lock, RefreshCw } from 'lucide-react'
+import {
+  PlusCircle,
+  Save,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Trash2,
+  KeyRound,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function AdminPage() {
@@ -26,14 +43,15 @@ export default function AdminPage() {
 
 function AdminContent() {
   const { data: matches, isLoading, mutate } = useMatches()
+  const { data: users, isLoading: usersLoading, mutate: mutateUsers } = useUsers()
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-heading text-3xl font-bold">Administrare</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Adaugă meciuri și introdu rezultatele oficiale. Clasamentele se
-          recalculează automat.
+          Adaugă meciuri, introdu rezultatele oficiale și gestionează conturile.
+          Clasamentele se recalculează automat.
         </p>
       </div>
 
@@ -41,10 +59,19 @@ function AdminContent() {
         <TabsList>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
           <TabsTrigger value="add">Adaugă meci</TabsTrigger>
+          <TabsTrigger value="users">Participanți</TabsTrigger>
         </TabsList>
 
         <TabsContent value="add" className="mt-4">
           <AddMatchForm onAdded={() => mutate()} />
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <UsersManager
+            users={users}
+            loading={usersLoading}
+            onChanged={() => mutateUsers()}
+          />
         </TabsContent>
 
         <TabsContent value="results" className="mt-4">
@@ -257,6 +284,226 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
               <Save className="size-4" />
             )}
             {match.homeScore !== null ? 'Actualizează rezultatul' : 'Salvează rezultatul'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function UsersManager({
+  users,
+  loading,
+  onChanged,
+}: {
+  users: AppUser[] | undefined
+  loading: boolean
+  onChanged: () => void
+}) {
+  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [seeding, setSeeding] = useState(false)
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !username.trim() || !password.trim()) {
+      toast.error('Completează nume, utilizator și parolă.')
+      return
+    }
+    const exists = (users ?? []).some(
+      (u) => u.username === username.trim().toLowerCase(),
+    )
+    if (exists) {
+      toast.error('Acest utilizator există deja.')
+      return
+    }
+    setSaving(true)
+    try {
+      await createUser(name, username, password, false)
+      toast.success('Participant adăugat!')
+      setName('')
+      setUsername('')
+      setPassword('')
+      onChanged()
+    } catch {
+      toast.error('Eroare la adăugare.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSeed() {
+    setSeeding(true)
+    try {
+      const created = await seedUsersIfEmpty()
+      if (created) {
+        toast.success('Lista de participanți a fost creată (parolă: cm2026).')
+        onChanged()
+      } else {
+        toast.info('Există deja conturi. Lista nu a fost suprascrisă.')
+      }
+    } catch {
+      toast.error('Eroare la inițializare.')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
+  const participants = (users ?? []).filter((u) => !u.isAdmin)
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Adaugă participant</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAdd} className="flex flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="u-name">Nume complet</Label>
+                <Input
+                  id="u-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="ex: Simon Tiberiu"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="u-username">Utilizator</Label>
+                <Input
+                  id="u-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="ex: simon.tiberiu"
+                  autoCapitalize="none"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="u-password">Parolă</Label>
+                <Input
+                  id="u-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="ex: cm2026"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={saving} className="self-start">
+                {saving ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <UserPlus className="size-4" />
+                )}
+                Adaugă participant
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={seeding}
+                onClick={handleSeed}
+              >
+                {seeding ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Users className="size-4" />
+                )}
+                Inițializează lista J4F
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      ) : participants.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+          Niciun participant. Adaugă manual sau folosește &quot;Inițializează
+          lista J4F&quot;.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {participants
+            .slice()
+            .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
+            .map((u) => (
+              <UserRow key={u.id} user={u} onChanged={onChanged} />
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+
+  async function handleReset() {
+    const pwd = window.prompt(
+      `Parolă nouă pentru ${user.name || user.username}:`,
+      'cm2026',
+    )
+    if (!pwd) return
+    setBusy(true)
+    try {
+      await updateUserPassword(user.id, pwd)
+      toast.success('Parolă actualizată.')
+      onChanged()
+    } catch {
+      toast.error('Eroare la actualizare.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Ștergi participantul ${user.name || user.username}?`)) return
+    setBusy(true)
+    try {
+      await deleteUser(user.id)
+      toast.success('Participant șters.')
+      onChanged()
+    } catch {
+      toast.error('Eroare la ștergere.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between gap-3 p-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium">{user.name || user.username}</p>
+          <p className="truncate text-xs text-muted-foreground">@{user.username}</p>
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Resetează parola"
+            disabled={busy}
+            onClick={handleReset}
+          >
+            <KeyRound className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Șterge participant"
+            className="text-destructive hover:text-destructive"
+            disabled={busy}
+            onClick={handleDelete}
+          >
+            <Trash2 className="size-4" />
           </Button>
         </div>
       </CardContent>
