@@ -4,15 +4,15 @@ import Link from 'next/link'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
-import { Countdown } from '@/components/countdown'
+import { DeadlineBanner } from '@/components/deadline-banner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { STAGES } from '@/lib/types'
+import { STAGES, getActiveStage, getStageDeadline, isLocked, type StageId } from '@/lib/types'
 import { computeStandings } from '@/lib/data'
 import { formatKickoff } from '@/lib/utils'
-import { ListChecks, Trophy, BarChart3, CalendarClock, Flag } from 'lucide-react'
+import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock } from 'lucide-react'
 
 export default function DashboardPage() {
   return (
@@ -28,11 +28,12 @@ function DashboardContent() {
   const { data: predictions } = useAllPredictions()
   const { data: users } = useUsers()
 
-  const now = Date.now()
-  const upcoming = (matches ?? [])
-    .filter((m) => new Date(m.kickoff).getTime() > now)
+  const activeStage = getActiveStage()
+  const activeDeadline = getStageDeadline(activeStage)
+  const activeStageInfo = STAGES.find((s) => s.id === activeStage)
+  const stageMatches = (matches ?? [])
+    .filter((m) => m.stage === activeStage)
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
-  const next = upcoming[0]
 
   const standings =
     users && matches && predictions
