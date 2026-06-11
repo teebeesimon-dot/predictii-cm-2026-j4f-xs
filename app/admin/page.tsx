@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { SyncPanel } from '@/components/sync-panel'
 import { formatKickoff } from '@/lib/utils'
 import {
   PlusCircle,
@@ -145,6 +146,7 @@ function AdminContent() {
       <Tabs defaultValue="results">
         <TabsList>
           <TabsTrigger value="results">Rezultate</TabsTrigger>
+          <TabsTrigger value="sync">Sincronizare</TabsTrigger>
           <TabsTrigger value="completion">Completare</TabsTrigger>
           <TabsTrigger value="add">Adaugă meci</TabsTrigger>
           <TabsTrigger value="users">Participanți</TabsTrigger>
@@ -180,6 +182,10 @@ function AdminContent() {
             predictions={predictions}
             loading={isLoading || usersLoading}
           />
+        </TabsContent>
+
+        <TabsContent value="sync" className="mt-4">
+          <SyncPanel />
         </TabsContent>
 
         <TabsContent value="results" className="mt-4">

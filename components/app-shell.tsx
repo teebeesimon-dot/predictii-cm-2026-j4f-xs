@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
 import { AppNav } from '@/components/app-nav'
+import { AutoSync } from '@/components/auto-sync'
 import { Trophy } from 'lucide-react'
 
 export function AppShell({
@@ -45,6 +46,7 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background">
+      <AutoSync />
       <AppNav />
       <main className="mx-auto max-w-6xl px-4 py-6 md:py-8">{children}</main>
     </div>
