@@ -26,7 +26,10 @@ function StatisticsContent() {
   const ready = users && matches && predictions
 
   const myRow = ready
-    ? computeStandings(users, matches, predictions).find((r) => r.userId === user?.id)
+    ? computeStandings(users, matches, predictions, undefined, {
+        id: user?.id,
+        isAdmin: user?.isAdmin,
+      }).find((r) => r.userId === user?.id)
     : undefined
 
   const scored = myRow ? myRow.exact + myRow.correct1x2 : 0

@@ -23,7 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { TeamName } from '@/components/team-name'
 import { formatKickoff } from '@/lib/utils'
-import { Lock, Save, Loader2, Flag } from 'lucide-react'
+import { Lock, Save, Loader2, Flag, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Entry = { home: string; away: string }
@@ -113,7 +113,19 @@ function PredictionsContent() {
         </p>
       </div>
 
-      {isLoading ? (
+      {user?.viewOnly ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <Eye className="size-8 text-muted-foreground" />
+            <p className="font-heading text-lg font-bold">Cont de supraveghere</p>
+            <p className="max-w-md text-pretty text-sm text-muted-foreground">
+              Acest cont are doar rol de supraveghere. Poți urmări tot ce se
+              întâmplă, dar nu poți completa pronosticuri și nu apari în
+              clasamente.
+            </p>
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <div className="flex flex-col gap-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-24 w-full" />

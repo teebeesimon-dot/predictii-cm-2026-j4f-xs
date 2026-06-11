@@ -11,6 +11,7 @@ import {
   createUser,
   deleteUser,
   updateUserPassword,
+  updateUserAccess,
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
@@ -22,6 +23,7 @@ import {
   STAGES,
   isLocked,
   isUserAdmin,
+  isViewOnly,
   getActiveStage,
   KNOCKOUT_ROUNDS,
   type Match,
@@ -36,6 +38,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { formatKickoff } from '@/lib/utils'
 import {
@@ -52,6 +55,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   CircleDashed,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -222,7 +227,9 @@ function CompletionOverview({
     )
   }
 
-  const participants = (users ?? []).filter((u) => !isUserAdmin(u))
+  const participants = (users ?? []).filter(
+    (u) => !isUserAdmin(u) && !isViewOnly(u),
+  )
   const allMatches = matches ?? []
   const allPreds = predictions ?? []
 
@@ -941,6 +948,10 @@ function UsersManager({
 
 function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) {
   const [busy, setBusy] = useState(false)
+  const [savingAccess, setSavingAccess] = useState(false)
+  // Stare optimistă pentru comutatoare, ca UI-ul să răspundă imediat.
+  const [viewOnly, setViewOnly] = useState(user.viewOnly === true)
+  const [hidden, setHidden] = useState(user.hideFromStandings === true)
 
   async function handleReset() {
     const pwd = window.prompt(
@@ -974,33 +985,108 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
     }
   }
 
+  // Salvează un comutator de acces; revine la valoarea veche dacă eșuează.
+  async function saveAccess(
+    patch: { viewOnly?: boolean; hideFromStandings?: boolean },
+    revert: () => void,
+  ) {
+    setSavingAccess(true)
+    try {
+      await updateUserAccess(user.id, patch)
+      toast.success('Acces actualizat.')
+      onChanged()
+    } catch {
+      toast.error('Eroare la actualizarea accesului.')
+      revert()
+    } finally {
+      setSavingAccess(false)
+    }
+  }
+
+  function toggleViewOnly(next: boolean) {
+    const prev = viewOnly
+    setViewOnly(next)
+    // Un cont de supraveghere e implicit ascuns oricum; nu forțăm hidden, dar
+    // clasamentele îl exclud automat prin isViewOnly.
+    void saveAccess({ viewOnly: next }, () => setViewOnly(prev))
+  }
+
+  function toggleHidden(next: boolean) {
+    const prev = hidden
+    setHidden(next)
+    void saveAccess({ hideFromStandings: next }, () => setHidden(prev))
+  }
+
   return (
     <Card>
-      <CardContent className="flex items-center justify-between gap-3 p-3">
-        <div className="min-w-0">
-          <p className="truncate font-medium">{user.name || user.username}</p>
-          <p className="truncate text-xs text-muted-foreground">@{user.username}</p>
+      <CardContent className="flex flex-col gap-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-medium">{user.name || user.username}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              @{user.username}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Resetează parola"
+              disabled={busy}
+              onClick={handleReset}
+            >
+              <KeyRound className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Șterge participant"
+              className="text-destructive hover:text-destructive"
+              disabled={busy}
+              onClick={handleDelete}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex shrink-0 gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Resetează parola"
-            disabled={busy}
-            onClick={handleReset}
-          >
-            <KeyRound className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Șterge participant"
-            className="text-destructive hover:text-destructive"
-            disabled={busy}
-            onClick={handleDelete}
-          >
-            <Trash2 className="size-4" />
-          </Button>
+
+        {/* Drepturi de acces controlate de admin */}
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+          <label className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm">
+              <Eye className="size-4 text-muted-foreground" />
+              <span>
+                <span className="font-medium">Doar supraveghere</span>
+                <span className="block text-xs text-muted-foreground">
+                  Nu poate pronostica și nu apare nicăieri.
+                </span>
+              </span>
+            </span>
+            <Switch
+              checked={viewOnly}
+              disabled={savingAccess}
+              onCheckedChange={toggleViewOnly}
+              aria-label="Doar supraveghere"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm">
+              <EyeOff className="size-4 text-muted-foreground" />
+              <span>
+                <span className="font-medium">Ascuns din clasamente</span>
+                <span className="block text-xs text-muted-foreground">
+                  Joacă normal și apare la „Colegii", dar nu în clasamente
+                  (se vede doar pe sine).
+                </span>
+              </span>
+            </span>
+            <Switch
+              checked={hidden}
+              disabled={savingAccess || viewOnly}
+              onCheckedChange={toggleHidden}
+              aria-label="Ascuns din clasamente"
+            />
+          </label>
         </div>
       </CardContent>
     </Card>

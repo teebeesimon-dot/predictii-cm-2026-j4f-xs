@@ -12,6 +12,7 @@ import {
   type Prediction,
   type AppUser,
   isLocked,
+  isViewOnly,
   scorePrediction,
 } from '@/lib/types'
 import { formatKickoff } from '@/lib/utils'
@@ -173,9 +174,17 @@ function MatchPredictions({
   const matchPreds = predictions.filter((p) => p.matchId === match.id)
 
   // Sortăm participanții alfabetic; cei fără pronostic apar la final.
+  // Excludem conturile de supraveghere și adminul dedicat (nu joacă, nu apar
+  // nici aici). Jucătorii „ascunși din clasamente" (ex. vasilescu) rămân
+  // vizibili aici, ca un coleg normal.
   const rows = useMemo(() => {
     return [...users]
-      .filter((u) => u.username !== 'admin')
+      .filter(
+        (u) =>
+          !isViewOnly(u) &&
+          u.username !== 'admin' &&
+          (u.name ?? '').toLowerCase() !== 'administrator',
+      )
       .map((u) => ({
         user: u,
         pred: matchPreds.find((p) => p.userId === u.id) ?? null,
