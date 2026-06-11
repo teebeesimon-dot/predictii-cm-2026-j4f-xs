@@ -147,8 +147,15 @@ export function computeStandings(
   )
   const predByKey = new Map(predictions.map((p) => [`${p.userId}_${p.matchId}`, p]))
 
+  // Note: we intentionally do NOT exclude admins here. In this league the
+  // administrator (e.g. Simon) is also a participant, so excluding admins would
+  // drop a real player from the standings. We only hide a dedicated, non-playing
+  // admin account (username "admin" / name "Administrator").
+  const isDedicatedAdmin = (u: AppUser) =>
+    u.username === 'admin' || (u.name ?? '').toLowerCase() === 'administrator'
+
   const rows: Omit<StandingRow, 'rank'>[] = users
-    .filter((u) => !u.isAdmin)
+    .filter((u) => !isDedicatedAdmin(u))
     .map((u) => {
       let points = 0
       let exact = 0

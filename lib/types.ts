@@ -34,8 +34,16 @@ export interface AppUser {
   // Full display name (e.g. "Simon Tiberiu")
   name: string
   password: string
-  isAdmin: boolean
-  createdAt: number
+  // Some documents use a boolean `isAdmin`, others a `role` string. Both are
+  // supported; use `isUserAdmin()` to resolve admin status reliably.
+  isAdmin?: boolean
+  role?: 'user' | 'admin'
+  createdAt?: number
+}
+
+// Resolve admin status from either the boolean flag or the role string.
+export function isUserAdmin(u: Pick<AppUser, 'isAdmin' | 'role'>): boolean {
+  return u.isAdmin === true || u.role === 'admin'
 }
 
 export interface Match {

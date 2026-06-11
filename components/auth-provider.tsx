@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser } from '@/lib/types'
+import { isUserAdmin } from '@/lib/types'
 import { seedUsersIfEmpty } from '@/lib/data'
 
 interface SessionUser {
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: docSnap.id,
         username: data.username,
         name: data.name || data.username,
-        isAdmin: !!data.isAdmin,
+        isAdmin: isUserAdmin(data),
       })
       return { ok: true }
     },
