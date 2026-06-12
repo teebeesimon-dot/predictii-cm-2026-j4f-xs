@@ -23,7 +23,7 @@ import {
   type AppUser,
 } from '@/lib/types'
 import { computeStandings } from '@/lib/data'
-import { cn } from '@/lib/utils'
+import { cn, formatKickoff } from '@/lib/utils'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -89,6 +89,13 @@ function DashboardContent() {
     })
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
 
+  // Următorul meci: cel mai apropiat meci din viitor (kickoff încă nu a trecut).
+  // Folosit doar când nu există niciun meci în desfășurare.
+  const nextMatch =
+    [...(matches ?? [])]
+      .filter((m) => +new Date(m.kickoff) > now)
+      .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))[0] ?? null
+
   return (
     <div className="flex flex-col gap-6">
       {/* Hero welcome banner — deasupra a tot */}
@@ -143,6 +150,66 @@ function DashboardContent() {
                 <div className="flex items-center gap-2">
                   <Trophy className="size-5 text-primary" />
                   <CardTitle className="text-base">Clasament live</CardTitle>
+                </div>
+                <Badge variant="secondary" className="hidden sm:inline-flex">
+                  General
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <StandingsTable rows={standings} highlightUserId={user?.id} />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+      {/* Niciun meci live → următorul meci + clasament, în același layout split */}
+      {!isLoading && liveMatches.length === 0 && nextMatch && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="size-5 text-primary" />
+            <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+              Următorul meci
+            </h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Stânga: următorul meci */}
+            <Card className="border-primary/30">
+              <CardContent className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+                <div className="flex w-full items-center justify-center gap-3">
+                  <TeamName
+                    team={nextMatch.homeTeam}
+                    align="right"
+                    className="flex-1 justify-end font-heading text-base font-bold"
+                  />
+                  <span className="shrink-0 rounded-md bg-secondary px-3 py-1 font-mono text-sm font-bold text-muted-foreground">
+                    vs
+                  </span>
+                  <TeamName
+                    team={nextMatch.awayTeam}
+                    className="flex-1 font-heading text-base font-bold"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <CalendarClock className="size-4" />
+                  <span className="capitalize">
+                    {formatKickoff(nextMatch.kickoff)}
+                  </span>
+                </div>
+                <Link
+                  href="/predictions"
+                  className={buttonVariants({ variant: 'secondary' })}
+                >
+                  <ListChecks className="size-4" />
+                  Pune pronosticul
+                </Link>
+              </CardContent>
+            </Card>
+            {/* Dreapta: clasamentul general */}
+            <Card className="border-primary/30">
+              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                <div className="flex items-center gap-2">
+                  <Trophy className="size-5 text-primary" />
+                  <CardTitle className="text-base">Clasament</CardTitle>
                 </div>
                 <Badge variant="secondary" className="hidden sm:inline-flex">
                   General
