@@ -10,9 +10,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { STAGES, getActiveStage, getStageDeadline, isLocked } from '@/lib/types'
+import {
+  STAGES,
+  getActiveStage,
+  getStageDeadline,
+  isLocked,
+  isViewOnly,
+  scorePrediction,
+  type Match,
+  type Prediction,
+  type AppUser,
+} from '@/lib/types'
 import { computeStandings } from '@/lib/data'
-import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2 } from 'lucide-react'
 
 export default function DashboardPage() {
   return (
@@ -64,8 +75,44 @@ function DashboardContent() {
     (m) => !isLocked(m) && !myPredictedMatchIds.has(m.id),
   ).length
 
+  // Meciuri „în desfășurare": au început (kickoff a trecut), sunt în fereastra
+  // de ~2,5 ore de la start și nu au încă scor final. Sunt afișate primele, în
+  // stilul paginii „Colegi", cu pronosticurile tuturor.
+  const now = Date.now()
+  const LIVE_WINDOW_MS = 2.5 * 60 * 60 * 1000
+  const liveMatches = (matches ?? [])
+    .filter((m) => {
+      const ko = +new Date(m.kickoff)
+      const hasResult = m.homeScore !== null && m.awayScore !== null
+      return !hasResult && ko <= now && now - ko <= LIVE_WINDOW_MS
+    })
+    .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Meci în desfășurare — afișat primul, cu pronosticurile tuturor */}
+      {!isLoading && liveMatches.length > 0 && users && predictions && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex size-2.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive opacity-75" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-destructive" />
+            </span>
+            <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+              Se joacă acum
+            </h2>
+          </div>
+          {liveMatches.map((m) => (
+            <LiveMatchCard
+              key={m.id}
+              match={m}
+              users={users}
+              predictions={predictions}
+              currentUserId={user?.id}
+            />
+          ))}
+        </section>
+      )}
       {/* Hero welcome banner */}
       <div className="relative overflow-hidden rounded-2xl border border-border">
         <div
@@ -256,6 +303,139 @@ function DashboardContent() {
         />
       </div>
     </div>
+  )
+}
+
+function LiveMatchCard({
+  match,
+  users,
+  predictions,
+  currentUserId,
+}: {
+  match: Match
+  users: AppUser[]
+  predictions: Prediction[]
+  currentUserId?: string
+}) {
+  // Un meci „în desfășurare" este întotdeauna blocat, deci pronosticurile pot fi
+  // dezvăluite. Refolosim stilul din pagina „Colegi".
+  const hasResult = match.homeScore !== null && match.awayScore !== null
+  const matchPreds = predictions.filter((p) => p.matchId === match.id)
+
+  const rows = [...users]
+    .filter(
+      (u) =>
+        !isViewOnly(u) &&
+        u.username !== 'admin' &&
+        (u.name ?? '').toLowerCase() !== 'administrator',
+    )
+    .map((u) => ({
+      user: u,
+      pred: matchPreds.find((p) => p.userId === u.id) ?? null,
+    }))
+    .sort((a, b) => {
+      if (!!a.pred !== !!b.pred) return a.pred ? -1 : 1
+      return a.user.name.localeCompare(b.user.name, 'ro')
+    })
+
+  return (
+    <Card className="border-destructive/40">
+      <CardContent className="p-4">
+        {/* Header meci */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <TeamName
+              team={match.homeTeam}
+              align="right"
+              className="font-heading font-bold"
+            />
+            {hasResult ? (
+              <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
+                {match.homeScore} - {match.awayScore}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">vs</span>
+            )}
+            <TeamName team={match.awayTeam} className="font-heading font-bold" />
+          </div>
+          <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
+            <Radio className="size-3" />
+            Live
+          </Badge>
+        </div>
+
+        {matchPreds.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Niciun pronostic înregistrat pentru acest meci.
+          </p>
+        ) : (
+          <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            {rows.map(({ user, pred }) => {
+              const isMe = user.id === currentUserId
+              const points = hasResult ? scorePrediction(pred, match) : null
+              const exact = points === 3
+              const correct1x2 = points === 1
+              return (
+                <li
+                  key={user.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 rounded-md border px-3 py-2',
+                    isMe
+                      ? 'border-l-4 border-l-primary bg-primary/10'
+                      : 'border-border',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5 truncate text-sm',
+                      isMe && 'font-bold',
+                    )}
+                  >
+                    {user.name}
+                    {isMe && (
+                      <Badge className="bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
+                        Tu
+                      </Badge>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    {pred ? (
+                      <span
+                        className={cn(
+                          'rounded font-mono text-sm font-bold tabular-nums',
+                          exact && 'text-primary',
+                          correct1x2 && 'text-accent',
+                        )}
+                      >
+                        {pred.homeScore} - {pred.awayScore}
+                      </span>
+                    ) : (
+                      <span className="text-xs italic text-muted-foreground">
+                        fără pronostic
+                      </span>
+                    )}
+                    {exact && (
+                      <Badge className="gap-1 bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
+                        <CheckCircle2 className="size-3" />
+                        Exact
+                      </Badge>
+                    )}
+                    {correct1x2 && (
+                      <Badge
+                        variant="secondary"
+                        className="px-1.5 py-0 text-[10px] font-bold"
+                      >
+                        1X2
+                      </Badge>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
