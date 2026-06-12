@@ -91,6 +91,27 @@ function DashboardContent() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Hero welcome banner — deasupra a tot */}
+      <div className="relative overflow-hidden rounded-2xl border border-border">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/stadium-night.png')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+        <div className="relative flex flex-col gap-1 p-6 sm:p-8">
+          <p className="text-sm font-medium uppercase tracking-widest text-accent">
+            Bun venit
+          </p>
+          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+            {user?.name ?? user?.username}
+          </h1>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Iată ce urmează în Campionatul Mondial 2026. Pune-ți pronosticurile
+            și urcă în clasament.
+          </p>
+        </div>
+      </div>
+
       {/* Meci în desfășurare — afișat primul, split: pronosticuri + clasament live */}
       {!isLoading && liveMatches.length > 0 && users && predictions && (
         <section className="flex flex-col gap-3">
@@ -134,27 +155,6 @@ function DashboardContent() {
           </div>
         </section>
       )}
-      {/* Hero welcome banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('/stadium-night.png')" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
-        <div className="relative flex flex-col gap-1 p-6 sm:p-8">
-          <p className="text-sm font-medium uppercase tracking-widest text-accent">
-            Bun venit
-          </p>
-          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
-            {user?.name ?? user?.username}
-          </h1>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Iată ce urmează în Campionatul Mondial 2026. Pune-ți pronosticurile
-            și urcă în clasament.
-          </p>
-        </div>
-      </div>
-
       {/* Current stage + deadline countdown */}
       <Card className="overflow-hidden border-primary/30">
         <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
