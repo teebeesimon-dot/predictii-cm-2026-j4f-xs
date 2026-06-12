@@ -6,6 +6,7 @@ import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { TeamName } from '@/components/team-name'
+import { StandingsTable } from '@/components/standings-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -90,7 +91,7 @@ function DashboardContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Meci în desfășurare — afișat primul, cu pronosticurile tuturor */}
+      {/* Meci în desfășurare — afișat primul, split: pronosticuri + clasament live */}
       {!isLoading && liveMatches.length > 0 && users && predictions && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -102,15 +103,35 @@ function DashboardContent() {
               Se joacă acum
             </h2>
           </div>
-          {liveMatches.map((m) => (
-            <LiveMatchCard
-              key={m.id}
-              match={m}
-              users={users}
-              predictions={predictions}
-              currentUserId={user?.id}
-            />
-          ))}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Stânga: meciul/meciurile live cu pronosticurile tuturor */}
+            <div className="flex flex-col gap-3">
+              {liveMatches.map((m) => (
+                <LiveMatchCard
+                  key={m.id}
+                  match={m}
+                  users={users}
+                  predictions={predictions}
+                  currentUserId={user?.id}
+                />
+              ))}
+            </div>
+            {/* Dreapta: clasamentul live (se actualizează pe măsură ce intră scorurile) */}
+            <Card className="border-primary/30">
+              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                <div className="flex items-center gap-2">
+                  <Trophy className="size-5 text-primary" />
+                  <CardTitle className="text-base">Clasament live</CardTitle>
+                </div>
+                <Badge variant="secondary" className="hidden sm:inline-flex">
+                  General
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <StandingsTable rows={standings} highlightUserId={user?.id} />
+              </CardContent>
+            </Card>
+          </div>
         </section>
       )}
       {/* Hero welcome banner */}
@@ -369,7 +390,7 @@ function LiveMatchCard({
             Niciun pronostic înregistrat pentru acest meci.
           </p>
         ) : (
-          <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          <ul className="mt-3 grid grid-cols-1 gap-1.5">
             {rows.map(({ user, pred }) => {
               const isMe = user.id === currentUserId
               const points = hasResult ? scorePrediction(pred, match) : null
