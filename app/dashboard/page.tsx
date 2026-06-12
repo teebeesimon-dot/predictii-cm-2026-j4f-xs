@@ -172,38 +172,14 @@ function DashboardContent() {
             </h2>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Stânga: următorul meci */}
-            <Card className="border-primary/30">
-              <CardContent className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-                <div className="flex w-full items-center justify-center gap-3">
-                  <TeamName
-                    team={nextMatch.homeTeam}
-                    align="right"
-                    className="flex-1 justify-end font-heading text-base font-bold"
-                  />
-                  <span className="shrink-0 rounded-md bg-secondary px-3 py-1 font-mono text-sm font-bold text-muted-foreground">
-                    vs
-                  </span>
-                  <TeamName
-                    team={nextMatch.awayTeam}
-                    className="flex-1 font-heading text-base font-bold"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <CalendarClock className="size-4" />
-                  <span className="capitalize">
-                    {formatKickoff(nextMatch.kickoff)}
-                  </span>
-                </div>
-                <Link
-                  href="/predictions"
-                  className={buttonVariants({ variant: 'secondary' })}
-                >
-                  <ListChecks className="size-4" />
-                  Pune pronosticul
-                </Link>
-              </CardContent>
-            </Card>
+            {/* Stânga: următorul meci cu pronosticurile tuturor */}
+            <LiveMatchCard
+              match={nextMatch}
+              users={users ?? []}
+              predictions={predictions ?? []}
+              currentUserId={user?.id}
+              variant="next"
+            />
             {/* Dreapta: clasamentul general */}
             <Card className="border-primary/30">
               <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
@@ -399,15 +375,19 @@ function LiveMatchCard({
   users,
   predictions,
   currentUserId,
+  variant = 'live',
 }: {
   match: Match
   users: AppUser[]
   predictions: Prediction[]
   currentUserId?: string
+  variant?: 'live' | 'next'
 }) {
-  // Un meci „în desfășurare" este întotdeauna blocat, deci pronosticurile pot fi
-  // dezvăluite. Refolosim stilul din pagina „Colegi".
+  // Pronosticurile se dezvăluie doar după ce meciul e blocat (a început sau a
+  // trecut termenul limită), exact ca pe pagina „Colegi". Un meci live este
+  // mereu blocat; pentru următorul meci, dezvăluim doar dacă deja e blocat.
   const hasResult = match.homeScore !== null && match.awayScore !== null
+  const revealed = variant === 'live' || isLocked(match)
   const matchPreds = predictions.filter((p) => p.matchId === match.id)
 
   const rows = [...users]
@@ -427,7 +407,7 @@ function LiveMatchCard({
     })
 
   return (
-    <Card className="border-destructive/40">
+    <Card className={variant === 'live' ? 'border-destructive/40' : 'border-primary/30'}>
       <CardContent className="p-4">
         {/* Header meci */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -446,13 +426,25 @@ function LiveMatchCard({
             )}
             <TeamName team={match.awayTeam} className="font-heading font-bold" />
           </div>
-          <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
-            <Radio className="size-3" />
-            Live
-          </Badge>
+          {variant === 'live' ? (
+            <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
+              <Radio className="size-3" />
+              Live
+            </Badge>
+          ) : (
+            <span className="flex items-center gap-1 text-xs capitalize text-muted-foreground">
+              <CalendarClock className="size-3.5" />
+              {formatKickoff(match.kickoff)}
+            </span>
+          )}
         </div>
 
-        {matchPreds.length === 0 ? (
+        {!revealed ? (
+          <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="size-4" />
+            Pronosticurile se afișează după ce începe meciul.
+          </p>
+        ) : matchPreds.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
             Niciun pronostic înregistrat pentru acest meci.
           </p>
