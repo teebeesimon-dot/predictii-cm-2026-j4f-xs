@@ -76,16 +76,16 @@ function DashboardContent() {
     (m) => !isLocked(m) && !myPredictedMatchIds.has(m.id),
   ).length
 
-  // Meciuri „în desfășurare": au început (kickoff a trecut), sunt în fereastra
-  // de ~2,5 ore de la start și nu au încă scor final. Sunt afișate primele, în
-  // stilul paginii „Colegi", cu pronosticurile tuturor.
+  // Meciuri „în desfășurare": au început (kickoff a trecut) și sunt în fereastra
+  // de ~2,5 ore de la start. Rămân afișate chiar dacă adminul a introdus deja un
+  // scor live. Sunt afișate primele, în stilul paginii „Colegi", cu
+  // pronosticurile tuturor.
   const now = Date.now()
   const LIVE_WINDOW_MS = 2.5 * 60 * 60 * 1000
   const liveMatches = (matches ?? [])
     .filter((m) => {
       const ko = +new Date(m.kickoff)
-      const hasResult = m.homeScore !== null && m.awayScore !== null
-      return !hasResult && ko <= now && now - ko <= LIVE_WINDOW_MS
+      return ko <= now && now - ko <= LIVE_WINDOW_MS
     })
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
 
