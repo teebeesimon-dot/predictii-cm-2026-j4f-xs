@@ -36,9 +36,12 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user } = useAuth()
-  const { data: matches, isLoading } = useMatches()
-  const { data: predictions } = useAllPredictions()
-  const { data: users } = useUsers()
+  // Reîmprospătare automată în fundal la 10s, fără reîncărcarea paginii.
+  // SWR revalidează datele și actualizează doar ce s-a schimbat (scoruri,
+  // pronosticuri, clasament), păstrând starea și scroll-ul.
+  const { data: matches, isLoading } = useMatches(10_000)
+  const { data: predictions } = useAllPredictions(10_000)
+  const { data: users } = useUsers(10_000)
 
   const activeStage = getActiveStage()
   const activeDeadline = getStageDeadline(activeStage)

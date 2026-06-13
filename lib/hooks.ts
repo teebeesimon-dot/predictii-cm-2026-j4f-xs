@@ -8,16 +8,25 @@ import {
   getUserPredictions,
 } from '@/lib/data'
 
-export function useMatches() {
-  return useSWR('matches', getMatches, { revalidateOnFocus: false })
+export function useMatches(refreshMs?: number) {
+  return useSWR('matches', getMatches, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
-export function useUsers() {
-  return useSWR('users', getUsers, { revalidateOnFocus: false })
+export function useUsers(refreshMs?: number) {
+  return useSWR('users', getUsers, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
-export function useAllPredictions() {
-  return useSWR('predictions', getAllPredictions, { revalidateOnFocus: false })
+export function useAllPredictions(refreshMs?: number) {
+  return useSWR('predictions', getAllPredictions, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
 export function useUserPredictions(userId: string | undefined) {
