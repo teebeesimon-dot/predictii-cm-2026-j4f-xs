@@ -238,25 +238,30 @@ function DashboardContent() {
                     return (
                       <li
                         key={m.id}
-                        className="flex items-center gap-3 px-3 py-2.5 text-sm"
+                        className="flex flex-col gap-1 px-3 py-2.5 text-sm"
                       >
-                        <TeamName
-                          team={m.homeTeam}
-                          align="right"
-                          className="flex-1 justify-end font-medium"
-                        />
-                        <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                          {m.homeScore !== null && m.awayScore !== null
-                            ? `${m.homeScore} - ${m.awayScore}`
-                            : 'vs'}
+                        <div className="flex items-center gap-3">
+                          <TeamName
+                            team={m.homeTeam}
+                            align="right"
+                            className="flex-1 justify-end font-medium"
+                          />
+                          <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                            {m.homeScore !== null && m.awayScore !== null
+                              ? `${m.homeScore} - ${m.awayScore}`
+                              : 'vs'}
+                          </span>
+                          <TeamName
+                            team={m.awayTeam}
+                            className="flex-1 font-medium"
+                          />
+                          {locked && (
+                            <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                          )}
+                        </div>
+                        <span className="text-center text-xs capitalize text-muted-foreground">
+                          {formatKickoff(m.kickoff)}
                         </span>
-                        <TeamName
-                          team={m.awayTeam}
-                          className="flex-1 font-medium"
-                        />
-                        {locked && (
-                          <Lock className="size-3.5 shrink-0 text-muted-foreground" />
-                        )}
                       </li>
                     )
                   })}
