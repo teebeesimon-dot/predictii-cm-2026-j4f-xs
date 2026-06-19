@@ -75,6 +75,26 @@ export interface AppUser {
   // Jucător ascuns din clasamente pentru ceilalți participanți. Rămâne vizibil
   // în pagina „Colegii" și se vede pe sine (plus adminii îl văd) în clasamente.
   hideFromStandings?: boolean
+  // Acces per ediție (cheie = editionId). La edițiile noi nimeni nu are acces
+  // până când adminul nu bifează explicit. Ediția World Cup 2026 (cea existentă)
+  // este accesibilă implicit tuturor (vezi hasEditionAccess).
+  access?: Record<string, boolean>
+}
+
+// Ediția implicită / existentă, accesibilă tuturor fără bifare specială.
+export const DEFAULT_EDITION_ID = 'wc-2026'
+
+// Determină dacă un utilizator are acces la o ediție. Adminii au mereu acces.
+// Ediția existentă (wc-2026) e accesibilă tuturor dacă nu e blocată explicit.
+// Edițiile noi necesită bifare explicită (access[editionId] === true).
+export function hasEditionAccess(
+  u: Pick<AppUser, 'isAdmin' | 'role' | 'access'>,
+  editionId: string,
+): boolean {
+  if (isUserAdmin(u)) return true
+  const explicit = u.access?.[editionId]
+  if (editionId === DEFAULT_EDITION_ID) return explicit !== false
+  return explicit === true
 }
 
 // Resolve admin status from either the boolean flag or the role string.
@@ -89,6 +109,9 @@ export function isViewOnly(u: Pick<AppUser, 'viewOnly'>): boolean {
 
 export interface Match {
   id: string
+  // Ediția (competiție + an) căreia îi aparține meciul. Documentele mai vechi
+  // nu au acest câmp și sunt tratate implicit ca ediția World Cup 2026.
+  editionId?: string
   stage: StageId
   // Doar pentru Etapa 5: runda eliminatorie (decide termenul limită)
   round?: KnockoutRound
@@ -106,6 +129,9 @@ export interface Prediction {
   id: string
   userId: string
   matchId: string
+  // Ediția căreia îi aparține pronosticul (derivată din meci). Documentele mai
+  // vechi nu au acest câmp și sunt tratate implicit ca World Cup 2026.
+  editionId?: string
   homeScore: number
   awayScore: number
   updatedAt: number

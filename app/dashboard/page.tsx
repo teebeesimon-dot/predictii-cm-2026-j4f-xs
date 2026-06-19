@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
+import { useEdition } from '@/components/edition-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { TeamName } from '@/components/team-name'
@@ -36,6 +38,7 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user } = useAuth()
+  const { edition, competition } = useEdition()
   // Reîmprospătare automată în fundal la 10s, fără reîncărcarea paginii.
   // SWR revalidează datele și actualizează doar ce s-a schimbat (scoruri,
   // pronosticuri, clasament), păstrând starea și scroll-ul.
@@ -108,17 +111,26 @@ function DashboardContent() {
           style={{ backgroundImage: "url('/stadium-night.png')" }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
-        <div className="relative flex flex-col gap-1 p-6 sm:p-8">
-          <p className="text-sm font-medium uppercase tracking-widest text-accent">
-            Bun venit
-          </p>
-          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
-            {user?.name ?? user?.username}
-          </h1>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
-            Iată ce urmează în Campionatul Mondial 2026. Pune-ți pronosticurile
-            și urcă în clasament.
-          </p>
+        <div className="relative flex items-center justify-between gap-4 p-6 sm:p-8">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium uppercase tracking-widest text-accent">
+              Bun venit
+            </p>
+            <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+              {user?.name ?? user?.username}
+            </h1>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              {`Iată ce urmează în ${edition.label}. Pune-ți pronosticurile și urcă în clasament.`}
+            </p>
+          </div>
+          <Image
+            src={competition.mascot || '/placeholder.svg'}
+            alt={`Mascota ${competition.name}`}
+            width={120}
+            height={120}
+            className="hidden size-28 shrink-0 object-contain drop-shadow-lg sm:block lg:size-32"
+            priority
+          />
         </div>
       </div>
 

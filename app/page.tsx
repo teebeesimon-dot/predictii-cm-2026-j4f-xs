@@ -57,13 +57,13 @@ export default function LoginPage() {
             <Trophy className="size-8" />
           </div>
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
-            Predictii CM 2026
+            Predictii Just4Fun
           </h1>
           <p className="mt-1 text-sm font-medium uppercase tracking-[0.3em] text-accent">
-            J4F League
+            Just4Fun League
           </p>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
-            Pune pronosticuri la meciurile Campionatului Mondial, urcă în clasament
+            Pune pronosticuri la marile competiții de fotbal, urcă în clasament
             și cucerește trofeul.
           </p>
         </div>

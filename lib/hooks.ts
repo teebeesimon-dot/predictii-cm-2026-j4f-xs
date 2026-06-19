@@ -6,10 +6,26 @@ import {
   getUsers,
   getAllPredictions,
   getUserPredictions,
+  getAvailableEditionIds,
 } from '@/lib/data'
+import { useEdition } from '@/components/edition-provider'
+
+// Edițiile care au meciuri încărcate (pentru selector). Reîmprospătare lejeră
+// ca o ediție nou populată să apară fără reîncărcarea paginii.
+export function useAvailableEditionIds(refreshMs?: number) {
+  return useSWR('available-editions', getAvailableEditionIds, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
+}
+
+// Toate hook-urile de date sunt legate de ediția curentă (competiție + an).
+// editionId face parte din cheia SWR, deci la schimbarea ediției datele se
+// reîncarcă automat, iar cache-ul fiecărei ediții rămâne separat.
 
 export function useMatches(refreshMs?: number) {
-  return useSWR('matches', getMatches, {
+  const { editionId } = useEdition()
+  return useSWR(['matches', editionId], () => getMatches(editionId), {
     revalidateOnFocus: false,
     refreshInterval: refreshMs ?? 0,
   })
@@ -23,14 +39,17 @@ export function useUsers(refreshMs?: number) {
 }
 
 export function useAllPredictions(refreshMs?: number) {
-  return useSWR('predictions', getAllPredictions, {
+  const { editionId } = useEdition()
+  return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
     revalidateOnFocus: false,
     refreshInterval: refreshMs ?? 0,
   })
 }
 
 export function useUserPredictions(userId: string | undefined) {
-  return useSWR(userId ? ['user-predictions', userId] : null, () =>
-    getUserPredictions(userId as string),
+  const { editionId } = useEdition()
+  return useSWR(
+    userId ? ['user-predictions', userId, editionId] : null,
+    () => getUserPredictions(userId as string, editionId),
   )
 }

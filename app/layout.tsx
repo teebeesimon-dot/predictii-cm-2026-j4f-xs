@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono, Oswald } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth-provider'
+import { EditionProvider } from '@/components/edition-provider'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -17,9 +18,9 @@ const oswald = Oswald({
 })
 
 export const metadata: Metadata = {
-  title: 'Predictii CM 2026 J4F',
+  title: 'Predictii Just4Fun',
   description:
-    'Jocul de predicții pentru Campionatul Mondial 2026. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
+    'Jocul de predicții Just4Fun pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
   generator: 'v0.app',
 }
 
@@ -48,7 +49,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>{children}</AuthProvider>
+          <EditionProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </EditionProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

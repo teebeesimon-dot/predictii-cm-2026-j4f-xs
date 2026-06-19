@@ -12,17 +12,36 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
-import { scorePrediction, PARTICIPANTS, isViewOnly } from '@/lib/types'
+import {
+  scorePrediction,
+  PARTICIPANTS,
+  isViewOnly,
+  DEFAULT_EDITION_ID,
+  hasEditionAccess,
+} from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 
 // Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
 // a detecta conturile mai vechi care nu și-au schimbat încă parola.
 export const DEFAULT_PASSWORD = 'cm2026'
 
-export async function getMatches(): Promise<Match[]> {
+// Ediția unui document (meci/pronostic): documentele mai vechi nu au câmpul
+// editionId și aparțin ediției existente World Cup 2026.
+function editionOf(doc: { editionId?: string }): string {
+  return doc.editionId ?? DEFAULT_EDITION_ID
+}
+
+// Toate meciurile unei ediții. Dacă editionId lipsește, întoarce toate
+// meciurile (folosit doar la sincronizare/migrare internă).
+export async function getMatches(editionId?: string): Promise<Match[]> {
   const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
   const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Match, 'id'>) }))
+  const all = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Match, 'id'>),
+  }))
+  if (!editionId) return all
+  return all.filter((m) => editionOf(m) === editionId)
 }
 
 export async function getUsers(): Promise<AppUser[]> {
@@ -30,13 +49,35 @@ export async function getUsers(): Promise<AppUser[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AppUser, 'id'>) }))
 }
 
-export async function getAllPredictions(): Promise<Prediction[]> {
-  const snap = await getDocs(collection(db, 'predictions'))
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Prediction, 'id'>) }))
+// Id-urile edițiilor care au cel puțin un meci încărcat. Edițiile fără meciuri
+// sunt ascunse jucătorilor (selectorul le afișează doar adminilor).
+export async function getAvailableEditionIds(): Promise<string[]> {
+  const snap = await getDocs(collection(db, 'matches'))
+  const set = new Set<string>()
+  snap.docs.forEach((d) => {
+    const data = d.data() as Omit<Match, 'id'>
+    set.add(editionOf(data))
+  })
+  return Array.from(set)
 }
 
-export async function getUserPredictions(userId: string): Promise<Prediction[]> {
-  const all = await getAllPredictions()
+export async function getAllPredictions(
+  editionId?: string,
+): Promise<Prediction[]> {
+  const snap = await getDocs(collection(db, 'predictions'))
+  const all = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Prediction, 'id'>),
+  }))
+  if (!editionId) return all
+  return all.filter((p) => editionOf(p) === editionId)
+}
+
+export async function getUserPredictions(
+  userId: string,
+  editionId?: string,
+): Promise<Prediction[]> {
+  const all = await getAllPredictions(editionId)
   return all.filter((p) => p.userId === userId)
 }
 
@@ -55,7 +96,10 @@ export async function savePrediction(
 ): Promise<void> {
   // Backend guard: conturile de supraveghere nu pot trimite pronosticuri.
   const userSnap = await getDoc(doc(db, 'users', userId))
-  if (userSnap.exists() && isViewOnly(userSnap.data() as Omit<AppUser, 'id'>)) {
+  const userData = userSnap.exists()
+    ? (userSnap.data() as Omit<AppUser, 'id'>)
+    : null
+  if (userData && isViewOnly(userData)) {
     throw new Error('Contul de supraveghere nu poate trimite pronosticuri.')
   }
   // Backend guard: never trust the UI. A prediction cannot be saved or changed
@@ -65,6 +109,12 @@ export async function savePrediction(
     throw new Error('Meciul nu există.')
   }
   const match = snap.data() as Omit<Match, 'id'>
+  const editionId = editionOf(match)
+
+  // Backend guard: utilizatorul trebuie să aibă acces la ediția meciului.
+  if (userData && !hasEditionAccess(userData, editionId)) {
+    throw new Error('Nu ai acces la această competiție.')
+  }
   if (new Date(match.kickoff).getTime() <= Date.now()) {
     throw new PredictionLockedError()
   }
@@ -73,6 +123,7 @@ export async function savePrediction(
   await setDoc(doc(db, 'predictions', id), {
     userId,
     matchId,
+    editionId,
     homeScore,
     awayScore,
     updatedAt: Date.now(),
@@ -90,13 +141,13 @@ export async function deleteMatch(matchId: string): Promise<void> {
 
 // Seed all 72 group-stage matches if none exist yet. Returns the number added.
 export async function seedGroupMatchesIfEmpty(): Promise<number> {
-  const existing = await getMatches()
+  const existing = await getMatches(DEFAULT_EDITION_ID)
   if (existing.length > 0) return 0
 
   const batch = writeBatch(db)
   for (const m of WC2026_GROUP_MATCHES) {
     const ref = doc(collection(db, 'matches'))
-    batch.set(ref, m)
+    batch.set(ref, { ...m, editionId: DEFAULT_EDITION_ID })
   }
   await batch.commit()
   return WC2026_GROUP_MATCHES.length
@@ -239,6 +290,18 @@ export async function updateUserAccess(
   access: { viewOnly?: boolean; hideFromStandings?: boolean },
 ): Promise<void> {
   await updateDoc(doc(db, 'users', userId), access)
+}
+
+// Setează (sau revocă) accesul unui utilizator la o anumită ediție. Folosit de
+// admin pentru a bifa cine participă la fiecare competiție/an.
+export async function setUserEditionAccess(
+  userId: string,
+  editionId: string,
+  allowed: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    [`access.${editionId}`]: allowed,
+  })
 }
 
 // Resetare parolă de către admin: setează noua parolă și forțează utilizatorul

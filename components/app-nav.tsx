@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/components/auth-provider'
+import { EditionSelector } from '@/components/edition-selector'
 
 type NavItem = {
   href: string
@@ -140,17 +141,22 @@ export function AppNav() {
         <div className="flex-1 bg-[#CE1126]" />
       </div>
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Trophy className="size-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="font-heading text-sm font-bold tracking-wide">PREDICTII CM 2026</p>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              J4F League
-            </p>
-          </div>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Trophy className="size-5" />
+            </div>
+            <div className="hidden leading-tight sm:block">
+              <p className="font-heading text-sm font-bold tracking-wide">
+                PREDICTII JUST4FUN
+              </p>
+              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                Just4Fun League
+              </p>
+            </div>
+          </Link>
+          <EditionSelector />
+        </div>
 
         <nav className="hidden items-center gap-0.5 xl:flex">
           {items.map((item) => {

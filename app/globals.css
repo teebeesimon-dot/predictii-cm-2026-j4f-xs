@@ -117,6 +117,94 @@
   --sidebar-ring: oklch(0.62 0.15 158);
 }
 
+/* ===========================================================================
+   Teme per competiție. Atributul data-competition este setat pe <html> de
+   EditionProvider. World Cup (wc) folosește paleta verde implicită de mai sus.
+   Champions League (cl) = albastru-navy + argintiu. Euro = crimson + albastru.
+   Suprascriem doar tokenii de brand (+ ușor hue-ul neutrelor) ca să păstrăm
+   contrastul. Selectorii „.dark[...]" au prioritate față de blocul .dark.
+   =========================================================================== */
+
+/* ---- Champions League: light ---- */
+[data-competition='cl'] {
+  --primary: oklch(0.48 0.16 264);
+  --primary-foreground: oklch(0.99 0.01 264);
+  --accent: oklch(0.72 0.08 250);
+  --accent-foreground: oklch(0.25 0.06 264);
+  --ring: oklch(0.48 0.16 264);
+  --chart-1: oklch(0.48 0.16 264);
+  --chart-2: oklch(0.72 0.08 250);
+  --sidebar-primary: oklch(0.48 0.16 264);
+  --sidebar-ring: oklch(0.48 0.16 264);
+}
+
+/* ---- Champions League: dark (navy night) ---- */
+.dark[data-competition='cl'] {
+  --background: oklch(0.17 0.035 264);
+  --foreground: oklch(0.96 0.01 264);
+  --card: oklch(0.22 0.04 264);
+  --card-foreground: oklch(0.96 0.01 264);
+  --popover: oklch(0.22 0.04 264);
+  --popover-foreground: oklch(0.96 0.01 264);
+  --primary: oklch(0.65 0.16 262);
+  --primary-foreground: oklch(0.15 0.03 264);
+  --secondary: oklch(0.3 0.05 264);
+  --secondary-foreground: oklch(0.96 0.01 264);
+  --muted: oklch(0.27 0.04 264);
+  --muted-foreground: oklch(0.72 0.03 260);
+  --accent: oklch(0.78 0.1 250);
+  --accent-foreground: oklch(0.2 0.05 264);
+  --ring: oklch(0.65 0.16 262);
+  --chart-1: oklch(0.65 0.16 262);
+  --chart-2: oklch(0.78 0.1 250);
+  --sidebar: oklch(0.19 0.038 264);
+  --sidebar-foreground: oklch(0.96 0.01 264);
+  --sidebar-primary: oklch(0.65 0.16 262);
+  --sidebar-accent: oklch(0.3 0.05 264);
+  --sidebar-accent-foreground: oklch(0.96 0.01 264);
+  --sidebar-ring: oklch(0.65 0.16 262);
+}
+
+/* ---- Euro: light ---- */
+[data-competition='euro'] {
+  --primary: oklch(0.52 0.2 25);
+  --primary-foreground: oklch(0.99 0.01 25);
+  --accent: oklch(0.62 0.13 250);
+  --accent-foreground: oklch(0.99 0.01 250);
+  --ring: oklch(0.52 0.2 25);
+  --chart-1: oklch(0.52 0.2 25);
+  --chart-2: oklch(0.62 0.13 250);
+  --sidebar-primary: oklch(0.52 0.2 25);
+  --sidebar-ring: oklch(0.52 0.2 25);
+}
+
+/* ---- Euro: dark ---- */
+.dark[data-competition='euro'] {
+  --background: oklch(0.18 0.025 25);
+  --foreground: oklch(0.96 0.01 25);
+  --card: oklch(0.23 0.03 25);
+  --card-foreground: oklch(0.96 0.01 25);
+  --popover: oklch(0.23 0.03 25);
+  --popover-foreground: oklch(0.96 0.01 25);
+  --primary: oklch(0.62 0.21 25);
+  --primary-foreground: oklch(0.15 0.02 25);
+  --secondary: oklch(0.3 0.04 25);
+  --secondary-foreground: oklch(0.96 0.01 25);
+  --muted: oklch(0.28 0.03 25);
+  --muted-foreground: oklch(0.72 0.02 30);
+  --accent: oklch(0.68 0.14 250);
+  --accent-foreground: oklch(0.99 0.01 250);
+  --ring: oklch(0.62 0.21 25);
+  --chart-1: oklch(0.62 0.21 25);
+  --chart-2: oklch(0.68 0.14 250);
+  --sidebar: oklch(0.2 0.028 25);
+  --sidebar-foreground: oklch(0.96 0.01 25);
+  --sidebar-primary: oklch(0.62 0.21 25);
+  --sidebar-accent: oklch(0.3 0.04 25);
+  --sidebar-accent-foreground: oklch(0.96 0.01 25);
+  --sidebar-ring: oklch(0.62 0.21 25);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
