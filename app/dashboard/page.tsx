@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   STAGES,
   getActiveStage,
+  getLiveStage,
   getStageDeadline,
   isLocked,
   isViewOnly,
@@ -60,10 +61,14 @@ function DashboardContent() {
           isAdmin: user?.isAdmin,
         })
       : []
-  // Clasamentul doar pe etapa activă (live pe măsură ce intră scorurile).
+  // Etapa care se joacă efectiv acum (poate diferi de etapa „activă" pentru
+  // pronosticuri, care sare la următoarea etapă imediat ce termenul expiră).
+  const liveStage = getLiveStage(matches ?? [])
+  const liveStageInfo = STAGES.find((s) => s.id === liveStage)
+  // Clasamentul doar pe etapa live (se actualizează pe măsură ce intră scorurile).
   const stageStandings =
     users && matches && predictions
-      ? computeStandings(users, matches, predictions, activeStage, {
+      ? computeStandings(users, matches, predictions, liveStage, {
           id: user?.id,
           isAdmin: user?.isAdmin,
         })
@@ -176,7 +181,7 @@ function DashboardContent() {
                     <CardTitle className="text-base">Clasament live etapă</CardTitle>
                   </div>
                   <Badge variant="secondary" className="hidden sm:inline-flex">
-                    {activeStageInfo?.short}
+                    {liveStageInfo?.short}
                   </Badge>
                 </CardHeader>
                 <CardContent>
@@ -228,7 +233,7 @@ function DashboardContent() {
                     <CardTitle className="text-base">Clasament etapă</CardTitle>
                   </div>
                   <Badge variant="secondary" className="hidden sm:inline-flex">
-                    {activeStageInfo?.short}
+                    {liveStageInfo?.short}
                   </Badge>
                 </CardHeader>
                 <CardContent>

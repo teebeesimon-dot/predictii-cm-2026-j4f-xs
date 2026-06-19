@@ -198,6 +198,22 @@ export function getActiveStage(): StageId {
   return 5
 }
 
+// Etapa „live" pentru clasamentul în desfășurare: cea mai avansată etapă care
+// are deja cel puțin un meci început (kickoff <= acum). Spre deosebire de
+// getActiveStage() — care vizează termenul de pronostic și sare la etapa
+// următoare imediat ce termenul curent expiră — aceasta reflectă etapa care se
+// joacă efectiv acum. Dacă niciun meci nu a început, întoarce prima etapă.
+export function getLiveStage(matches: { stage: StageId; kickoff: string }[]): StageId {
+  const now = Date.now()
+  let live: StageId | null = null
+  for (const m of matches) {
+    if (new Date(m.kickoff).getTime() <= now) {
+      if (live === null || m.stage > live) live = m.stage
+    }
+  }
+  return live ?? 1
+}
+
 // Termenul limită activ pentru o etapă (Etapa 5 → următoarea rundă neexpirată).
 export function getStageDeadline(stage: StageId): string | null {
   if (stage !== 5) return STAGE_DEADLINES[stage as Exclude<StageId, 5>] ?? null
