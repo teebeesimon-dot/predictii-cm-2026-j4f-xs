@@ -45,39 +45,9 @@ const NAV: NavItem[] = [
   },
   {
     href: '/standings',
-    label: 'Clasament General',
+    label: 'Clasament',
     icon: Trophy,
-    match: (p, s) => p === '/standings' && (!s || s === 'general'),
-  },
-  {
-    href: '/standings?stage=1',
-    label: 'Etapa 1',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '1',
-  },
-  {
-    href: '/standings?stage=2',
-    label: 'Etapa 2',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '2',
-  },
-  {
-    href: '/standings?stage=3',
-    label: 'Etapa 3',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '3',
-  },
-  {
-    href: '/standings?stage=4',
-    label: 'Etapa 4',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '4',
-  },
-  {
-    href: '/standings?stage=5',
-    label: 'Etapa 5',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '5',
+    match: (p) => p === '/standings',
   },
   {
     href: '/statistics',

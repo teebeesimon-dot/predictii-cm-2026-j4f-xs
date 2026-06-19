@@ -4,9 +4,10 @@ import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
-import { computeStandings } from '@/lib/data'
+import { computeStandings, computePositionHistory } from '@/lib/data'
 import { STAGES, type StageId } from '@/lib/types'
 import { StandingsTable } from '@/components/standings-table'
+import { PositionEvolutionChart } from '@/components/position-evolution-chart'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
@@ -61,6 +62,9 @@ function StandingsContent() {
                     {s.short}
                   </TabsTrigger>
                 ))}
+                <TabsTrigger value="evolution" className="flex-1">
+                  Evoluție
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="general" className="mt-4">
@@ -93,6 +97,22 @@ function StandingsContent() {
                   />
                 </TabsContent>
               ))}
+
+              <TabsContent value="evolution" className="mt-4">
+                <p className="mb-3 text-sm font-medium text-muted-foreground">
+                  Evoluția poziției fiecărui participant după fiecare meci.
+                  Selectează jucătorii pe care vrei să-i compari.
+                </p>
+                <PositionEvolutionChart
+                  history={computePositionHistory(
+                    users,
+                    matches,
+                    predictions,
+                    viewer,
+                  )}
+                  highlightUserId={user?.id}
+                />
+              </TabsContent>
             </Tabs>
           )}
         </CardContent>

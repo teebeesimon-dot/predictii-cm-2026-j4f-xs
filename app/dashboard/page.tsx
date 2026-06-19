@@ -60,6 +60,14 @@ function DashboardContent() {
           isAdmin: user?.isAdmin,
         })
       : []
+  // Clasamentul doar pe etapa activă (live pe măsură ce intră scorurile).
+  const stageStandings =
+    users && matches && predictions
+      ? computeStandings(users, matches, predictions, activeStage, {
+          id: user?.id,
+          isAdmin: user?.isAdmin,
+        })
+      : []
   const myRow = standings.find((r) => r.userId === user?.id)
   const myRank = myRow?.rank ?? -1
 
@@ -159,21 +167,37 @@ function DashboardContent() {
                 />
               ))}
             </div>
-            {/* Dreapta: clasamentul live (se actualizează pe măsură ce intră scorurile) */}
-            <Card className="border-primary/30">
-              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <Trophy className="size-5 text-primary" />
-                  <CardTitle className="text-base">Clasament live</CardTitle>
-                </div>
-                <Badge variant="secondary" className="hidden sm:inline-flex">
-                  General
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <StandingsTable rows={standings} highlightUserId={user?.id} />
-              </CardContent>
-            </Card>
+            {/* Dreapta: mai întâi clasamentul live pe etapa curentă, apoi cel general */}
+            <div className="flex flex-col gap-4">
+              <Card className="border-destructive/30">
+                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="size-5 text-destructive" />
+                    <CardTitle className="text-base">Clasament live etapă</CardTitle>
+                  </div>
+                  <Badge variant="secondary" className="hidden sm:inline-flex">
+                    {activeStageInfo?.short}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <StandingsTable rows={stageStandings} highlightUserId={user?.id} />
+                </CardContent>
+              </Card>
+              <Card className="border-primary/30">
+                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="size-5 text-primary" />
+                    <CardTitle className="text-base">Clasament general</CardTitle>
+                  </div>
+                  <Badge variant="secondary" className="hidden sm:inline-flex">
+                    General
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <StandingsTable rows={standings} highlightUserId={user?.id} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </section>
       )}
@@ -195,21 +219,37 @@ function DashboardContent() {
               currentUserId={user?.id}
               variant="next"
             />
-            {/* Dreapta: clasamentul general */}
-            <Card className="border-primary/30">
-              <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <div className="flex items-center gap-2">
-                  <Trophy className="size-5 text-primary" />
-                  <CardTitle className="text-base">Clasament</CardTitle>
-                </div>
-                <Badge variant="secondary" className="hidden sm:inline-flex">
-                  General
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <StandingsTable rows={standings} highlightUserId={user?.id} />
-              </CardContent>
-            </Card>
+            {/* Dreapta: mai întâi clasamentul pe etapa curentă, apoi cel general */}
+            <div className="flex flex-col gap-4">
+              <Card className="border-primary/30">
+                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="size-5 text-primary" />
+                    <CardTitle className="text-base">Clasament etapă</CardTitle>
+                  </div>
+                  <Badge variant="secondary" className="hidden sm:inline-flex">
+                    {activeStageInfo?.short}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <StandingsTable rows={stageStandings} highlightUserId={user?.id} />
+                </CardContent>
+              </Card>
+              <Card className="border-primary/30">
+                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="size-5 text-primary" />
+                    <CardTitle className="text-base">Clasament general</CardTitle>
+                  </div>
+                  <Badge variant="secondary" className="hidden sm:inline-flex">
+                    General
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <StandingsTable rows={standings} highlightUserId={user?.id} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </section>
       )}
