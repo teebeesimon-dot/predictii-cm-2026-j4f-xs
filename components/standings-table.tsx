@@ -55,7 +55,7 @@ export function StandingsTable({
               >
                 <TableCell className="text-center font-bold tabular-nums">
                   <span className="inline-flex items-center justify-center gap-1">
-                    {rank <= 3 && (
+                    {rank <= 3 && row.points > 0 && (
                       <Trophy
                         className={cn(
                           'size-4',
