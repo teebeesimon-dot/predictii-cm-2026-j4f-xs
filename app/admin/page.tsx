@@ -3,7 +3,13 @@
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
-import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
+import {
+  useMatches,
+  useUsers,
+  useAllPredictions,
+  useAvailableEditionIds,
+} from '@/lib/hooks'
 import {
   createMatch,
   deleteMatch,
@@ -12,12 +18,16 @@ import {
   deleteUser,
   updateUserPassword,
   updateUserAccess,
+  setUserEditionAccess,
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
   resyncMatchTeams,
   computeStandings,
 } from '@/lib/data'
+import { importEditionMatches } from '@/app/actions/sync'
+import { EDITIONS, COMPETITIONS } from '@/lib/editions'
+import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
@@ -70,6 +80,7 @@ export default function AdminPage() {
 }
 
 function AdminContent() {
+  const { editionId, edition } = useEdition()
   const { data: matches, isLoading, mutate } = useMatches()
   const { data: users, isLoading: usersLoading, mutate: mutateUsers } = useUsers()
   const { data: predictions } = useAllPredictions()
@@ -127,6 +138,10 @@ function AdminContent() {
             Adaugă meciuri, introdu rezultatele oficiale și gestionează conturile.
             Clasamentele se recalculează automat.
           </p>
+          <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+            Editezi:{' '}
+            <span className="font-bold text-foreground">{edition.label}</span>
+          </p>
         </div>
         <Button
           variant="outline"
@@ -154,16 +169,30 @@ function AdminContent() {
 
         <TabsContent value="add" className="mt-4">
           <div className="flex flex-col gap-4">
-            <SeedMatchesPrompt
-              hasMatches={(matches?.length ?? 0) > 0}
-              onSeeded={() => mutate()}
-            />
-            <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
-            <ResyncMatchesBanner
-              matches={matches ?? []}
-              onResynced={() => mutate()}
-            />
-            <AddMatchForm onAdded={() => mutate()} />
+            {editionId === DEFAULT_EDITION_ID ? (
+              <>
+                <SeedMatchesPrompt
+                  hasMatches={(matches?.length ?? 0) > 0}
+                  onSeeded={() => mutate()}
+                />
+                <PlayoffFixBanner
+                  matches={matches ?? []}
+                  onFixed={() => mutate()}
+                />
+                <ResyncMatchesBanner
+                  matches={matches ?? []}
+                  onResynced={() => mutate()}
+                />
+              </>
+            ) : (
+              <ImportEditionMatchesBanner
+                editionId={editionId}
+                editionLabel={edition.label}
+                hasMatches={(matches?.length ?? 0) > 0}
+                onImported={() => mutate()}
+              />
+            )}
+            <AddMatchForm editionId={editionId} onAdded={() => mutate()} />
           </div>
         </TabsContent>
 
@@ -571,7 +600,75 @@ function SeedMatchesPrompt({
   )
 }
 
-function AddMatchForm({ onAdded }: { onAdded: () => void }) {
+// Banner pentru încărcarea meciurilor unei ediții (alta decât CM 2026) de la
+// football-data.org. Edițiile viitoare pot fi goale până când furnizorul are
+// programul; atunci importul întoarce un mesaj prietenos.
+function ImportEditionMatchesBanner({
+  editionId,
+  editionLabel,
+  hasMatches,
+  onImported,
+}: {
+  editionId: string
+  editionLabel: string
+  hasMatches: boolean
+  onImported: () => void
+}) {
+  const [importing, setImporting] = useState(false)
+
+  async function handleImport() {
+    setImporting(true)
+    try {
+      const res = await importEditionMatches(editionId)
+      if (res.ok) {
+        toast.success(res.message)
+        onImported()
+      } else {
+        toast.info(res.message)
+      }
+    } catch {
+      toast.error('Eroare la importul meciurilor.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Download className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium">Încarcă meciurile · {editionLabel}</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Preia automat programul acestei ediții de la football-data.org. Dacă
+            furnizorul nu are încă meciurile, încearcă din nou mai târziu.
+            Meciurile deja încărcate nu sunt suprascrise.
+          </p>
+        </div>
+      </div>
+      <Button
+        onClick={handleImport}
+        disabled={importing || hasMatches}
+        className="shrink-0"
+      >
+        {importing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4" />
+        )}
+        {hasMatches ? 'Meciuri deja încărcate' : 'Încarcă meciuri'}
+      </Button>
+    </div>
+  )
+}
+
+function AddMatchForm({
+  editionId,
+  onAdded,
+}: {
+  editionId: string
+  onAdded: () => void
+}) {
   const [home, setHome] = useState('')
   const [away, setAway] = useState('')
   const [stage, setStage] = useState<StageId>(1)
@@ -588,6 +685,7 @@ function AddMatchForm({ onAdded }: { onAdded: () => void }) {
     setSaving(true)
     try {
       await createMatch({
+        editionId,
         homeTeam: home.trim(),
         awayTeam: away.trim(),
         stage,
@@ -824,11 +922,20 @@ function UsersManager({
   loading: boolean
   onChanged: () => void
 }) {
+  const { data: availableEditionIds } = useAvailableEditionIds()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
+
+  // Edițiile pentru care setăm acces: cele care au meciuri încărcate. Includem
+  // mereu WC 2026. Sortate după ordinea din registru.
+  const accessEditions = EDITIONS.filter(
+    (e) =>
+      e.id === DEFAULT_EDITION_ID ||
+      (availableEditionIds ?? []).includes(e.id),
+  )
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -959,7 +1066,12 @@ function UsersManager({
             .slice()
             .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
             .map((u) => (
-              <UserRow key={u.id} user={u} onChanged={onChanged} />
+              <UserRow
+                key={u.id}
+                user={u}
+                editions={accessEditions}
+                onChanged={onChanged}
+              />
             ))}
         </div>
       )}
@@ -967,7 +1079,15 @@ function UsersManager({
   )
 }
 
-function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) {
+function UserRow({
+  user,
+  editions,
+  onChanged,
+}: {
+  user: AppUser
+  editions: typeof EDITIONS
+  onChanged: () => void
+}) {
   const [busy, setBusy] = useState(false)
   const [savingAccess, setSavingAccess] = useState(false)
   // Stare optimistă pentru comutatoare, ca UI-ul să răspundă imediat.
@@ -1036,6 +1156,20 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
     const prev = hidden
     setHidden(next)
     void saveAccess({ hideFromStandings: next }, () => setHidden(prev))
+  }
+
+  // Acces per ediție: setează access[editionId] pe utilizator. Optimist.
+  const [editionBusy, setEditionBusy] = useState<string | null>(null)
+  async function toggleEdition(editionId: string, next: boolean) {
+    setEditionBusy(editionId)
+    try {
+      await setUserEditionAccess(user.id, editionId, next)
+      onChanged()
+    } catch {
+      toast.error('Eroare la actualizarea accesului la competiție.')
+    } finally {
+      setEditionBusy(null)
+    }
   }
 
   return (
@@ -1109,6 +1243,37 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
             />
           </label>
         </div>
+
+        {/* Acces per competiție/ediție: la edițiile noi nimeni nu are acces
+            până când adminul nu bifează aici. */}
+        {editions.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <p className="text-sm font-medium">Acces la competiții</p>
+            <div className="flex flex-col gap-2">
+              {editions.map((e) => {
+                const allowed = hasEditionAccess(user, e.id)
+                const comp = COMPETITIONS[e.competitionId]
+                return (
+                  <label
+                    key={e.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="text-sm">
+                      <span className="font-medium">{comp.short}</span>{' '}
+                      <span className="text-muted-foreground">{e.year}</span>
+                    </span>
+                    <Switch
+                      checked={allowed}
+                      disabled={editionBusy === e.id || viewOnly}
+                      onCheckedChange={(next) => toggleEdition(e.id, next)}
+                      aria-label={`Acces ${e.label}`}
+                    />
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
