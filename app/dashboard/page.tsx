@@ -65,6 +65,10 @@ function DashboardContent() {
   // pronosticuri, care sare la următoarea etapă imediat ce termenul expiră).
   const liveStage = getLiveStage(matches ?? [])
   const liveStageInfo = STAGES.find((s) => s.id === liveStage)
+  // Meciurile etapei în curs (cele jucate au scor, cele neîncepute arată „vs").
+  const liveStageMatches = (matches ?? [])
+    .filter((m) => m.stage === liveStage)
+    .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
   // Clasamentul doar pe etapa live (se actualizează pe măsură ce intră scorurile).
   const stageStandings =
     users && matches && predictions
@@ -264,11 +268,11 @@ function DashboardContent() {
           <div className="flex items-center gap-2">
             <CalendarClock className="size-5 text-primary" />
             <CardTitle className="text-base">
-              {activeStageInfo?.name ?? 'Etapa curentă'}
+              {liveStageInfo?.name ?? 'Etapa curentă'}
             </CardTitle>
           </div>
           <Badge variant="secondary" className="hidden sm:inline-flex">
-            {activeStageInfo?.label}
+            {liveStageInfo?.label}
           </Badge>
         </CardHeader>
         <CardContent>
@@ -281,7 +285,7 @@ function DashboardContent() {
                 label="Pronosticurile se închid în"
               />
 
-              {stageMatches.length === 0 ? (
+              {liveStageMatches.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
                   <Flag className="size-8 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
@@ -290,7 +294,7 @@ function DashboardContent() {
                 </div>
               ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
-                  {stageMatches.map((m) => {
+                  {liveStageMatches.map((m) => {
                     const locked = isLocked(m)
                     return (
                       <li
