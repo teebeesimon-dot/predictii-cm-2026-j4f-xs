@@ -122,6 +122,10 @@ export interface Match {
   // official result (null until admin enters it)
   homeScore: number | null
   awayScore: number | null
+  // Setat true când adminul introduce/corectează scorul manual. Sincronizarea
+  // automată NU suprascrie meciurile marcate astfel (furnizorul poate avea
+  // scorul greșit). Resetat la false când scorul e șters din admin.
+  scoreOverride?: boolean
 }
 
 export interface Prediction {

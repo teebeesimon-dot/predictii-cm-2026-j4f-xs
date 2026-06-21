@@ -362,7 +362,15 @@ export async function updateMatchResult(
   homeScore: number | null,
   awayScore: number | null,
 ): Promise<void> {
-  await updateDoc(doc(db, 'matches', matchId), { homeScore, awayScore })
+  // Când adminul introduce/corectează un scor, îl marcăm ca override manual ca
+  // sincronizarea automată să nu îl mai suprascrie. La ștergerea scorului
+  // (null) eliberăm flag-ul, lăsând sincronizarea să preia din nou.
+  const scoreOverride = homeScore !== null && awayScore !== null
+  await updateDoc(doc(db, 'matches', matchId), {
+    homeScore,
+    awayScore,
+    scoreOverride,
+  })
 }
 
 export async function updateMatch(matchId: string, data: Partial<Match>): Promise<void> {

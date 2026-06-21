@@ -283,6 +283,9 @@ export function diffScores(
 
   const updates: ScoreUpdate[] = []
   for (const m of firestoreMatches) {
+    // Scor corectat manual de admin: nu îl atingem (furnizorul poate greși).
+    if (m.scoreOverride === true) continue
+
     const api = apiByPair.get(teamPairKey(m.homeTeam, m.awayTeam))
     if (!api) continue
 

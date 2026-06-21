@@ -860,6 +860,15 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
           ) : (
             <Badge className="bg-primary/15 text-primary">Deschis</Badge>
           )}
+          {match.scoreOverride && (
+            <Badge
+              variant="outline"
+              className="gap-1 border-accent/50 text-accent"
+              title="Scor introdus manual. Sincronizarea automată nu îl suprascrie."
+            >
+              Manual
+            </Badge>
+          )}
           <Button
             variant="ghost"
             size="icon"
