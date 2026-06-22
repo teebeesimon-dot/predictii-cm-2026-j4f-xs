@@ -25,7 +25,10 @@ function AwardsContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
-  const viewer = { id: user?.id, isAdmin: user?.isAdmin }
+  // La premii, jucătorii ascunși din clasamente nu apar deloc — nici măcar
+  // pentru admin. Singura excepție e propriul cont (potrivire pe id), deci NU
+  // transmitem isAdmin aici.
+  const viewer = { id: user?.id }
 
   // Toți câștigătorii dintr-un clasament: rândurile de pe locul 1. La egalitate
   // de puncte mai mulți jucători împart locul 1, deci toți sunt câștigători.
