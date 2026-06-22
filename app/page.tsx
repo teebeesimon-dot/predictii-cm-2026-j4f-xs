@@ -56,7 +56,7 @@ export default function LoginPage() {
           <img
             src="/j4f-emblem.png"
             alt="Emblema Just4Fun League"
-            className="mb-4 size-24 object-contain drop-shadow-lg"
+            className="mb-2 h-40 w-auto object-contain drop-shadow-lg sm:h-48"
           />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
             Predictii Just4Fun
