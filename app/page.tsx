@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Trophy, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
@@ -53,9 +53,11 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-            <Trophy className="size-8" />
-          </div>
+          <img
+            src="/j4f-emblem.png"
+            alt="Emblema Just4Fun League"
+            className="mb-4 size-24 object-contain drop-shadow-lg"
+          />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
             Predictii Just4Fun
           </h1>

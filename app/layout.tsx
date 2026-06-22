@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   description:
     'Jocul de predicții Just4Fun pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
   generator: 'v0.app',
+  icons: {
+    icon: '/j4f-emblem.png',
+    shortcut: '/j4f-emblem.png',
+    apple: '/j4f-emblem.png',
+  },
 }
 
 export const viewport = {

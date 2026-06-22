@@ -113,9 +113,11 @@ export function AppNav() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Trophy className="size-5" />
-            </div>
+            <img
+              src="/j4f-emblem.png"
+              alt="Emblema Just4Fun League"
+              className="size-9 object-contain"
+            />
             <div className="hidden leading-tight sm:block">
               <p className="font-heading text-sm font-bold tracking-wide">
                 PREDICTII JUST4FUN
