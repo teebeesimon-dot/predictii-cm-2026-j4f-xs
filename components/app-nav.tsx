@@ -112,20 +112,12 @@ export function AppNav() {
       </div>
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center">
             <img
               src="/j4f-emblem.png"
-              alt="Emblema Just4Fun League"
-              className="size-9 object-contain"
+              alt="Predictii Just4Fun League"
+              className="size-12 object-contain lg:size-14"
             />
-            <div className="hidden leading-tight sm:block">
-              <p className="font-heading text-sm font-bold tracking-wide">
-                PREDICTII JUST4FUN
-              </p>
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                Just4Fun League
-              </p>
-            </div>
           </Link>
           <EditionSelector />
         </div>

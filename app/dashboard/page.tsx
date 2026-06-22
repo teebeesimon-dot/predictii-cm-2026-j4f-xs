@@ -143,9 +143,9 @@ function DashboardContent() {
           <Image
             src={competition.mascot || '/placeholder.svg'}
             alt={`Mascota ${competition.name}`}
-            width={120}
-            height={120}
-            className="hidden size-28 shrink-0 object-contain drop-shadow-lg sm:block lg:size-32"
+            width={220}
+            height={220}
+            className="hidden size-36 shrink-0 object-contain drop-shadow-lg sm:block lg:size-44"
             priority
           />
         </div>
