@@ -110,7 +110,7 @@ export function AppNav() {
         <div className="flex-1 bg-[#FCD116]" />
         <div className="flex-1 bg-[#CE1126]" />
       </div>
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex shrink-0 items-center">
             <img
