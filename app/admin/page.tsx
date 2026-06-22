@@ -159,7 +159,7 @@ function AdminContent() {
       </div>
 
       <Tabs defaultValue="results">
-        <TabsList>
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="results">Rezultate</TabsTrigger>
           <TabsTrigger value="sync">Sincronizare</TabsTrigger>
           <TabsTrigger value="completion">Completare</TabsTrigger>
