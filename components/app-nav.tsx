@@ -116,7 +116,7 @@ export function AppNav() {
             <img
               src="/j4f-emblem.png"
               alt="Predictii Just4Fun League"
-              className="h-14 w-auto shrink-0 object-contain lg:h-16"
+              className="h-10 w-auto shrink-0 object-contain lg:h-12"
             />
           </Link>
           <EditionSelector />
