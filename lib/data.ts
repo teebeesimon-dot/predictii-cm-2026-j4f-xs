@@ -488,27 +488,31 @@ export interface PositionHistory {
 }
 
 // Calculează evoluția pozițiilor: pentru fiecare meci încheiat (în ordine
-// cronologică), recalculează clasamentul general cumulativ și reține poziția
-// fiecărui jucător. Permite desenarea unui grafic „poziție după fiecare meci".
+// cronologică), recalculează clasamentul cumulativ și reține poziția fiecărui
+// jucător. Permite desenarea unui grafic „poziție după fiecare meci".
+// Dacă `stage` e dat, se iau în calcul doar meciurile acelei etape, iar
+// pozițiile reflectă clasamentul etapei respective.
 export function computePositionHistory(
   users: AppUser[],
   matches: Match[],
   predictions: Prediction[],
+  stage?: StageId,
   viewer?: { id?: string; isAdmin?: boolean },
 ): PositionHistory {
-  const finished = matches
+  const scoped = stage ? matches.filter((m) => m.stage === stage) : matches
+  const finished = scoped
     .filter((m) => m.homeScore !== null && m.awayScore !== null)
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
 
-  // Setul de jucători (și ordinea) din clasamentul final — respectă filtrele de
-  // vizibilitate (ascunși/supraveghere).
-  const finalRows = computeStandings(users, matches, predictions, undefined, viewer)
+  // Setul de jucători (și ordinea) din clasamentul final al scopului — respectă
+  // filtrele de vizibilitate (ascunși/supraveghere).
+  const finalRows = computeStandings(users, matches, predictions, stage, viewer)
   const players = finalRows.map((r) => ({ userId: r.userId, name: r.name }))
 
   const points: PositionHistoryPoint[] = []
   for (let i = 0; i < finished.length; i++) {
     const prefix = finished.slice(0, i + 1)
-    const rows = computeStandings(users, prefix, predictions, undefined, viewer)
+    const rows = computeStandings(users, prefix, predictions, stage, viewer)
     const ranks: Record<string, number> = {}
     for (const r of rows) ranks[r.userId] = r.rank
     points.push({ idx: i + 1, label: `M${i + 1}`, ranks })

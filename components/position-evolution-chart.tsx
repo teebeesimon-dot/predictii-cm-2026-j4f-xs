@@ -199,8 +199,7 @@ export function PositionEvolutionChart({
       </ChartContainer>
 
       <p className="text-center text-xs text-muted-foreground">
-        Poziția în clasamentul general după fiecare meci încheiat. Mai sus = loc
-        mai bun.
+        Poziția în clasament după fiecare meci încheiat. Mai sus = loc mai bun.
       </p>
     </div>
   )

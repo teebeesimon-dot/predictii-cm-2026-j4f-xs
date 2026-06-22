@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import { computeStandings, computePositionHistory } from '@/lib/data'
+import type { AppUser, Match, Prediction } from '@/lib/types'
 import { STAGES, type StageId } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { StandingsTable } from '@/components/standings-table'
 import { PositionEvolutionChart } from '@/components/position-evolution-chart'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -99,17 +102,11 @@ function StandingsContent() {
               ))}
 
               <TabsContent value="evolution" className="mt-4">
-                <p className="mb-3 text-sm font-medium text-muted-foreground">
-                  Evoluția poziției fiecărui participant după fiecare meci.
-                  Selectează jucătorii pe care vrei să-i compari.
-                </p>
-                <PositionEvolutionChart
-                  history={computePositionHistory(
-                    users,
-                    matches,
-                    predictions,
-                    viewer,
-                  )}
+                <EvolutionTab
+                  users={users}
+                  matches={matches}
+                  predictions={predictions}
+                  viewer={viewer}
                   highlightUserId={user?.id}
                 />
               </TabsContent>
@@ -117,6 +114,75 @@ function StandingsContent() {
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+// Tab-ul de evoluție, cu selector de scop: general sau o etapă anume. Graficul
+// se recalculează în funcție de scopul ales.
+function EvolutionTab({
+  users,
+  matches,
+  predictions,
+  viewer,
+  highlightUserId,
+}: {
+  users: AppUser[]
+  matches: Match[]
+  predictions: Prediction[]
+  viewer: { id?: string; isAdmin?: boolean }
+  highlightUserId?: string
+}) {
+  // 'general' = clasament cumulat pe tot turneul; altfel o etapă (StageId).
+  const [scope, setScope] = useState<'general' | StageId>('general')
+
+  const scopes: { key: 'general' | StageId; label: string }[] = [
+    { key: 'general', label: 'General' },
+    ...STAGES.map((s) => ({ key: s.id as StageId, label: s.short })),
+  ]
+
+  const history = computePositionHistory(
+    users,
+    matches,
+    predictions,
+    scope === 'general' ? undefined : scope,
+    viewer,
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm font-medium text-muted-foreground">
+        Evoluția poziției fiecărui participant după fiecare meci. Alege scopul și
+        selectează jucătorii pe care vrei să-i compari.
+      </p>
+
+      {/* Selector de scop: general sau etapă */}
+      <div className="flex flex-wrap gap-2">
+        {scopes.map((sc) => {
+          const on = scope === sc.key
+          return (
+            <button
+              key={String(sc.key)}
+              type="button"
+              onClick={() => setScope(sc.key)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                on
+                  ? 'border-transparent bg-primary text-primary-foreground'
+                  : 'border-border text-muted-foreground hover:bg-secondary',
+              )}
+            >
+              {sc.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <PositionEvolutionChart
+        key={String(scope)}
+        history={history}
+        highlightUserId={highlightUserId}
+      />
     </div>
   )
 }
