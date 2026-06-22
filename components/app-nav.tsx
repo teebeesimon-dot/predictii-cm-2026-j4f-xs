@@ -112,11 +112,11 @@ export function AppNav() {
       </div>
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/dashboard" className="flex shrink-0 items-center">
             <img
               src="/j4f-emblem.png"
               alt="Predictii Just4Fun League"
-              className="h-12 w-auto object-contain lg:h-14"
+              className="h-14 w-auto shrink-0 object-contain lg:h-16"
             />
           </Link>
           <EditionSelector />
