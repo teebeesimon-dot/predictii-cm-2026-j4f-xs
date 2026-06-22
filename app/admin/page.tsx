@@ -49,7 +49,13 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { SyncPanel } from '@/components/sync-panel'
 import { formatKickoff } from '@/lib/utils'
 import {
@@ -68,6 +74,8 @@ import {
   CircleDashed,
   Eye,
   EyeOff,
+  ChevronDown,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -85,6 +93,15 @@ function AdminContent() {
   const { data: users, isLoading: usersLoading, mutate: mutateUsers } = useUsers()
   const { data: predictions } = useAllPredictions()
   const [exporting, setExporting] = useState(false)
+  const [activeTab, setActiveTab] = useState('results')
+
+  const ADMIN_TABS = [
+    { value: 'results', label: 'Rezultate' },
+    { value: 'sync', label: 'Sincronizare' },
+    { value: 'completion', label: 'Completare' },
+    { value: 'add', label: 'Adaugă meci' },
+    { value: 'users', label: 'Participanți' },
+  ] as const
 
   async function handleExport() {
     if (!users || !matches || !predictions) {
@@ -158,14 +175,29 @@ function AdminContent() {
         </Button>
       </div>
 
-      <Tabs defaultValue="results">
-        <TabsList className="max-w-full justify-start overflow-x-auto">
-          <TabsTrigger value="results">Rezultate</TabsTrigger>
-          <TabsTrigger value="sync">Sincronizare</TabsTrigger>
-          <TabsTrigger value="completion">Completare</TabsTrigger>
-          <TabsTrigger value="add">Adaugă meci</TabsTrigger>
-          <TabsTrigger value="users">Participanți</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/70 sm:w-64">
+            <span>
+              {ADMIN_TABS.find((t) => t.value === activeTab)?.label}
+            </span>
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width] min-w-56">
+            {ADMIN_TABS.map((t) => (
+              <DropdownMenuItem
+                key={t.value}
+                onClick={() => setActiveTab(t.value)}
+                className="gap-2"
+              >
+                <span className="flex-1">{t.label}</span>
+                {t.value === activeTab && (
+                  <Check className="size-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <TabsContent value="add" className="mt-4">
           <div className="flex flex-col gap-4">
