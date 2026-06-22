@@ -83,14 +83,6 @@ export function EditionSelector() {
 
   return (
     <div className="flex items-center gap-1.5">
-      <Image
-        src={competition.logo || '/placeholder.svg'}
-        alt={competition.name}
-        width={28}
-        height={28}
-        className="size-7 shrink-0 rounded object-contain"
-      />
-
       {/* Competiție */}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/70">

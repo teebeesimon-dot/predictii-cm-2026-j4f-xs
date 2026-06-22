@@ -36,7 +36,7 @@ export const COMPETITIONS: Record<CompetitionId, Competition> = {
     theme: 'wc',
     footballDataCode: 2000,
     logo: '/competitions/wc-logo.png',
-    mascot: '/competitions/wc-mascot.png',
+    mascot: '/competitions/wc-mascot-v2.png',
   },
   euro: {
     id: 'euro',
@@ -45,7 +45,7 @@ export const COMPETITIONS: Record<CompetitionId, Competition> = {
     theme: 'euro',
     footballDataCode: 2018,
     logo: '/competitions/euro-logo.png',
-    mascot: '/competitions/euro-mascot.png',
+    mascot: '/competitions/euro-mascot-v2.png',
   },
   cl: {
     id: 'cl',
@@ -54,7 +54,7 @@ export const COMPETITIONS: Record<CompetitionId, Competition> = {
     theme: 'cl',
     footballDataCode: 2001,
     logo: '/competitions/cl-logo.png',
-    mascot: '/competitions/cl-mascot.png',
+    mascot: '/competitions/cl-mascot-v2.png',
   },
 }
 
