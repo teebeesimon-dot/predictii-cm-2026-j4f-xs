@@ -7,7 +7,8 @@ import { computeStandings } from '@/lib/data'
 import { STAGES, type StageId } from '@/lib/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Trophy, Medal, Crown } from 'lucide-react'
+import { Trophy, Medal } from 'lucide-react'
+import Image from 'next/image'
 
 export default function AwardsPage() {
   return (
@@ -61,9 +62,14 @@ function AwardsContent() {
           {/* Overall champion */}
           <Card className="overflow-hidden border-accent/50 bg-accent/10">
             <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-accent text-accent-foreground shadow-lg shadow-accent/30">
-                <Crown className="size-8" />
-              </div>
+              <Image
+                src="/cupa.png"
+                alt="Trofeu Marele Campion"
+                width={200}
+                height={260}
+                className="h-32 w-auto object-contain drop-shadow-lg sm:h-40"
+                priority
+              />
               <p className="text-sm font-medium uppercase tracking-widest text-accent">
                 {overall.length > 1 ? 'Marii Campioni' : 'Marele Campion'}
               </p>
