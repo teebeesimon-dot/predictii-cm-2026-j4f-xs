@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Predictii Just4Fun</string>
+    <string name="title_activity_main">Predictii Just4Fun</string>
+    <string name="package_name">ro.just4fun.predictii</string>
+    <string name="custom_url_scheme">ro.just4fun.predictii</string>
+</resources>
