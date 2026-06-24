@@ -3,7 +3,13 @@
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
-import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
+import {
+  useMatches,
+  useUsers,
+  useAllPredictions,
+  useAvailableEditionIds,
+} from '@/lib/hooks'
 import {
   createMatch,
   deleteMatch,
@@ -12,12 +18,16 @@ import {
   deleteUser,
   updateUserPassword,
   updateUserAccess,
+  setUserEditionAccess,
   seedUsersIfEmpty,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
   resyncMatchTeams,
   computeStandings,
 } from '@/lib/data'
+import { importEditionMatches } from '@/app/actions/sync'
+import { EDITIONS, COMPETITIONS } from '@/lib/editions'
+import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
@@ -39,7 +49,13 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
 import { SyncPanel } from '@/components/sync-panel'
 import { formatKickoff } from '@/lib/utils'
 import {
@@ -58,6 +74,8 @@ import {
   CircleDashed,
   Eye,
   EyeOff,
+  ChevronDown,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -70,10 +88,20 @@ export default function AdminPage() {
 }
 
 function AdminContent() {
+  const { editionId, edition } = useEdition()
   const { data: matches, isLoading, mutate } = useMatches()
   const { data: users, isLoading: usersLoading, mutate: mutateUsers } = useUsers()
   const { data: predictions } = useAllPredictions()
   const [exporting, setExporting] = useState(false)
+  const [activeTab, setActiveTab] = useState('results')
+
+  const ADMIN_TABS = [
+    { value: 'results', label: 'Rezultate' },
+    { value: 'sync', label: 'Sincronizare' },
+    { value: 'completion', label: 'Completare' },
+    { value: 'add', label: 'Adaugă meci' },
+    { value: 'users', label: 'Participanți' },
+  ] as const
 
   async function handleExport() {
     if (!users || !matches || !predictions) {
@@ -127,6 +155,10 @@ function AdminContent() {
             Adaugă meciuri, introdu rezultatele oficiale și gestionează conturile.
             Clasamentele se recalculează automat.
           </p>
+          <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+            Editezi:{' '}
+            <span className="font-bold text-foreground">{edition.label}</span>
+          </p>
         </div>
         <Button
           variant="outline"
@@ -143,27 +175,56 @@ function AdminContent() {
         </Button>
       </div>
 
-      <Tabs defaultValue="results">
-        <TabsList>
-          <TabsTrigger value="results">Rezultate</TabsTrigger>
-          <TabsTrigger value="sync">Sincronizare</TabsTrigger>
-          <TabsTrigger value="completion">Completare</TabsTrigger>
-          <TabsTrigger value="add">Adaugă meci</TabsTrigger>
-          <TabsTrigger value="users">Participanți</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary/70 sm:w-64">
+            <span>
+              {ADMIN_TABS.find((t) => t.value === activeTab)?.label}
+            </span>
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width] min-w-56">
+            {ADMIN_TABS.map((t) => (
+              <DropdownMenuItem
+                key={t.value}
+                onClick={() => setActiveTab(t.value)}
+                className="gap-2"
+              >
+                <span className="flex-1">{t.label}</span>
+                {t.value === activeTab && (
+                  <Check className="size-4 text-primary" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <TabsContent value="add" className="mt-4">
           <div className="flex flex-col gap-4">
-            <SeedMatchesPrompt
-              hasMatches={(matches?.length ?? 0) > 0}
-              onSeeded={() => mutate()}
-            />
-            <PlayoffFixBanner matches={matches ?? []} onFixed={() => mutate()} />
-            <ResyncMatchesBanner
-              matches={matches ?? []}
-              onResynced={() => mutate()}
-            />
-            <AddMatchForm onAdded={() => mutate()} />
+            {editionId === DEFAULT_EDITION_ID ? (
+              <>
+                <SeedMatchesPrompt
+                  hasMatches={(matches?.length ?? 0) > 0}
+                  onSeeded={() => mutate()}
+                />
+                <PlayoffFixBanner
+                  matches={matches ?? []}
+                  onFixed={() => mutate()}
+                />
+                <ResyncMatchesBanner
+                  matches={matches ?? []}
+                  onResynced={() => mutate()}
+                />
+              </>
+            ) : (
+              <ImportEditionMatchesBanner
+                editionId={editionId}
+                editionLabel={edition.label}
+                hasMatches={(matches?.length ?? 0) > 0}
+                onImported={() => mutate()}
+              />
+            )}
+            <AddMatchForm editionId={editionId} onAdded={() => mutate()} />
           </div>
         </TabsContent>
 
@@ -433,11 +494,10 @@ function PlayoffFixBanner({
   )
 }
 
-// Banner care detectează meciuri salvate cu ordinea greșită a echipelor în
-// grupă (ex. Portugalia–Uzbekistan în loc de Portugalia–RD Congo) și le
-// re-sincronizează cu programul oficial, mapând după ora de start. Numai
-// numele echipelor sunt actualizate; scorurile și pronosticurile rămân legate
-// de același slot orar.
+// Banner care detectează meciuri salvate cu data/ora, etapa sau ordinea
+// echipelor greșite față de programul oficial și le re-sincronizează. Mapează
+// după perechea de echipe (unică în grupe), așa că poate corecta inclusiv ziua
+// și ora. Scorurile și pronosticurile rămân atașate aceluiași meci.
 function ResyncMatchesBanner({
   matches,
   onResynced,
@@ -447,23 +507,34 @@ function ResyncMatchesBanner({
 }) {
   const [syncing, setSyncing] = useState(false)
 
-  // Index al programului corect după cheia (etapă + oră). Ora singură NU e
-  // unică (multe meciuri din ultima etapă încep simultan), așa că include și
-  // etapa și ignorăm sloturile cu mai multe meciuri la aceeași oră.
-  const correctByKey = new Map<string, (typeof WC2026_GROUP_MATCHES)[number]>()
-  const ambiguous = new Set<string>()
-  for (const m of WC2026_GROUP_MATCHES) {
-    const key = `${m.stage}|${m.kickoff}`
-    if (correctByKey.has(key)) ambiguous.add(key)
-    correctByKey.set(key, m)
+  // Cheie neordonată pentru o pereche de echipe (ignoră ordinea și diacriticele).
+  const pairKey = (a: string, b: string) => {
+    const norm = (s: string) =>
+      s
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    return [norm(a), norm(b)].sort().join('::')
   }
-  // Există vreun meci în baza de date care nu corespunde programului corect?
+
+  // Index al programului corect după perechea de echipe.
+  const correctByPair = new Map<string, (typeof WC2026_GROUP_MATCHES)[number]>()
+  for (const m of WC2026_GROUP_MATCHES) {
+    correctByPair.set(pairKey(m.homeTeam, m.awayTeam), m)
+  }
+
+  // Există vreun meci a cărui dată/oră, etapă sau ordine diferă de program?
   const mismatches = matches.filter((m) => {
-    const key = `${m.stage}|${m.kickoff}`
-    if (ambiguous.has(key)) return false
-    const correct = correctByKey.get(key)
+    const correct = correctByPair.get(pairKey(m.homeTeam, m.awayTeam))
     if (!correct) return false
-    return m.homeTeam !== correct.homeTeam || m.awayTeam !== correct.awayTeam
+    return (
+      m.kickoff !== correct.kickoff ||
+      m.stage !== correct.stage ||
+      m.homeTeam !== correct.homeTeam ||
+      m.awayTeam !== correct.awayTeam
+    )
   })
   if (mismatches.length === 0) return null
 
@@ -472,7 +543,7 @@ function ResyncMatchesBanner({
     try {
       const n = await resyncMatchTeams()
       toast.success(
-        `${n} meciuri re-sincronizate cu programul oficial (ordinea corectată).`,
+        `${n} meciuri re-sincronizate cu programul oficial (dată, oră și ordine corectate).`,
       )
       onResynced()
     } catch {
@@ -485,10 +556,9 @@ function ResyncMatchesBanner({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground">
-        {mismatches.length} meciuri au echipele în ordinea greșită față de
-        programul oficial (ex. „Portugalia – Uzbekistan" în loc de „Portugalia –
-        RD Congo"). Apasă pentru a le corecta. Scorurile și pronosticurile
-        atașate fiecărui interval orar nu sunt șterse.
+        {mismatches.length} meciuri au data/ora sau ordinea echipelor diferită
+        față de programul oficial. Apasă pentru a le corecta automat. Scorurile
+        și pronosticurile atașate fiecărui meci nu sunt șterse.
       </p>
       <Button
         onClick={handleResync}
@@ -562,7 +632,75 @@ function SeedMatchesPrompt({
   )
 }
 
-function AddMatchForm({ onAdded }: { onAdded: () => void }) {
+// Banner pentru încărcarea meciurilor unei ediții (alta decât CM 2026) de la
+// football-data.org. Edițiile viitoare pot fi goale până când furnizorul are
+// programul; atunci importul întoarce un mesaj prietenos.
+function ImportEditionMatchesBanner({
+  editionId,
+  editionLabel,
+  hasMatches,
+  onImported,
+}: {
+  editionId: string
+  editionLabel: string
+  hasMatches: boolean
+  onImported: () => void
+}) {
+  const [importing, setImporting] = useState(false)
+
+  async function handleImport() {
+    setImporting(true)
+    try {
+      const res = await importEditionMatches(editionId)
+      if (res.ok) {
+        toast.success(res.message)
+        onImported()
+      } else {
+        toast.info(res.message)
+      }
+    } catch {
+      toast.error('Eroare la importul meciurilor.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Download className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium">Încarcă meciurile · {editionLabel}</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Preia automat programul acestei ediții de la football-data.org. Dacă
+            furnizorul nu are încă meciurile, încearcă din nou mai târziu.
+            Meciurile deja încărcate nu sunt suprascrise.
+          </p>
+        </div>
+      </div>
+      <Button
+        onClick={handleImport}
+        disabled={importing || hasMatches}
+        className="shrink-0"
+      >
+        {importing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4" />
+        )}
+        {hasMatches ? 'Meciuri deja încărcate' : 'Încarcă meciuri'}
+      </Button>
+    </div>
+  )
+}
+
+function AddMatchForm({
+  editionId,
+  onAdded,
+}: {
+  editionId: string
+  onAdded: () => void
+}) {
   const [home, setHome] = useState('')
   const [away, setAway] = useState('')
   const [stage, setStage] = useState<StageId>(1)
@@ -579,6 +717,7 @@ function AddMatchForm({ onAdded }: { onAdded: () => void }) {
     setSaving(true)
     try {
       await createMatch({
+        editionId,
         homeTeam: home.trim(),
         awayTeam: away.trim(),
         stage,
@@ -753,6 +892,15 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
           ) : (
             <Badge className="bg-primary/15 text-primary">Deschis</Badge>
           )}
+          {match.scoreOverride && (
+            <Badge
+              variant="outline"
+              className="gap-1 border-accent/50 text-accent"
+              title="Scor introdus manual. Sincronizarea automată nu îl suprascrie."
+            >
+              Manual
+            </Badge>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -815,11 +963,20 @@ function UsersManager({
   loading: boolean
   onChanged: () => void
 }) {
+  const { data: availableEditionIds } = useAvailableEditionIds()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
+
+  // Edițiile pentru care setăm acces: cele care au meciuri încărcate. Includem
+  // mereu WC 2026. Sortate după ordinea din registru.
+  const accessEditions = EDITIONS.filter(
+    (e) =>
+      e.id === DEFAULT_EDITION_ID ||
+      (availableEditionIds ?? []).includes(e.id),
+  )
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -950,7 +1107,12 @@ function UsersManager({
             .slice()
             .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username))
             .map((u) => (
-              <UserRow key={u.id} user={u} onChanged={onChanged} />
+              <UserRow
+                key={u.id}
+                user={u}
+                editions={accessEditions}
+                onChanged={onChanged}
+              />
             ))}
         </div>
       )}
@@ -958,7 +1120,15 @@ function UsersManager({
   )
 }
 
-function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) {
+function UserRow({
+  user,
+  editions,
+  onChanged,
+}: {
+  user: AppUser
+  editions: typeof EDITIONS
+  onChanged: () => void
+}) {
   const [busy, setBusy] = useState(false)
   const [savingAccess, setSavingAccess] = useState(false)
   // Stare optimistă pentru comutatoare, ca UI-ul să răspundă imediat.
@@ -1027,6 +1197,20 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
     const prev = hidden
     setHidden(next)
     void saveAccess({ hideFromStandings: next }, () => setHidden(prev))
+  }
+
+  // Acces per ediție: setează access[editionId] pe utilizator. Optimist.
+  const [editionBusy, setEditionBusy] = useState<string | null>(null)
+  async function toggleEdition(editionId: string, next: boolean) {
+    setEditionBusy(editionId)
+    try {
+      await setUserEditionAccess(user.id, editionId, next)
+      onChanged()
+    } catch {
+      toast.error('Eroare la actualizarea accesului la competiție.')
+    } finally {
+      setEditionBusy(null)
+    }
   }
 
   return (
@@ -1100,6 +1284,37 @@ function UserRow({ user, onChanged }: { user: AppUser; onChanged: () => void }) 
             />
           </label>
         </div>
+
+        {/* Acces per competiție/ediție: la edițiile noi nimeni nu are acces
+            până când adminul nu bifează aici. */}
+        {editions.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <p className="text-sm font-medium">Acces la competiții</p>
+            <div className="flex flex-col gap-2">
+              {editions.map((e) => {
+                const allowed = hasEditionAccess(user, e.id)
+                const comp = COMPETITIONS[e.competitionId]
+                return (
+                  <label
+                    key={e.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="text-sm">
+                      <span className="font-medium">{comp.short}</span>{' '}
+                      <span className="text-muted-foreground">{e.year}</span>
+                    </span>
+                    <Switch
+                      checked={allowed}
+                      disabled={editionBusy === e.id || viewOnly}
+                      onCheckedChange={(next) => toggleEdition(e.id, next)}
+                      aria-label={`Acces ${e.label}`}
+                    />
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

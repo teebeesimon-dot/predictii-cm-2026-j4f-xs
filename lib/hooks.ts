@@ -6,22 +6,50 @@ import {
   getUsers,
   getAllPredictions,
   getUserPredictions,
+  getAvailableEditionIds,
 } from '@/lib/data'
+import { useEdition } from '@/components/edition-provider'
 
-export function useMatches() {
-  return useSWR('matches', getMatches, { revalidateOnFocus: false })
+// Edițiile care au meciuri încărcate (pentru selector). Reîmprospătare lejeră
+// ca o ediție nou populată să apară fără reîncărcarea paginii.
+export function useAvailableEditionIds(refreshMs?: number) {
+  return useSWR('available-editions', getAvailableEditionIds, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
-export function useUsers() {
-  return useSWR('users', getUsers, { revalidateOnFocus: false })
+// Toate hook-urile de date sunt legate de ediția curentă (competiție + an).
+// editionId face parte din cheia SWR, deci la schimbarea ediției datele se
+// reîncarcă automat, iar cache-ul fiecărei ediții rămâne separat.
+
+export function useMatches(refreshMs?: number) {
+  const { editionId } = useEdition()
+  return useSWR(['matches', editionId], () => getMatches(editionId), {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
-export function useAllPredictions() {
-  return useSWR('predictions', getAllPredictions, { revalidateOnFocus: false })
+export function useUsers(refreshMs?: number) {
+  return useSWR('users', getUsers, {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
+}
+
+export function useAllPredictions(refreshMs?: number) {
+  const { editionId } = useEdition()
+  return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
+    revalidateOnFocus: false,
+    refreshInterval: refreshMs ?? 0,
+  })
 }
 
 export function useUserPredictions(userId: string | undefined) {
-  return useSWR(userId ? ['user-predictions', userId] : null, () =>
-    getUserPredictions(userId as string),
+  const { editionId } = useEdition()
+  return useSWR(
+    userId ? ['user-predictions', userId, editionId] : null,
+    () => getUserPredictions(userId as string, editionId),
   )
 }

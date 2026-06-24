@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Trophy, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
@@ -53,17 +53,19 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-            <Trophy className="size-8" />
-          </div>
+          <img
+            src="/j4f-emblem.png"
+            alt="Emblema Just4Fun League"
+            className="mb-2 h-40 w-auto object-contain drop-shadow-lg sm:h-48"
+          />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
-            Predictii CM 2026
+            Predictii Just4Fun
           </h1>
           <p className="mt-1 text-sm font-medium uppercase tracking-[0.3em] text-accent">
-            J4F League
+            Just4Fun League
           </p>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
-            Pune pronosticuri la meciurile Campionatului Mondial, urcă în clasament
+            Pune pronosticuri la marile competiții de fotbal, urcă în clasament
             și cucerește trofeul.
           </p>
         </div>

@@ -193,6 +193,65 @@ export async function fetchWorldCupMatches(token: string): Promise<NormalizedApi
   })
 }
 
+// ---------------------------------------------------------------------------
+// Import generic de meciuri pentru orice competiție (ediții noi).
+// Spre deosebire de sincronizarea CM 2026 (care mapează la nume românești), aici
+// folosim numele brute din API (de regulă în engleză), fiindcă nu avem un orar
+// local pentru alte competiții. Meciurile importate primesc stage=1 implicit;
+// blocarea se face per-meci după kickoff.
+// ---------------------------------------------------------------------------
+
+export interface ImportableMatch {
+  homeTeam: string
+  awayTeam: string
+  kickoff: string // ISO
+  homeScore: number | null
+  awayScore: number | null
+  matchday: number | null
+}
+
+interface ApiMatchFull extends ApiMatch {
+  utcDate?: string
+  matchday?: number | null
+}
+
+// Preia toate meciurile unei competiții după cod și le pregătește pentru import.
+// Aruncă eroare dacă lipsește token-ul sau API-ul răspunde cu eroare (inclusiv
+// 403/404 când competiția nu e disponibilă pe planul gratuit).
+export async function fetchCompetitionMatches(
+  token: string,
+  competitionCode: number,
+): Promise<ImportableMatch[]> {
+  const res = await fetch(
+    `${API_BASE}/competitions/${competitionCode}/matches`,
+    {
+      headers: { 'X-Auth-Token': token },
+      cache: 'no-store',
+    },
+  )
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(
+      `football-data.org a răspuns ${res.status}: ${body.slice(0, 200)}`,
+    )
+  }
+
+  const data = (await res.json()) as { matches?: ApiMatchFull[] }
+  const matches = data.matches ?? []
+
+  return matches
+    .filter((m) => m.homeTeam?.name && m.awayTeam?.name && m.utcDate)
+    .map((m) => ({
+      homeTeam: m.homeTeam.name as string,
+      awayTeam: m.awayTeam.name as string,
+      kickoff: new Date(m.utcDate as string).toISOString(),
+      homeScore: m.score?.fullTime?.home ?? null,
+      awayScore: m.score?.fullTime?.away ?? null,
+      matchday: m.matchday ?? null,
+    }))
+}
+
 // Rezultatul calculării diferențelor între API și Firestore.
 export interface ScoreUpdate {
   matchId: string
@@ -224,6 +283,9 @@ export function diffScores(
 
   const updates: ScoreUpdate[] = []
   for (const m of firestoreMatches) {
+    // Scor corectat manual de admin: nu îl atingem (furnizorul poate greși).
+    if (m.scoreOverride === true) continue
+
     const api = apiByPair.get(teamPairKey(m.homeTeam, m.awayTeam))
     if (!api) continue
 

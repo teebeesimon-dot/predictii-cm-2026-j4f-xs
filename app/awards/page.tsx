@@ -25,18 +25,21 @@ function AwardsContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
-  const viewer = { id: user?.id, isAdmin: user?.isAdmin }
+  // La premii, jucătorii ascunși din clasamente nu apar deloc — nici măcar
+  // pentru admin. Singura excepție e propriul cont (potrivire pe id), deci NU
+  // transmitem isAdmin aici.
+  const viewer = { id: user?.id }
 
-  function stageWinner(stage?: StageId) {
-    if (!ready) return null
+  // Toți câștigătorii dintr-un clasament: rândurile de pe locul 1. La egalitate
+  // de puncte mai mulți jucători împart locul 1, deci toți sunt câștigători.
+  function stageWinners(stage?: StageId) {
+    if (!ready) return []
     const rows = computeStandings(users, matches, predictions, stage, viewer)
-    const top = rows[0]
-    // a winner only exists if there is at least 1 point scored in that scope
-    if (!top || top.points === 0) return null
-    return top
+    // un câștigător există doar dacă s-a marcat cel puțin 1 punct în acel scop
+    return rows.filter((r) => r.rank === 1 && r.points > 0)
   }
 
-  const overall = stageWinner(undefined)
+  const overall = stageWinners(undefined)
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,15 +65,23 @@ function AwardsContent() {
                 <Crown className="size-8" />
               </div>
               <p className="text-sm font-medium uppercase tracking-widest text-accent">
-                Marele Campion
+                {overall.length > 1 ? 'Marii Campioni' : 'Marele Campion'}
               </p>
-              {overall ? (
+              {overall.length > 0 ? (
                 <>
-                  <p className="font-heading text-3xl font-bold capitalize">
-                    {overall.username}
-                  </p>
+                  <div className="flex flex-col items-center gap-1">
+                    {overall.map((w) => (
+                      <p
+                        key={w.userId}
+                        className="font-heading text-3xl font-bold capitalize"
+                      >
+                        {w.name}
+                      </p>
+                    ))}
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    {overall.points} puncte · {overall.exact} scoruri exacte
+                    {overall[0].points} puncte · {overall[0].exact} scoruri exacte
+                    {overall.length > 1 && ` · ${overall.length} la egalitate`}
                   </p>
                 </>
               ) : (
@@ -82,7 +93,7 @@ function AwardsContent() {
           {/* Stage winners */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {STAGES.map((s) => {
-              const w = stageWinner(s.id as StageId)
+              const winners = stageWinners(s.id as StageId)
               return (
                 <Card key={s.id}>
                   <CardContent className="flex flex-col gap-3 p-5">
@@ -96,17 +107,29 @@ function AwardsContent() {
                       </div>
                     </div>
                     <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                      {w ? (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="size-4 text-accent" />
-                            <span className="font-heading font-bold capitalize">
-                              {w.username}
-                            </span>
-                          </div>
-                          <span className="text-sm font-semibold text-muted-foreground">
-                            {w.points} pct
-                          </span>
+                      {winners.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {winners.map((w) => (
+                            <div
+                              key={w.userId}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Trophy className="size-4 text-accent" />
+                                <span className="font-heading font-bold capitalize">
+                                  {w.name}
+                                </span>
+                              </div>
+                              <span className="text-sm font-semibold text-muted-foreground">
+                                {w.points} pct
+                              </span>
+                            </div>
+                          ))}
+                          {winners.length > 1 && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {winners.length} câștigători la egalitate
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground">

@@ -269,7 +269,7 @@ function MatchPredictions({
                         className={cn(
                           'rounded font-mono text-sm font-bold tabular-nums',
                           exact && 'text-primary',
-                          correct1x2 && 'text-accent-foreground',
+                          correct1x2 && 'text-accent',
                         )}
                       >
                         {pred.homeScore} - {pred.awayScore}

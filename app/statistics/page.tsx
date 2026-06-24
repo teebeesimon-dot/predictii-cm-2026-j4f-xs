@@ -3,8 +3,10 @@
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
-import { computeStandings } from '@/lib/data'
+import { computeStandings, type StandingRow } from '@/lib/data'
+import { STAGES, type StageId } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Target, CheckCircle2, Percent, ListChecks } from 'lucide-react'
 
@@ -25,23 +27,22 @@ function StatisticsContent() {
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
 
-  const myRow = ready
-    ? computeStandings(users, matches, predictions, undefined, {
-        id: user?.id,
-        isAdmin: user?.isAdmin,
-      }).find((r) => r.userId === user?.id)
-    : undefined
-
-  const scored = myRow ? myRow.exact + myRow.correct1x2 : 0
-  const successPct = myRow && myRow.predicted > 0 ? (scored / myRow.predicted) * 100 : 0
-  const exactPct = myRow && myRow.predicted > 0 ? (myRow.exact / myRow.predicted) * 100 : 0
+  // Statisticile mele pentru un scop dat (general sau o etapă anume).
+  function myRowFor(stage?: StageId): StandingRow | undefined {
+    if (!ready) return undefined
+    return computeStandings(users, matches, predictions, stage, {
+      id: user?.id,
+      isAdmin: user?.isAdmin,
+    }).find((r) => r.userId === user?.id)
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-heading text-3xl font-bold">Statistici</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Precizia pronosticurilor tale pe meciurile încheiate.
+          Precizia pronosticurilor tale pe meciurile încheiate, pe total și pe
+          fiecare etapă.
         </p>
       </div>
 
@@ -53,43 +54,30 @@ function StatisticsContent() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <BigStat
-              label="Scoruri exacte"
-              value={String(myRow?.exact ?? 0)}
-              hint="3 puncte fiecare"
-              icon={Target}
-              accent
-            />
-            <BigStat
-              label="Rezultate 1X2 corecte"
-              value={String(myRow?.correct1x2 ?? 0)}
-              hint="1 punct fiecare"
-              icon={CheckCircle2}
-            />
-            <BigStat
-              label="Procent reușită"
-              value={`${successPct.toFixed(0)}%`}
-              hint={`din ${myRow?.predicted ?? 0} pronosticuri`}
-              icon={Percent}
-            />
-            <BigStat
-              label="Total puncte"
-              value={String(myRow?.points ?? 0)}
-              hint="punctaj general"
-              icon={ListChecks}
-            />
-          </div>
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="flex w-full flex-wrap">
+              <TabsTrigger value="general" className="flex-1">
+                General
+              </TabsTrigger>
+              {STAGES.map((s) => (
+                <TabsTrigger key={s.id} value={String(s.id)} className="flex-1">
+                  {s.short}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Detalii precizie</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5">
-              <Bar label="Reușită totală (exact + 1X2)" pct={successPct} />
-              <Bar label="Procent scoruri exacte" pct={exactPct} />
-            </CardContent>
-          </Card>
+            <TabsContent value="general" className="mt-4">
+              <StatsView row={myRowFor(undefined)} />
+            </TabsContent>
+            {STAGES.map((s) => (
+              <TabsContent key={s.id} value={String(s.id)} className="mt-4">
+                <p className="mb-3 text-sm font-medium text-muted-foreground">
+                  {s.label}
+                </p>
+                <StatsView row={myRowFor(s.id as StageId)} />
+              </TabsContent>
+            ))}
+          </Tabs>
 
           <Card>
             <CardHeader>
@@ -107,6 +95,56 @@ function StatisticsContent() {
           </Card>
         </>
       )}
+    </div>
+  )
+}
+
+// Blocul de statistici pentru un scop (general sau o etapă). Dacă jucătorul nu
+// are pronosticuri în acel scop, valorile sunt 0 / procente 0%.
+function StatsView({ row }: { row: StandingRow | undefined }) {
+  const scored = row ? row.exact + row.correct1x2 : 0
+  const successPct = row && row.predicted > 0 ? (scored / row.predicted) * 100 : 0
+  const exactPct = row && row.predicted > 0 ? (row.exact / row.predicted) * 100 : 0
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <BigStat
+          label="Scoruri exacte"
+          value={String(row?.exact ?? 0)}
+          hint="3 puncte fiecare"
+          icon={Target}
+          accent
+        />
+        <BigStat
+          label="Rezultate 1X2 corecte"
+          value={String(row?.correct1x2 ?? 0)}
+          hint="1 punct fiecare"
+          icon={CheckCircle2}
+        />
+        <BigStat
+          label="Procent reușită"
+          value={`${successPct.toFixed(0)}%`}
+          hint={`din ${row?.predicted ?? 0} pronosticuri`}
+          icon={Percent}
+        />
+        <BigStat
+          label="Total puncte"
+          value={String(row?.points ?? 0)}
+          hint="punctaj"
+          icon={ListChecks}
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Detalii precizie</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <Bar label="Reușită totală (exact + 1X2)" pct={successPct} />
+          <Bar label="Procent scoruri exacte" pct={exactPct} />
+        </CardContent>
+      </Card>
     </div>
   )
 }

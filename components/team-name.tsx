@@ -29,16 +29,24 @@ export function TeamName({
     />
   ) : null
 
+  const nameEl = <span className="truncate">{team}</span>
+
+  // Pentru echipa gazdă ('right') punem numele întâi și steagul la final, ca
+  // steagul să stea lângă scor/„vs". Nu folosim flex-row-reverse fiindcă inversa
+  // direcția de aliniere (justify-end) și împingea grupul în partea greșită.
   return (
-    <span
-      className={cn(
-        'flex min-w-0 items-center gap-2',
-        align === 'right' && 'flex-row-reverse',
-        className,
+    <span className={cn('flex min-w-0 items-center gap-2', className)}>
+      {align === 'right' ? (
+        <>
+          {nameEl}
+          {flagEl}
+        </>
+      ) : (
+        <>
+          {flagEl}
+          {nameEl}
+        </>
       )}
-    >
-      {flagEl}
-      <span className="truncate">{team}</span>
     </span>
   )
 }

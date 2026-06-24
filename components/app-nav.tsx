@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/components/auth-provider'
+import { EditionSelector } from '@/components/edition-selector'
 
 type NavItem = {
   href: string
@@ -44,39 +45,9 @@ const NAV: NavItem[] = [
   },
   {
     href: '/standings',
-    label: 'Clasament General',
+    label: 'Clasament',
     icon: Trophy,
-    match: (p, s) => p === '/standings' && (!s || s === 'general'),
-  },
-  {
-    href: '/standings?stage=1',
-    label: 'Etapa 1',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '1',
-  },
-  {
-    href: '/standings?stage=2',
-    label: 'Etapa 2',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '2',
-  },
-  {
-    href: '/standings?stage=3',
-    label: 'Etapa 3',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '3',
-  },
-  {
-    href: '/standings?stage=4',
-    label: 'Etapa 4',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '4',
-  },
-  {
-    href: '/standings?stage=5',
-    label: 'Etapa 5',
-    icon: ListOrdered,
-    match: (p, s) => p === '/standings' && s === '5',
+    match: (p) => p === '/standings',
   },
   {
     href: '/statistics',
@@ -139,18 +110,17 @@ export function AppNav() {
         <div className="flex-1 bg-[#FCD116]" />
         <div className="flex-1 bg-[#CE1126]" />
       </div>
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Trophy className="size-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="font-heading text-sm font-bold tracking-wide">PREDICTII CM 2026</p>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              J4F League
-            </p>
-          </div>
-        </Link>
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex shrink-0 items-center">
+            <img
+              src="/j4f-emblem.png"
+              alt="Predictii Just4Fun League"
+              className="h-9 w-auto shrink-0 object-contain lg:h-11"
+            />
+          </Link>
+          <EditionSelector />
+        </div>
 
         <nav className="hidden items-center gap-0.5 xl:flex">
           {items.map((item) => {

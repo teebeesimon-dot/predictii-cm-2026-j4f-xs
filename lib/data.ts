@@ -12,17 +12,36 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
-import { scorePrediction, PARTICIPANTS, isViewOnly } from '@/lib/types'
+import {
+  scorePrediction,
+  PARTICIPANTS,
+  isViewOnly,
+  DEFAULT_EDITION_ID,
+  hasEditionAccess,
+} from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 
 // Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
 // a detecta conturile mai vechi care nu și-au schimbat încă parola.
 export const DEFAULT_PASSWORD = 'cm2026'
 
-export async function getMatches(): Promise<Match[]> {
+// Ediția unui document (meci/pronostic): documentele mai vechi nu au câmpul
+// editionId și aparțin ediției existente World Cup 2026.
+function editionOf(doc: { editionId?: string }): string {
+  return doc.editionId ?? DEFAULT_EDITION_ID
+}
+
+// Toate meciurile unei ediții. Dacă editionId lipsește, întoarce toate
+// meciurile (folosit doar la sincronizare/migrare internă).
+export async function getMatches(editionId?: string): Promise<Match[]> {
   const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
   const snap = await getDocs(q)
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Match, 'id'>) }))
+  const all = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Match, 'id'>),
+  }))
+  if (!editionId) return all
+  return all.filter((m) => editionOf(m) === editionId)
 }
 
 export async function getUsers(): Promise<AppUser[]> {
@@ -30,13 +49,35 @@ export async function getUsers(): Promise<AppUser[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AppUser, 'id'>) }))
 }
 
-export async function getAllPredictions(): Promise<Prediction[]> {
-  const snap = await getDocs(collection(db, 'predictions'))
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Prediction, 'id'>) }))
+// Id-urile edițiilor care au cel puțin un meci încărcat. Edițiile fără meciuri
+// sunt ascunse jucătorilor (selectorul le afișează doar adminilor).
+export async function getAvailableEditionIds(): Promise<string[]> {
+  const snap = await getDocs(collection(db, 'matches'))
+  const set = new Set<string>()
+  snap.docs.forEach((d) => {
+    const data = d.data() as Omit<Match, 'id'>
+    set.add(editionOf(data))
+  })
+  return Array.from(set)
 }
 
-export async function getUserPredictions(userId: string): Promise<Prediction[]> {
-  const all = await getAllPredictions()
+export async function getAllPredictions(
+  editionId?: string,
+): Promise<Prediction[]> {
+  const snap = await getDocs(collection(db, 'predictions'))
+  const all = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Prediction, 'id'>),
+  }))
+  if (!editionId) return all
+  return all.filter((p) => editionOf(p) === editionId)
+}
+
+export async function getUserPredictions(
+  userId: string,
+  editionId?: string,
+): Promise<Prediction[]> {
+  const all = await getAllPredictions(editionId)
   return all.filter((p) => p.userId === userId)
 }
 
@@ -55,7 +96,10 @@ export async function savePrediction(
 ): Promise<void> {
   // Backend guard: conturile de supraveghere nu pot trimite pronosticuri.
   const userSnap = await getDoc(doc(db, 'users', userId))
-  if (userSnap.exists() && isViewOnly(userSnap.data() as Omit<AppUser, 'id'>)) {
+  const userData = userSnap.exists()
+    ? (userSnap.data() as Omit<AppUser, 'id'>)
+    : null
+  if (userData && isViewOnly(userData)) {
     throw new Error('Contul de supraveghere nu poate trimite pronosticuri.')
   }
   // Backend guard: never trust the UI. A prediction cannot be saved or changed
@@ -65,6 +109,12 @@ export async function savePrediction(
     throw new Error('Meciul nu există.')
   }
   const match = snap.data() as Omit<Match, 'id'>
+  const editionId = editionOf(match)
+
+  // Backend guard: utilizatorul trebuie să aibă acces la ediția meciului.
+  if (userData && !hasEditionAccess(userData, editionId)) {
+    throw new Error('Nu ai acces la această competiție.')
+  }
   if (new Date(match.kickoff).getTime() <= Date.now()) {
     throw new PredictionLockedError()
   }
@@ -73,6 +123,7 @@ export async function savePrediction(
   await setDoc(doc(db, 'predictions', id), {
     userId,
     matchId,
+    editionId,
     homeScore,
     awayScore,
     updatedAt: Date.now(),
@@ -90,13 +141,13 @@ export async function deleteMatch(matchId: string): Promise<void> {
 
 // Seed all 72 group-stage matches if none exist yet. Returns the number added.
 export async function seedGroupMatchesIfEmpty(): Promise<number> {
-  const existing = await getMatches()
+  const existing = await getMatches(DEFAULT_EDITION_ID)
   if (existing.length > 0) return 0
 
   const batch = writeBatch(db)
   for (const m of WC2026_GROUP_MATCHES) {
     const ref = doc(collection(db, 'matches'))
-    batch.set(ref, m)
+    batch.set(ref, { ...m, editionId: DEFAULT_EDITION_ID })
   }
   await batch.commit()
   return WC2026_GROUP_MATCHES.length
@@ -131,45 +182,66 @@ export async function fixPlayoffTeamNames(): Promise<number> {
   return updated
 }
 
-// Re-sincronizează echipele meciurilor existente cu programul oficial corect.
+// Cheie neordonată pentru o pereche de echipe (ignoră gazdă/oaspete și
+// diacriticele), astfel încât un meci să fie identificat unic indiferent de
+// ordinea în care sunt trecute echipele.
+function pairKey(a: string, b: string): string {
+  const norm = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  return [norm(a), norm(b)].sort().join('::')
+}
+
+// Re-sincronizează meciurile existente cu programul OFICIAL corect.
 //
-// IMPORTANT: mapează după (etapă + ora de start). Ora de start NU este unică în
-// tot turneul (multe meciuri din ultima etapă a grupelor încep simultan), deci
-// maparea doar după oră ar suprascrie meciuri diferite între ele. Cheia
-// (etapă + oră) este unică în etapele 1 și 2. Pentru etapa 3, unde mai multe
-// meciuri pot împărți aceeași oră, sărim peste sloturile ambigue ca să nu
-// stricăm datele — acelea se corectează prin re-seed-ul etapei 3 din admin.
-//
-// Actualizează DOAR numele echipelor pe documentele existente, păstrând
-// id-urile, scorurile și pronosticurile.
+// Mapează după PERECHEA de echipe (unică în faza grupelor — fiecare pereche se
+// întâlnește o singură dată), nu după ora de start. Astfel putem corecta și
+// data/ora greșită, nu doar ordinea echipelor. Pentru fiecare meci existent
+// actualizăm `kickoff`, `stage` și orientarea gazdă/oaspete ca să corespundă
+// programului oficial. Id-urile documentelor, scorurile și pronosticurile rămân
+// neatinse (sunt legate de id-ul meciului, nu de oră).
 export async function resyncMatchTeams(): Promise<number> {
   const matches = await getMatches()
 
-  // Grupează programul corect după cheia (etapă + oră).
-  const programByKey = new Map<string, Omit<Match, 'id'>[]>()
+  // Index al programului corect după perechea de echipe.
+  const programByPair = new Map<string, Omit<Match, 'id'>>()
   for (const m of WC2026_GROUP_MATCHES) {
-    const key = `${m.stage}|${m.kickoff}`
-    const arr = programByKey.get(key) ?? []
-    arr.push(m)
-    programByKey.set(key, arr)
+    programByPair.set(pairKey(m.homeTeam, m.awayTeam), m)
   }
 
   const batch = writeBatch(db)
   let updated = 0
   for (const m of matches) {
-    const key = `${m.stage}|${m.kickoff}`
-    const candidates = programByKey.get(key)
-    // Sărim peste sloturi inexistente sau ambigue (mai multe meciuri la aceeași
-    // oră în aceeași etapă) ca să nu suprascriem greșit.
-    if (!candidates || candidates.length !== 1) continue
-    const correct = candidates[0]
-    if (m.homeTeam === correct.homeTeam && m.awayTeam === correct.awayTeam) {
-      continue
-    }
-    batch.update(doc(db, 'matches', m.id), {
+    const correct = programByPair.get(pairKey(m.homeTeam, m.awayTeam))
+    if (!correct) continue
+
+    const sameOrientation = m.homeTeam === correct.homeTeam
+    const needsUpdate =
+      m.kickoff !== correct.kickoff ||
+      m.stage !== correct.stage ||
+      !sameOrientation
+
+    if (!needsUpdate) continue
+
+    const patch: Partial<Match> = {
+      kickoff: correct.kickoff,
+      stage: correct.stage,
       homeTeam: correct.homeTeam,
       awayTeam: correct.awayTeam,
-    })
+    }
+
+    // Dacă ordinea gazdă/oaspete s-a inversat, inversăm și scorul deja salvat
+    // ca să rămână corect față de noua orientare.
+    if (!sameOrientation) {
+      patch.homeScore = m.awayScore
+      patch.awayScore = m.homeScore
+    }
+
+    batch.update(doc(db, 'matches', m.id), patch)
     updated += 1
   }
   if (updated > 0) await batch.commit()
@@ -218,6 +290,18 @@ export async function updateUserAccess(
   access: { viewOnly?: boolean; hideFromStandings?: boolean },
 ): Promise<void> {
   await updateDoc(doc(db, 'users', userId), access)
+}
+
+// Setează (sau revocă) accesul unui utilizator la o anumită ediție. Folosit de
+// admin pentru a bifa cine participă la fiecare competiție/an.
+export async function setUserEditionAccess(
+  userId: string,
+  editionId: string,
+  allowed: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    [`access.${editionId}`]: allowed,
+  })
 }
 
 // Resetare parolă de către admin: setează noua parolă și forțează utilizatorul
@@ -278,7 +362,15 @@ export async function updateMatchResult(
   homeScore: number | null,
   awayScore: number | null,
 ): Promise<void> {
-  await updateDoc(doc(db, 'matches', matchId), { homeScore, awayScore })
+  // Când adminul introduce/corectează un scor, îl marcăm ca override manual ca
+  // sincronizarea automată să nu îl mai suprascrie. La ștergerea scorului
+  // (null) eliberăm flag-ul, lăsând sincronizarea să preia din nou.
+  const scoreOverride = homeScore !== null && awayScore !== null
+  await updateDoc(doc(db, 'matches', matchId), {
+    homeScore,
+    awayScore,
+    scoreOverride,
+  })
 }
 
 export async function updateMatch(matchId: string, data: Partial<Match>): Promise<void> {
@@ -381,4 +473,50 @@ export function computeStandings(
     }
     return { ...row, rank }
   })
+}
+
+// Un punct pe graficul de evoluție: poziția fiecărui jucător după meciul `idx`.
+export interface PositionHistoryPoint {
+  idx: number // numărul meciului încheiat (1-based), în ordine cronologică
+  label: string // etichetă scurtă pentru axă (ex. „M1")
+  ranks: Record<string, number> // userId -> poziție după acest meci
+}
+
+export interface PositionHistory {
+  points: PositionHistoryPoint[]
+  players: { userId: string; name: string }[]
+}
+
+// Calculează evoluția pozițiilor: pentru fiecare meci încheiat (în ordine
+// cronologică), recalculează clasamentul cumulativ și reține poziția fiecărui
+// jucător. Permite desenarea unui grafic „poziție după fiecare meci".
+// Dacă `stage` e dat, se iau în calcul doar meciurile acelei etape, iar
+// pozițiile reflectă clasamentul etapei respective.
+export function computePositionHistory(
+  users: AppUser[],
+  matches: Match[],
+  predictions: Prediction[],
+  stage?: StageId,
+  viewer?: { id?: string; isAdmin?: boolean },
+): PositionHistory {
+  const scoped = stage ? matches.filter((m) => m.stage === stage) : matches
+  const finished = scoped
+    .filter((m) => m.homeScore !== null && m.awayScore !== null)
+    .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
+
+  // Setul de jucători (și ordinea) din clasamentul final al scopului — respectă
+  // filtrele de vizibilitate (ascunși/supraveghere).
+  const finalRows = computeStandings(users, matches, predictions, stage, viewer)
+  const players = finalRows.map((r) => ({ userId: r.userId, name: r.name }))
+
+  const points: PositionHistoryPoint[] = []
+  for (let i = 0; i < finished.length; i++) {
+    const prefix = finished.slice(0, i + 1)
+    const rows = computeStandings(users, prefix, predictions, stage, viewer)
+    const ranks: Record<string, number> = {}
+    for (const r of rows) ranks[r.userId] = r.rank
+    points.push({ idx: i + 1, label: `M${i + 1}`, ranks })
+  }
+
+  return { points, players }
 }
