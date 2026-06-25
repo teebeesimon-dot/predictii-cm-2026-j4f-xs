@@ -14,8 +14,10 @@ import { useEdition } from '@/components/edition-provider'
 // ca o ediție nou populată să apară fără reîncărcarea paginii.
 export function useAvailableEditionIds(refreshMs?: number) {
   return useSWR('available-editions', getAvailableEditionIds, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
     refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
   })
 }
 
@@ -26,23 +28,31 @@ export function useAvailableEditionIds(refreshMs?: number) {
 export function useMatches(refreshMs?: number) {
   const { editionId } = useEdition()
   return useSWR(['matches', editionId], () => getMatches(editionId), {
-    revalidateOnFocus: false,
+    // Reîmprospătează imediat când utilizatorul redeschide aplicația/tab-ul sau
+    // revine online, ca să nu vadă scoruri vechi din cache (mai ales pe mobil).
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
     refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
   })
 }
 
 export function useUsers(refreshMs?: number) {
   return useSWR('users', getUsers, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
     refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
   })
 }
 
 export function useAllPredictions(refreshMs?: number) {
   const { editionId } = useEdition()
   return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
     refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
   })
 }
 
