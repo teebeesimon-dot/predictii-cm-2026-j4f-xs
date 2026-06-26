@@ -23,6 +23,7 @@ export function AutoSync() {
   const { data: matches } = useMatches()
   const { mutate } = useSWRConfig()
   const runningRef = useRef(false)
+  const caughtUpRef = useRef(false)
 
   useEffect(() => {
     if (!matches || matches.length === 0) return
@@ -37,16 +38,15 @@ export function AutoSync() {
       })
     }
 
-    async function maybeSync() {
+    // Rulează o sincronizare și reîmprospătează datele dacă s-au schimbat scoruri.
+    async function runSync(includeLive: boolean) {
       if (runningRef.current) return
-      if (!inMatchWindow()) return
       runningRef.current = true
       try {
-        const res = await triggerSync({ includeLive: true })
-        // Dacă s-au schimbat scoruri, reîmprospătăm datele ca toate paginile
-        // (clasamente, statistici, premii) să reflecte noile rezultate.
+        const res = await triggerSync({ includeLive })
         if (res.ran && res.result && res.result.updated > 0) {
-          await mutate('matches')
+          // Reîmprospătăm toate cheile (meciuri, clasamente, statistici, premii).
+          await mutate(() => true, undefined, { revalidate: true })
         }
       } catch {
         // Eșec silențios: pollerul va reîncerca la următorul interval.
@@ -55,9 +55,23 @@ export function AutoSync() {
       }
     }
 
-    // Încearcă imediat la montare, apoi la fiecare interval.
-    void maybeSync()
-    const id = setInterval(() => void maybeSync(), POLL_INTERVAL_MS)
+    // Sincronizare de RECUPERARE la deschiderea aplicației: rulează O DATĂ,
+    // indiferent dacă suntem într-o fereastră de meci, ca utilizatorul care
+    // tocmai a deschis aplicația să prindă scorurile meciurilor încheiate când
+    // nimeni nu era online (ex. meciuri de noapte). E sigur pentru cota API:
+    // apelul real e throttled server-side (MIN_INTERVAL_MS), deci dacă altcineva
+    // a sincronizat recent, nu mai lovește furnizorul.
+    if (!caughtUpRef.current) {
+      caughtUpRef.current = true
+      void runSync(true)
+    }
+
+    // Polling periodic doar în ferestrele cu meciuri (economisește cota API).
+    function maybeSync() {
+      if (!inMatchWindow()) return
+      void runSync(true)
+    }
+    const id = setInterval(maybeSync, POLL_INTERVAL_MS)
     return () => clearInterval(id)
   }, [matches, mutate])
 
