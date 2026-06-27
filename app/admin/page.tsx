@@ -25,7 +25,10 @@ import {
   resyncMatchTeams,
   computeStandings,
 } from '@/lib/data'
-import { importEditionMatches, importWorldCupStage4 } from '@/app/actions/sync'
+import {
+  importEditionMatches,
+  importWorldCupKnockout,
+} from '@/app/actions/sync'
 import { EDITIONS, COMPETITIONS } from '@/lib/editions'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
@@ -216,7 +219,7 @@ function AdminContent() {
                   matches={matches ?? []}
                   onResynced={() => mutate()}
                 />
-                <ImportStage4Banner onImported={() => mutate()} />
+                <ImportKnockoutBanner onImported={() => mutate()} />
               </>
             ) : (
               <ImportEditionMatchesBanner
@@ -696,17 +699,18 @@ function ImportEditionMatchesBanner({
   )
 }
 
-// Buton de import pentru șaisprezecimile CM 2026 (Etapa 4 = Round of 32).
-// Preia perechile de echipe din football-data.org și le creează în Firestore.
-// Poate fi reapăsat oricând: adaugă doar meciurile noi (cu echipe stabilite),
-// fără duplicate. Scorurile se sincronizează apoi automat.
-function ImportStage4Banner({ onImported }: { onImported: () => void }) {
+// Buton de import pentru întreaga fază eliminatorie a CM 2026: șaisprezecimi
+// (Etapa 4) + optimi/sferturi/semifinale/finală (Etapa 5). Preia perechile de
+// echipe din football-data.org și le creează în Firestore. Poate fi reapăsat
+// oricând: adaugă doar meciurile noi (cu echipe stabilite), fără duplicate.
+// Scorurile se sincronizează apoi automat.
+function ImportKnockoutBanner({ onImported }: { onImported: () => void }) {
   const [importing, setImporting] = useState(false)
 
   async function handleImport() {
     setImporting(true)
     try {
-      const res = await importWorldCupStage4()
+      const res = await importWorldCupKnockout()
       if (!res.ok) {
         toast.info(res.message)
       } else if (res.imported > 0) {
@@ -716,7 +720,7 @@ function ImportStage4Banner({ onImported }: { onImported: () => void }) {
         toast.info(res.message)
       }
     } catch {
-      toast.error('Eroare la importul șaisprezecimilor.')
+      toast.error('Eroare la importul fazei eliminatorii.')
     } finally {
       setImporting(false)
     }
@@ -727,10 +731,11 @@ function ImportStage4Banner({ onImported }: { onImported: () => void }) {
       <div className="flex items-start gap-3">
         <Trophy className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <div>
-          <p className="font-medium">Încarcă șaisprezecimile (Etapa 4)</p>
+          <p className="font-medium">Încarcă faza eliminatorie</p>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Preia perechile din faza eliminatorie (Round of 32) de la
-            football-data.org. Apasă din nou după tragerea la sorți pentru
+            Preia de la football-data.org toate meciurile din faza eliminatorie:
+            șaisprezecimi (Etapa 4) plus optimi, sferturi, semifinale și finală
+            (Etapa 5). Apasă din nou după fiecare tragere la sorți pentru
             meciurile noi — cele deja încărcate nu se dublează, iar scorurile se
             sincronizează automat.
           </p>
@@ -742,7 +747,7 @@ function ImportStage4Banner({ onImported }: { onImported: () => void }) {
         ) : (
           <Download className="size-4" />
         )}
-        {importing ? 'Se importă...' : 'Încarcă șaisprezecimi'}
+        {importing ? 'Se importă...' : 'Încarcă faza eliminatorie'}
       </Button>
     </div>
   )

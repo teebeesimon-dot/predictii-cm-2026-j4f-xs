@@ -9,7 +9,12 @@ import {
   teamPairKey,
 } from '@/lib/football-data'
 import { getEdition, getCompetition } from '@/lib/editions'
-import { DEFAULT_EDITION_ID, type Match } from '@/lib/types'
+import {
+  DEFAULT_EDITION_ID,
+  type Match,
+  type StageId,
+  type KnockoutRound,
+} from '@/lib/types'
 
 // Interval minim între apeluri REALE către API atunci când sincronizarea e
 // declanșată din aplicație (poller-ul din browser sau butonul din admin).
@@ -156,16 +161,36 @@ export interface ImportStageResult {
   message: string
 }
 
-// Importă șaisprezecimile CM 2026 (Etapa 4 = Round of 32) din football-data.org
-// și le creează în Firestore. Este IDEMPOTENT și INCREMENTAL:
+// Maparea fazelor football-data.org → modelul nostru (etapă + rundă).
+// Faza eliminatorie a CM 2026:
+//  - LAST_32        → Etapa 4 (șaisprezecimi)
+//  - LAST_16        → Etapa 5, runda 'r16'   (optimi)
+//  - QUARTER_FINALS → Etapa 5, runda 'qf'    (sferturi)
+//  - SEMI_FINALS    → Etapa 5, runda 'sf'    (semifinale)
+//  - THIRD_PLACE    → Etapa 5, runda 'final' (finala mică)
+//  - FINAL          → Etapa 5, runda 'final' (finala mare)
+const KNOCKOUT_STAGE_MAP: Record<
+  string,
+  { stage: StageId; round?: KnockoutRound }
+> = {
+  LAST_32: { stage: 4 },
+  LAST_16: { stage: 5, round: 'r16' },
+  QUARTER_FINALS: { stage: 5, round: 'qf' },
+  SEMI_FINALS: { stage: 5, round: 'sf' },
+  THIRD_PLACE: { stage: 5, round: 'final' },
+  FINAL: { stage: 5, round: 'final' },
+}
+
+// Importă întreaga fază eliminatorie a CM 2026 (șaisprezecimi → finală) din
+// football-data.org și o creează în Firestore. Este IDEMPOTENT și INCREMENTAL:
 //  - creează doar meciurile cu ambele echipe deja stabilite (mapate la RO);
 //  - sare peste meciurile deja existente (identificate după perechea de echipe);
 //  - meciurile încă „TBD" (necompletate de furnizor) sunt raportate ca `pending`,
-//    astfel încât adminul poate reapăsa butonul după tragerea la sorți ca să le
-//    adauge pe cele noi, fără duplicate.
+//    astfel încât adminul poate reapăsa butonul după fiecare tragere la sorți ca
+//    să adauge meciurile noi, fără duplicate.
 // Scorurile se vor sincroniza apoi automat (sincronizarea le potrivește după
 // perechea de echipe).
-export async function importWorldCupStage4(): Promise<ImportStageResult> {
+export async function importWorldCupKnockout(): Promise<ImportStageResult> {
   const token = process.env.FOOTBALL_DATA_API_TOKEN
   if (!token) {
     return {
@@ -179,28 +204,28 @@ export async function importWorldCupStage4(): Promise<ImportStageResult> {
 
   try {
     const all = await fetchWorldCupMatchesStaged(token)
-    const r32 = all.filter((m) => m.apiStage === 'LAST_32')
+    const knockout = all.filter((m) => m.apiStage in KNOCKOUT_STAGE_MAP)
 
-    if (r32.length === 0) {
+    if (knockout.length === 0) {
       return {
         ok: false,
         imported: 0,
         pending: 0,
         unmapped: [],
         message:
-          'Furnizorul nu are încă meciurile din șaisprezecimi. Încearcă din nou mai târziu.',
+          'Furnizorul nu are încă meciurile din faza eliminatorie. Încearcă din nou mai târziu.',
       }
     }
 
-    // Meciurile de Etapă 4 existente deja în ediția World Cup, indexate după
-    // perechea de echipe (neordonată) ca să evităm duplicatele.
+    // Meciurile eliminatorii existente deja în ediția World Cup, indexate după
+    // etapă + perechea de echipe (neordonată) ca să evităm duplicatele.
     const snap = await getDocs(collection(db, 'matches'))
     const existingPairs = new Set<string>()
     for (const d of snap.docs) {
       const m = d.data() as Match
       if ((m.editionId ?? DEFAULT_EDITION_ID) !== DEFAULT_EDITION_ID) continue
-      if (m.stage !== 4) continue
-      existingPairs.add(teamPairKey(m.homeTeam, m.awayTeam))
+      if (m.stage !== 4 && m.stage !== 5) continue
+      existingPairs.add(`${m.stage}|${teamPairKey(m.homeTeam, m.awayTeam)}`)
     }
 
     let imported = 0
@@ -208,7 +233,8 @@ export async function importWorldCupStage4(): Promise<ImportStageResult> {
     const unmapped = new Set<string>()
     const batch = writeBatch(db)
 
-    for (const m of r32) {
+    for (const m of knockout) {
+      const mapping = KNOCKOUT_STAGE_MAP[m.apiStage]
       const hasTeams = !!m.rawHome && !!m.rawAway
       if (!hasTeams) {
         pending += 1
@@ -223,13 +249,15 @@ export async function importWorldCupStage4(): Promise<ImportStageResult> {
         continue
       }
 
-      const key = teamPairKey(m.roHome, m.roAway)
+      const key = `${mapping.stage}|${teamPairKey(m.roHome, m.roAway)}`
       if (existingPairs.has(key)) continue
 
       const ref = doc(collection(db, 'matches'))
       batch.set(ref, {
         editionId: DEFAULT_EDITION_ID,
-        stage: 4,
+        stage: mapping.stage,
+        // câmpul `round` doar pentru Etapa 5 (rundele eliminatorii)
+        ...(mapping.round ? { round: mapping.round } : {}),
         homeTeam: m.roHome,
         awayTeam: m.roAway,
         kickoff: m.kickoff,
@@ -260,7 +288,9 @@ export async function importWorldCupStage4(): Promise<ImportStageResult> {
     }
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : 'Eroare la importul șaisprezecimilor.'
+      err instanceof Error
+        ? err.message
+        : 'Eroare la importul fazei eliminatorii.'
     return { ok: false, imported: 0, pending: 0, unmapped: [], message }
   }
 }
