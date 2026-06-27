@@ -194,6 +194,65 @@ export async function fetchWorldCupMatches(token: string): Promise<NormalizedApi
 }
 
 // ---------------------------------------------------------------------------
+// Import al fazei eliminatorii a CM 2026 (ex. șaisprezecimi = Etapa 4).
+// Spre deosebire de sincronizarea de scoruri, aici avem nevoie și de FAZA
+// (stage) și de ORA meciului, ca să putem CREA meciurile care nu există încă în
+// Firestore. Numele echipelor sunt mapate la forma românească (ca restul
+// orarului), iar meciurile fără echipe stabilite încă (TBD la tragerea la sorți)
+// sunt semnalate apelantului prin roHome/roAway = null.
+// ---------------------------------------------------------------------------
+
+export interface StagedWcMatch {
+  apiStage: string // ex. GROUP_STAGE, LAST_32, LAST_16, QUARTER_FINALS...
+  kickoff: string // ISO (gol dacă lipsește data)
+  roHome: string | null
+  roAway: string | null
+  rawHome: string | null
+  rawAway: string | null
+  homeScore: number | null
+  awayScore: number | null
+}
+
+interface ApiMatchStaged extends ApiMatch {
+  stage?: string
+  utcDate?: string
+}
+
+// Preia toate meciurile CM 2026 împreună cu faza (stage) și ora fiecăruia.
+export async function fetchWorldCupMatchesStaged(
+  token: string,
+): Promise<StagedWcMatch[]> {
+  const res = await fetch(
+    `${API_BASE}/competitions/${WORLD_CUP_COMPETITION}/matches`,
+    {
+      headers: { 'X-Auth-Token': token },
+      cache: 'no-store',
+    },
+  )
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(
+      `football-data.org a răspuns ${res.status}: ${body.slice(0, 200)}`,
+    )
+  }
+
+  const data = (await res.json()) as { matches?: ApiMatchStaged[] }
+  const matches = data.matches ?? []
+
+  return matches.map((m) => ({
+    apiStage: m.stage ?? '',
+    kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
+    roHome: mapApiTeamToRo(m.homeTeam),
+    roAway: mapApiTeamToRo(m.awayTeam),
+    rawHome: m.homeTeam?.name ?? null,
+    rawAway: m.awayTeam?.name ?? null,
+    homeScore: m.score?.fullTime?.home ?? null,
+    awayScore: m.score?.fullTime?.away ?? null,
+  }))
+}
+
+// ---------------------------------------------------------------------------
 // Import generic de meciuri pentru orice competiție (ediții noi).
 // Spre deosebire de sincronizarea CM 2026 (care mapează la nume românești), aici
 // folosim numele brute din API (de regulă în engleză), fiindcă nu avem un orar

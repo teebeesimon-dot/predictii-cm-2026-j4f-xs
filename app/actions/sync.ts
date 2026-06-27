@@ -3,9 +3,13 @@
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { runResultsSync, getSyncStatus, type SyncResult, type SyncStatus } from '@/lib/sync-results'
-import { fetchCompetitionMatches } from '@/lib/football-data'
+import {
+  fetchCompetitionMatches,
+  fetchWorldCupMatchesStaged,
+  teamPairKey,
+} from '@/lib/football-data'
 import { getEdition, getCompetition } from '@/lib/editions'
-import type { Match } from '@/lib/types'
+import { DEFAULT_EDITION_ID, type Match } from '@/lib/types'
 
 // Interval minim între apeluri REALE către API atunci când sincronizarea e
 // declanșată din aplicație (poller-ul din browser sau butonul din admin).
@@ -138,5 +142,125 @@ export async function importEditionMatches(
     const message =
       err instanceof Error ? err.message : 'Eroare la importul meciurilor.'
     return { ok: false, imported: 0, message }
+  }
+}
+
+export interface ImportStageResult {
+  ok: boolean
+  imported: number
+  // Câte meciuri din fază nu au încă echipe stabilite (TBD la tragerea la sorți).
+  pending: number
+  // Nume de echipe pe care nu le-am putut mapa la forma românească (de adăugat
+  // în aliasurile din lib/football-data.ts).
+  unmapped: string[]
+  message: string
+}
+
+// Importă șaisprezecimile CM 2026 (Etapa 4 = Round of 32) din football-data.org
+// și le creează în Firestore. Este IDEMPOTENT și INCREMENTAL:
+//  - creează doar meciurile cu ambele echipe deja stabilite (mapate la RO);
+//  - sare peste meciurile deja existente (identificate după perechea de echipe);
+//  - meciurile încă „TBD" (necompletate de furnizor) sunt raportate ca `pending`,
+//    astfel încât adminul poate reapăsa butonul după tragerea la sorți ca să le
+//    adauge pe cele noi, fără duplicate.
+// Scorurile se vor sincroniza apoi automat (sincronizarea le potrivește după
+// perechea de echipe).
+export async function importWorldCupStage4(): Promise<ImportStageResult> {
+  const token = process.env.FOOTBALL_DATA_API_TOKEN
+  if (!token) {
+    return {
+      ok: false,
+      imported: 0,
+      pending: 0,
+      unmapped: [],
+      message: 'Lipsește FOOTBALL_DATA_API_TOKEN.',
+    }
+  }
+
+  try {
+    const all = await fetchWorldCupMatchesStaged(token)
+    const r32 = all.filter((m) => m.apiStage === 'LAST_32')
+
+    if (r32.length === 0) {
+      return {
+        ok: false,
+        imported: 0,
+        pending: 0,
+        unmapped: [],
+        message:
+          'Furnizorul nu are încă meciurile din șaisprezecimi. Încearcă din nou mai târziu.',
+      }
+    }
+
+    // Meciurile de Etapă 4 existente deja în ediția World Cup, indexate după
+    // perechea de echipe (neordonată) ca să evităm duplicatele.
+    const snap = await getDocs(collection(db, 'matches'))
+    const existingPairs = new Set<string>()
+    for (const d of snap.docs) {
+      const m = d.data() as Match
+      if ((m.editionId ?? DEFAULT_EDITION_ID) !== DEFAULT_EDITION_ID) continue
+      if (m.stage !== 4) continue
+      existingPairs.add(teamPairKey(m.homeTeam, m.awayTeam))
+    }
+
+    let imported = 0
+    let pending = 0
+    const unmapped = new Set<string>()
+    const batch = writeBatch(db)
+
+    for (const m of r32) {
+      const hasTeams = !!m.rawHome && !!m.rawAway
+      if (!hasTeams) {
+        pending += 1
+        continue
+      }
+      // Echipe stabilite, dar nemapate la RO: le semnalăm și sărim peste (ca să
+      // nu stricăm potrivirea scorurilor, care se face pe nume românești).
+      if (!m.roHome) unmapped.add(m.rawHome as string)
+      if (!m.roAway) unmapped.add(m.rawAway as string)
+      if (!m.roHome || !m.roAway) {
+        pending += 1
+        continue
+      }
+
+      const key = teamPairKey(m.roHome, m.roAway)
+      if (existingPairs.has(key)) continue
+
+      const ref = doc(collection(db, 'matches'))
+      batch.set(ref, {
+        editionId: DEFAULT_EDITION_ID,
+        stage: 4,
+        homeTeam: m.roHome,
+        awayTeam: m.roAway,
+        kickoff: m.kickoff,
+        homeScore: m.homeScore,
+        awayScore: m.awayScore,
+      })
+      existingPairs.add(key)
+      imported += 1
+    }
+
+    if (imported > 0) await batch.commit()
+
+    const parts: string[] = []
+    if (imported > 0) parts.push(`${imported} meciuri importate`)
+    if (pending > 0) parts.push(`${pending} încă fără echipe stabilite`)
+    if (imported === 0 && pending === 0)
+      parts.push('toate meciurile erau deja încărcate')
+    const unmappedArr = Array.from(unmapped)
+    if (unmappedArr.length > 0)
+      parts.push(`nemapate: ${unmappedArr.join(', ')}`)
+
+    return {
+      ok: true,
+      imported,
+      pending,
+      unmapped: unmappedArr,
+      message: parts.join(' · ') + '.',
+    }
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Eroare la importul șaisprezecimilor.'
+    return { ok: false, imported: 0, pending: 0, unmapped: [], message }
   }
 }

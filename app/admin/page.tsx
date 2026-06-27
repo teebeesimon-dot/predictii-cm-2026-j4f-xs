@@ -25,7 +25,7 @@ import {
   resyncMatchTeams,
   computeStandings,
 } from '@/lib/data'
-import { importEditionMatches } from '@/app/actions/sync'
+import { importEditionMatches, importWorldCupStage4 } from '@/app/actions/sync'
 import { EDITIONS, COMPETITIONS } from '@/lib/editions'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
@@ -76,6 +76,7 @@ import {
   EyeOff,
   ChevronDown,
   Check,
+  Trophy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -215,6 +216,7 @@ function AdminContent() {
                   matches={matches ?? []}
                   onResynced={() => mutate()}
                 />
+                <ImportStage4Banner onImported={() => mutate()} />
               </>
             ) : (
               <ImportEditionMatchesBanner
@@ -689,6 +691,58 @@ function ImportEditionMatchesBanner({
           <Download className="size-4" />
         )}
         {hasMatches ? 'Meciuri deja încărcate' : 'Încarcă meciuri'}
+      </Button>
+    </div>
+  )
+}
+
+// Buton de import pentru șaisprezecimile CM 2026 (Etapa 4 = Round of 32).
+// Preia perechile de echipe din football-data.org și le creează în Firestore.
+// Poate fi reapăsat oricând: adaugă doar meciurile noi (cu echipe stabilite),
+// fără duplicate. Scorurile se sincronizează apoi automat.
+function ImportStage4Banner({ onImported }: { onImported: () => void }) {
+  const [importing, setImporting] = useState(false)
+
+  async function handleImport() {
+    setImporting(true)
+    try {
+      const res = await importWorldCupStage4()
+      if (!res.ok) {
+        toast.info(res.message)
+      } else if (res.imported > 0) {
+        toast.success(res.message)
+        onImported()
+      } else {
+        toast.info(res.message)
+      }
+    } catch {
+      toast.error('Eroare la importul șaisprezecimilor.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Trophy className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium">Încarcă șaisprezecimile (Etapa 4)</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Preia perechile din faza eliminatorie (Round of 32) de la
+            football-data.org. Apasă din nou după tragerea la sorți pentru
+            meciurile noi — cele deja încărcate nu se dublează, iar scorurile se
+            sincronizează automat.
+          </p>
+        </div>
+      </div>
+      <Button onClick={handleImport} disabled={importing} className="shrink-0">
+        {importing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4" />
+        )}
+        {importing ? 'Se importă...' : 'Încarcă șaisprezecimi'}
       </Button>
     </div>
   )
