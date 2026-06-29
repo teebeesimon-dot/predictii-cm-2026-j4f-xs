@@ -33,18 +33,38 @@ interface ApiTeam {
   tla?: string | null
 }
 
+interface ApiScoreLine {
+  home: number | null
+  away: number | null
+}
+
 interface ApiMatch {
   id: number
   status: ApiMatchStatus
   homeTeam: ApiTeam
   awayTeam: ApiTeam
   score: {
-    // Pentru fazele eliminatorii API-ul include și extraTime/penalties, dar
-    // pentru pronosticuri ne interesează rezultatul „regulamentar" afișat în
-    // fullTime (care la grupe este scorul final).
-    fullTime: { home: number | null; away: number | null }
-    regularTime?: { home: number | null; away: number | null }
+    // `duration` = REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT.
+    duration?: string
+    // `fullTime` include prelungirile (și penalty-urile) la meciurile
+    // eliminatorii care nu s-au decis în 90 de minute.
+    fullTime: ApiScoreLine
+    // `regularTime` = scorul DOAR după 90 de minute (apare doar când meciul a
+    // trecut în prelungiri). Acesta e scorul pe care îl folosim la pronosticuri.
+    regularTime?: ApiScoreLine
   }
+}
+
+// Extrage scorul „regulamentar" (DOAR 90 de minute), conform regulilor ligii:
+// nu se iau în calcul prelungirile sau loviturile de departajare. Când meciul a
+// mers în prelungiri, folosim `regularTime`; altfel `fullTime` este deja scorul
+// de la finalul celor 90 de minute (grupe + eliminatorii decise în timp regul.).
+export function extractRegulationScore(score: ApiMatch['score']): ApiScoreLine {
+  const reg = score.regularTime
+  if (reg && reg.home !== null && reg.home !== undefined && reg.away !== null && reg.away !== undefined) {
+    return { home: reg.home, away: reg.away }
+  }
+  return { home: score.fullTime.home, away: score.fullTime.away }
 }
 
 interface ApiMatchesResponse {
@@ -179,8 +199,8 @@ export async function fetchWorldCupMatches(token: string): Promise<NormalizedApi
   const matches = data.matches ?? []
 
   return matches.map((m) => {
-    const home = m.score.fullTime.home
-    const away = m.score.fullTime.away
+    // Scorul de la 90 de minute (fără prelungiri/penalty-uri).
+    const { home, away } = extractRegulationScore(m.score)
     return {
       status: m.status,
       roHome: mapApiTeamToRo(m.homeTeam),
@@ -240,16 +260,20 @@ export async function fetchWorldCupMatchesStaged(
   const data = (await res.json()) as { matches?: ApiMatchStaged[] }
   const matches = data.matches ?? []
 
-  return matches.map((m) => ({
-    apiStage: m.stage ?? '',
-    kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
-    roHome: mapApiTeamToRo(m.homeTeam),
-    roAway: mapApiTeamToRo(m.awayTeam),
-    rawHome: m.homeTeam?.name ?? null,
-    rawAway: m.awayTeam?.name ?? null,
-    homeScore: m.score?.fullTime?.home ?? null,
-    awayScore: m.score?.fullTime?.away ?? null,
-  }))
+  return matches.map((m) => {
+    // Scorul de la 90 de minute (fără prelungiri/penalty-uri).
+    const reg = m.score ? extractRegulationScore(m.score) : { home: null, away: null }
+    return {
+      apiStage: m.stage ?? '',
+      kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
+      roHome: mapApiTeamToRo(m.homeTeam),
+      roAway: mapApiTeamToRo(m.awayTeam),
+      rawHome: m.homeTeam?.name ?? null,
+      rawAway: m.awayTeam?.name ?? null,
+      homeScore: reg.home,
+      awayScore: reg.away,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -301,14 +325,18 @@ export async function fetchCompetitionMatches(
 
   return matches
     .filter((m) => m.homeTeam?.name && m.awayTeam?.name && m.utcDate)
-    .map((m) => ({
-      homeTeam: m.homeTeam.name as string,
-      awayTeam: m.awayTeam.name as string,
-      kickoff: new Date(m.utcDate as string).toISOString(),
-      homeScore: m.score?.fullTime?.home ?? null,
-      awayScore: m.score?.fullTime?.away ?? null,
-      matchday: m.matchday ?? null,
-    }))
+    .map((m) => {
+      // Scorul de la 90 de minute (fără prelungiri/penalty-uri).
+      const reg = m.score ? extractRegulationScore(m.score) : { home: null, away: null }
+      return {
+        homeTeam: m.homeTeam.name as string,
+        awayTeam: m.awayTeam.name as string,
+        kickoff: new Date(m.utcDate as string).toISOString(),
+        homeScore: reg.home,
+        awayScore: reg.away,
+        matchday: m.matchday ?? null,
+      }
+    })
 }
 
 // Rezultatul calculării diferențelor între API și Firestore.
