@@ -181,10 +181,14 @@ export function teamPairKey(a: string, b: string): string {
   return [normalize(a), normalize(b)].sort().join('::')
 }
 
-// Preia toate meciurile CM 2026 de la football-data.org și le normalizează.
-// Aruncă eroare dacă lipsește token-ul sau API-ul răspunde cu eroare.
-export async function fetchWorldCupMatches(token: string): Promise<NormalizedApiMatch[]> {
-  const res = await fetch(`${API_BASE}/competitions/${WORLD_CUP_COMPETITION}/matches`, {
+// Preia toate meciurile unei competiții de la football-data.org și le
+// normalizează. Aruncă eroare dacă lipsește token-ul sau API-ul răspunde cu
+// eroare. `competitionCode` implicit = World Cup (compatibilitate).
+export async function fetchWorldCupMatches(
+  token: string,
+  competitionCode: number = WORLD_CUP_COMPETITION,
+): Promise<NormalizedApiMatch[]> {
+  const res = await fetch(`${API_BASE}/competitions/${competitionCode}/matches`, {
     headers: { 'X-Auth-Token': token },
     // Nu cache-uim: vrem mereu cele mai noi scoruri.
     cache: 'no-store',
@@ -222,28 +226,35 @@ export async function fetchWorldCupMatches(token: string): Promise<NormalizedApi
 // sunt semnalate apelantului prin roHome/roAway = null.
 // ---------------------------------------------------------------------------
 
-export interface StagedWcMatch {
-  apiStage: string // ex. GROUP_STAGE, LAST_32, LAST_16, QUARTER_FINALS...
+export interface StagedApiMatch {
+  apiStage: string // ex. GROUP_STAGE, LEAGUE_STAGE, LAST_32, PLAYOFFS...
+  matchday: number | null // pentru fazele-ligă/grupe (CL: runda 1-8)
   kickoff: string // ISO (gol dacă lipsește data)
-  roHome: string | null
+  roHome: string | null // numele mapat la RO (doar la echipe naționale)
   roAway: string | null
-  rawHome: string | null
+  rawHome: string | null // numele brut din API (cluburi la CL)
   rawAway: string | null
   homeScore: number | null
   awayScore: number | null
 }
 
+// Alias pentru compatibilitate cu importul fazei eliminatorii CM.
+export type StagedWcMatch = StagedApiMatch
+
 interface ApiMatchStaged extends ApiMatch {
   stage?: string
+  matchday?: number | null
   utcDate?: string
 }
 
-// Preia toate meciurile CM 2026 împreună cu faza (stage) și ora fiecăruia.
-export async function fetchWorldCupMatchesStaged(
+// Preia toate meciurile unei competiții împreună cu faza (stage), etapa
+// (matchday) și ora fiecăruia. Folosit la importul care CREEAZĂ meciuri.
+export async function fetchStagedMatches(
   token: string,
-): Promise<StagedWcMatch[]> {
+  competitionCode: number,
+): Promise<StagedApiMatch[]> {
   const res = await fetch(
-    `${API_BASE}/competitions/${WORLD_CUP_COMPETITION}/matches`,
+    `${API_BASE}/competitions/${competitionCode}/matches`,
     {
       headers: { 'X-Auth-Token': token },
       cache: 'no-store',
@@ -265,6 +276,7 @@ export async function fetchWorldCupMatchesStaged(
     const reg = m.score ? extractRegulationScore(m.score) : { home: null, away: null }
     return {
       apiStage: m.stage ?? '',
+      matchday: m.matchday ?? null,
       kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
       roHome: mapApiTeamToRo(m.homeTeam),
       roAway: mapApiTeamToRo(m.awayTeam),
@@ -274,6 +286,13 @@ export async function fetchWorldCupMatchesStaged(
       awayScore: reg.away,
     }
   })
+}
+
+// Compat: importul fazei eliminatorii CM folosește World Cup (cod 2000).
+export async function fetchWorldCupMatchesStaged(
+  token: string,
+): Promise<StagedApiMatch[]> {
+  return fetchStagedMatches(token, WORLD_CUP_COMPETITION)
 }
 
 // ---------------------------------------------------------------------------
@@ -361,11 +380,18 @@ export function diffScores(
 ): ScoreUpdate[] {
   const includeLive = options.includeLive === true
 
+  // Numele „efectiv" al unei echipe din API: numele mapat la RO (echipe
+  // naționale) sau, dacă nu există mapare, numele brut (cluburi la CL).
+  const effHome = (a: NormalizedApiMatch) => a.roHome ?? a.rawHome
+  const effAway = (a: NormalizedApiMatch) => a.roAway ?? a.rawAway
+
   // Index API după perechea de echipe (neordonată).
   const apiByPair = new Map<string, NormalizedApiMatch>()
   for (const a of apiMatches) {
-    if (!a.roHome || !a.roAway) continue
-    apiByPair.set(teamPairKey(a.roHome, a.roAway), a)
+    const h = effHome(a)
+    const aw = effAway(a)
+    if (!h || !aw) continue
+    apiByPair.set(teamPairKey(h, aw), a)
   }
 
   const updates: ScoreUpdate[] = []
@@ -383,7 +409,7 @@ export function diffScores(
     // Aliniază scorurile la orientarea gazdă/oaspete din orarul nostru.
     let toHome = api.homeScore
     let toAway = api.awayScore
-    const sameOrientation = normalize(m.homeTeam) === normalize(api.roHome as string)
+    const sameOrientation = normalize(m.homeTeam) === normalize(effHome(api) as string)
     if (!sameOrientation) {
       toHome = api.awayScore
       toAway = api.homeScore

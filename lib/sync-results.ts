@@ -17,7 +17,8 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Match } from '@/lib/types'
+import { DEFAULT_EDITION_ID, type Match } from '@/lib/types'
+import { getCompetition } from '@/lib/editions'
 import {
   fetchWorldCupMatches,
   diffScores,
@@ -98,10 +99,31 @@ export async function runResultsSync(
   }
 
   try {
-    const [firestoreMatches, apiMatches] = await Promise.all([
-      getFirestoreMatches(),
-      fetchWorldCupMatches(token),
-    ])
+    const firestoreMatches = await getFirestoreMatches()
+
+    // Grupăm meciurile din Firestore pe competiție (prin ediția lor) și
+    // sincronizăm fiecare competiție cu propriul cod football-data. Astfel
+    // scorurile se actualizează pentru TOATE competițiile care au meciuri
+    // (World Cup, Champions League etc.), nu doar World Cup.
+    const codeByEdition = new Map<string, number>()
+    for (const m of firestoreMatches) {
+      const editionId = m.editionId ?? DEFAULT_EDITION_ID
+      if (codeByEdition.has(editionId)) continue
+      const code = getCompetition(editionId)?.footballDataCode
+      if (code) codeByEdition.set(editionId, code)
+    }
+    const codes = Array.from(new Set(codeByEdition.values()))
+    // Dacă nu există încă meciuri, sincronizăm măcar World Cup (implicit).
+    if (codes.length === 0) {
+      const wc = getCompetition(DEFAULT_EDITION_ID)?.footballDataCode
+      if (wc) codes.push(wc)
+    }
+
+    // Un fetch per competiție (rămânem sub limita de 10 cereri/minut).
+    const perCompetition = await Promise.all(
+      codes.map((code) => fetchWorldCupMatches(token, code)),
+    )
+    const apiMatches = perCompetition.flat()
 
     const unmatched = apiMatches.filter((a) => !a.roHome || !a.roAway).length
     const changes = diffScores(firestoreMatches, apiMatches, {

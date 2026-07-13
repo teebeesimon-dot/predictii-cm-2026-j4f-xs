@@ -6,6 +6,7 @@ import { runResultsSync, getSyncStatus, type SyncResult, type SyncStatus } from 
 import {
   fetchCompetitionMatches,
   fetchWorldCupMatchesStaged,
+  fetchStagedMatches,
   teamPairKey,
 } from '@/lib/football-data'
 import { getEdition, getCompetition } from '@/lib/editions'
@@ -291,6 +292,142 @@ export async function importWorldCupKnockout(): Promise<ImportStageResult> {
       err instanceof Error
         ? err.message
         : 'Eroare la importul fazei eliminatorii.'
+    return { ok: false, imported: 0, pending: 0, unmapped: [], message }
+  }
+}
+
+// Maparea fazelor football-data.org (Champions League) → etapele noastre.
+// Faza-ligă (LEAGUE_STAGE) folosește matchday 1-8 → Etapele 1-8. Restul sunt
+// faze eliminatorii cu etapă fixă.
+//  - LEAGUE_STAGE (matchday 1..8) → Etapele 1..8
+//  - PLAYOFFS        → Etapa 9  (baraj, tur-retur)
+//  - LAST_16         → Etapa 10 (optimi, tur-retur)
+//  - QUARTER_FINALS  → Etapa 11
+//  - SEMI_FINALS     → Etapa 11
+//  - FINAL           → Etapa 11
+const CL_KNOCKOUT_STAGE_MAP: Record<string, StageId> = {
+  PLAYOFFS: 9,
+  LAST_16: 10,
+  QUARTER_FINALS: 11,
+  SEMI_FINALS: 11,
+  FINAL: 11,
+}
+
+function clStageFor(apiStage: string, matchday: number | null): StageId | null {
+  if (apiStage === 'LEAGUE_STAGE' || apiStage === 'GROUP_STAGE') {
+    if (matchday && matchday >= 1 && matchday <= 8) return matchday as StageId
+    return null
+  }
+  return CL_KNOCKOUT_STAGE_MAP[apiStage] ?? null
+}
+
+// Importă meciurile Champions League din football-data.org și le creează în
+// Firestore pentru ediția CL dată. Ca la World Cup: IDEMPOTENT și INCREMENTAL
+// (dedup pe etapă + perechea de echipe), creează doar meciurile cu echipe
+// stabilite, raportează câte sunt încă TBD. Echipele sunt cluburi, deci
+// folosim numele brute din API (fără mapare la RO). Scorurile (90') se
+// sincronizează apoi automat prin importul generic de rezultate.
+export async function importChampionsLeague(
+  editionId: string,
+): Promise<ImportStageResult> {
+  const token = process.env.FOOTBALL_DATA_API_TOKEN
+  if (!token) {
+    return {
+      ok: false,
+      imported: 0,
+      pending: 0,
+      unmapped: [],
+      message: 'Lipsește FOOTBALL_DATA_API_TOKEN.',
+    }
+  }
+
+  const edition = getEdition(editionId)
+  const competition = getCompetition(editionId)
+  if (!edition || !competition || edition.competitionId !== 'cl') {
+    return {
+      ok: false,
+      imported: 0,
+      pending: 0,
+      unmapped: [],
+      message: 'Selectează o ediție de Champions League pentru acest import.',
+    }
+  }
+
+  try {
+    const all = await fetchStagedMatches(token, competition.footballDataCode)
+    if (all.length === 0) {
+      return {
+        ok: false,
+        imported: 0,
+        pending: 0,
+        unmapped: [],
+        message:
+          'Furnizorul nu are încă meciuri pentru această competiție. Încearcă mai târziu.',
+      }
+    }
+
+    // Meciurile existente ale acestei ediții, indexate după etapă + perechea de
+    // echipe (neordonată) ca să evităm duplicatele.
+    const snap = await getDocs(collection(db, 'matches'))
+    const existingPairs = new Set<string>()
+    for (const d of snap.docs) {
+      const m = d.data() as Match
+      if ((m.editionId ?? DEFAULT_EDITION_ID) !== editionId) continue
+      existingPairs.add(`${m.stage}|${teamPairKey(m.homeTeam, m.awayTeam)}`)
+    }
+
+    let imported = 0
+    let pending = 0
+    const batch = writeBatch(db)
+
+    for (const m of all) {
+      const stage = clStageFor(m.apiStage, m.matchday)
+      if (stage === null) continue // fază necunoscută → ignorăm
+
+      const home = m.rawHome
+      const away = m.rawAway
+      if (!home || !away) {
+        pending += 1
+        continue
+      }
+
+      const key = `${stage}|${teamPairKey(home, away)}`
+      if (existingPairs.has(key)) continue
+
+      const ref = doc(collection(db, 'matches'))
+      batch.set(ref, {
+        editionId,
+        stage,
+        homeTeam: home,
+        awayTeam: away,
+        kickoff: m.kickoff,
+        homeScore: m.homeScore,
+        awayScore: m.awayScore,
+      })
+      existingPairs.add(key)
+      imported += 1
+    }
+
+    if (imported > 0) await batch.commit()
+
+    const parts: string[] = []
+    if (imported > 0) parts.push(`${imported} meciuri importate`)
+    if (pending > 0) parts.push(`${pending} încă fără echipe stabilite`)
+    if (imported === 0 && pending === 0)
+      parts.push('toate meciurile erau deja încărcate')
+
+    return {
+      ok: true,
+      imported,
+      pending,
+      unmapped: [],
+      message: parts.join(' · ') + '.',
+    }
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'Eroare la importul Champions League.'
     return { ok: false, imported: 0, pending: 0, unmapped: [], message }
   }
 }

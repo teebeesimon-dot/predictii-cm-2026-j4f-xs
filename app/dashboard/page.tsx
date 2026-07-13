@@ -63,8 +63,8 @@ function DashboardContent() {
       : []
   // Etapa care se joacă efectiv acum (poate diferi de etapa „activă" pentru
   // pronosticuri, care sare la următoarea etapă imediat ce termenul expiră).
-  const liveStage = getLiveStage(matches ?? [])
-  const liveStageInfo = STAGES.find((s) => s.id === liveStage)
+  const liveStage = scheduler.getLiveStage()
+  const liveStageInfo = scheduler.stages.find((s) => s.id === liveStage)
   // Meciurile etapei în curs (cele jucate au scor, cele neîncepute arată „vs").
   const liveStageMatches = (matches ?? [])
     .filter((m) => m.stage === liveStage)
@@ -96,7 +96,7 @@ function DashboardContent() {
       .map((p) => p.matchId),
   )
   const remaining = stageMatches.filter(
-    (m) => !isLocked(m) && !myPredictedMatchIds.has(m.id),
+    (m) => !scheduler.isLocked(m) && !myPredictedMatchIds.has(m.id),
   ).length
 
   // Meciuri „în desfășurare": au început (kickoff a trecut) și sunt în fereastra
@@ -173,6 +173,7 @@ function DashboardContent() {
                   users={users}
                   predictions={predictions}
                   currentUserId={user?.id}
+                  scheduler={scheduler}
                 />
               ))}
             </div>
@@ -227,6 +228,7 @@ function DashboardContent() {
               predictions={predictions ?? []}
               currentUserId={user?.id}
               variant="next"
+              scheduler={scheduler}
             />
             {/* Dreapta: mai întâi clasamentul pe etapa curentă, apoi cel general */}
             <div className="flex flex-col gap-4">
@@ -295,7 +297,7 @@ function DashboardContent() {
               ) : (
                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                   {liveStageMatches.map((m) => {
-                    const locked = isLocked(m)
+                    const locked = scheduler.isLocked(m)
                     return (
                       <li
                         key={m.id}
@@ -445,18 +447,20 @@ function LiveMatchCard({
   predictions,
   currentUserId,
   variant = 'live',
+  scheduler,
 }: {
   match: Match
   users: AppUser[]
   predictions: Prediction[]
   currentUserId?: string
   variant?: 'live' | 'next'
+  scheduler: Scheduler
 }) {
   // Pronosticurile se dezvăluie doar după ce meciul e blocat (a început sau a
   // trecut termenul limită), exact ca pe pagina „Colegi". Un meci live este
   // mereu blocat; pentru următorul meci, dezvăluim doar dacă deja e blocat.
   const hasResult = match.homeScore !== null && match.awayScore !== null
-  const revealed = variant === 'live' || isLocked(match)
+  const revealed = variant === 'live' || scheduler.isLocked(match)
   const matchPreds = predictions.filter((p) => p.matchId === match.id)
 
   const rows = [...users]

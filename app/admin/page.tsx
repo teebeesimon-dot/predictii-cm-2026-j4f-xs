@@ -28,6 +28,7 @@ import {
 import {
   importEditionMatches,
   importWorldCupKnockout,
+  importChampionsLeague,
 } from '@/app/actions/sync'
 import { EDITIONS, COMPETITIONS } from '@/lib/editions'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
@@ -221,6 +222,12 @@ function AdminContent() {
                 />
                 <ImportKnockoutBanner onImported={() => mutate()} />
               </>
+            ) : edition.competitionId === 'cl' ? (
+              <ImportChampionsLeagueBanner
+                editionId={editionId}
+                editionLabel={edition.label}
+                onImported={() => mutate()}
+              />
             ) : (
               <ImportEditionMatchesBanner
                 editionId={editionId}
@@ -748,6 +755,68 @@ function ImportKnockoutBanner({ onImported }: { onImported: () => void }) {
           <Download className="size-4" />
         )}
         {importing ? 'Se importă...' : 'Încarcă faza eliminatorie'}
+      </Button>
+    </div>
+  )
+}
+
+// Buton de import pentru Champions League: preia din football-data.org toate
+// meciurile competiției (faza-ligă Etapele 1-8, play-off Etapa 9, optimi Etapa
+// 10, sferturi/semifinale/finală Etapa 11) și le creează pentru ediția curentă.
+// Idempotent: reapasă oricând după tragerile la sorți — meciurile existente nu
+// se dublează, iar scorurile (90') se sincronizează automat.
+function ImportChampionsLeagueBanner({
+  editionId,
+  editionLabel,
+  onImported,
+}: {
+  editionId: string
+  editionLabel: string
+  onImported: () => void
+}) {
+  const [importing, setImporting] = useState(false)
+
+  async function handleImport() {
+    setImporting(true)
+    try {
+      const res = await importChampionsLeague(editionId)
+      if (!res.ok) {
+        toast.info(res.message)
+      } else if (res.imported > 0) {
+        toast.success(res.message)
+        onImported()
+      } else {
+        toast.info(res.message)
+      }
+    } catch {
+      toast.error('Eroare la importul Champions League.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Trophy className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <div>
+          <p className="font-medium">Încarcă meciurile ({editionLabel})</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Preia de la football-data.org meciurile din Champions League: faza-ligă
+            (Etapele 1-8), play-off (Etapa 9), optimi (Etapa 10) și
+            sferturi/semifinale/finală (Etapa 11). Apasă din nou după fiecare
+            tragere la sorți — meciurile existente nu se dublează, iar scorurile
+            se sincronizează automat.
+          </p>
+        </div>
+      </div>
+      <Button onClick={handleImport} disabled={importing} className="shrink-0">
+        {importing ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4" />
+        )}
+        {importing ? 'Se importă...' : 'Încarcă meciurile'}
       </Button>
     </div>
   )
