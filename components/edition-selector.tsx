@@ -115,9 +115,9 @@ export function EditionSelector() {
 
       {/* An */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/70">
+        <DropdownMenuTrigger className="flex items-center gap-1 whitespace-nowrap rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/70">
           {formatSeasonYear(edition.competitionId, edition.year)}
-          <ChevronDown className="size-3.5 text-muted-foreground" />
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-24">
           {years.map((y) => (
