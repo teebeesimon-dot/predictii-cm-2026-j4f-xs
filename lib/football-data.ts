@@ -41,6 +41,7 @@ interface ApiScoreLine {
 interface ApiMatch {
   id: number
   status: ApiMatchStatus
+  utcDate?: string
   homeTeam: ApiTeam
   awayTeam: ApiTeam
   score: {
@@ -173,6 +174,7 @@ export interface NormalizedApiMatch {
   awayScore: number | null
   rawHome: string
   rawAway: string
+  kickoff: string // ISO; folosit pentru a distinge manșele tur-retur
 }
 
 // Cheie neordonată pentru o pereche de echipe (ca scorul să nimerească meciul
@@ -213,6 +215,7 @@ export async function fetchWorldCupMatches(
       awayScore: away,
       rawHome: m.homeTeam.name ?? m.homeTeam.shortName ?? '?',
       rawAway: m.awayTeam.name ?? m.awayTeam.shortName ?? '?',
+      kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
     }
   })
 }
@@ -385,13 +388,17 @@ export function diffScores(
   const effHome = (a: NormalizedApiMatch) => a.roHome ?? a.rawHome
   const effAway = (a: NormalizedApiMatch) => a.roAway ?? a.rawAway
 
-  // Index API după perechea de echipe (neordonată).
-  const apiByPair = new Map<string, NormalizedApiMatch>()
+  // Index API după perechea de echipe (neordonată). O pereche poate avea MAI
+  // MULTE meciuri (ex. tur-retur în Champions League), deci stocăm o listă.
+  const apiByPair = new Map<string, NormalizedApiMatch[]>()
   for (const a of apiMatches) {
     const h = effHome(a)
     const aw = effAway(a)
     if (!h || !aw) continue
-    apiByPair.set(teamPairKey(h, aw), a)
+    const key = teamPairKey(h, aw)
+    const arr = apiByPair.get(key)
+    if (arr) arr.push(a)
+    else apiByPair.set(key, [a])
   }
 
   const updates: ScoreUpdate[] = []
@@ -399,8 +406,23 @@ export function diffScores(
     // Scor corectat manual de admin: nu îl atingem (furnizorul poate greși).
     if (m.scoreOverride === true) continue
 
-    const api = apiByPair.get(teamPairKey(m.homeTeam, m.awayTeam))
-    if (!api) continue
+    const candidates = apiByPair.get(teamPairKey(m.homeTeam, m.awayTeam))
+    if (!candidates || candidates.length === 0) continue
+
+    // Când sunt mai multe meciuri pentru aceeași pereche (tur-retur), alegem
+    // manșa cu ora de start cea mai apropiată de meciul nostru, ca să nu
+    // aplicăm scorul unei manșe pe cealaltă.
+    let api = candidates[0]
+    if (candidates.length > 1) {
+      const target = m.kickoff ? +new Date(m.kickoff) : NaN
+      if (!Number.isNaN(target)) {
+        api = candidates.reduce((best, c) => {
+          const cd = c.kickoff ? Math.abs(+new Date(c.kickoff) - target) : Infinity
+          const bd = best.kickoff ? Math.abs(+new Date(best.kickoff) - target) : Infinity
+          return cd < bd ? c : best
+        }, candidates[0])
+      }
+    }
 
     const usable = isFinalStatus(api.status) || (includeLive && isLiveStatus(api.status))
     if (!usable) continue

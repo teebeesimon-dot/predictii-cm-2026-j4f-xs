@@ -366,14 +366,14 @@ export async function importChampionsLeague(
       }
     }
 
-    // Meciurile existente ale acestei ediții, indexate după etapă + perechea de
-    // echipe (neordonată) ca să evităm duplicatele.
+    // Meciurile existente ale acestei ediții, indexate după etapă + gazdă|oaspete
+    // (ORDONAT) ca să evităm duplicatele, dar să permitem ambele manșe tur-retur.
     const snap = await getDocs(collection(db, 'matches'))
     const existingPairs = new Set<string>()
     for (const d of snap.docs) {
       const m = d.data() as Match
       if ((m.editionId ?? DEFAULT_EDITION_ID) !== editionId) continue
-      existingPairs.add(`${m.stage}|${teamPairKey(m.homeTeam, m.awayTeam)}`)
+      existingPairs.add(`${m.stage}|${m.homeTeam}|${m.awayTeam}`)
     }
 
     let imported = 0
@@ -391,7 +391,9 @@ export async function importChampionsLeague(
         continue
       }
 
-      const key = `${stage}|${teamPairKey(home, away)}`
+      // Cheie ORDONATĂ (gazdă|oaspete): distinge manșa tur de retur la
+      // eliminatoriile tur-retur (A-B vs B-A sunt meciuri diferite).
+      const key = `${stage}|${home}|${away}`
       if (existingPairs.has(key)) continue
 
       const ref = doc(collection(db, 'matches'))
