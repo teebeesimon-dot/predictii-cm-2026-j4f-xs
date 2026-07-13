@@ -3,8 +3,10 @@
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
 import { computeStandings, type StandingRow } from '@/lib/data'
-import { STAGES, type StageId } from '@/lib/types'
+import { type StageId } from '@/lib/types'
+import { stagesForEdition } from '@/lib/stages'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,12 +22,15 @@ export default function StatisticsPage() {
 
 function StatisticsContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
+  // Etapele competiției curente (World Cup = 5, Champions League = 11).
+  const stages = stagesForEdition(editionId)
 
   // Statisticile mele pentru un scop dat (general sau o etapă anume).
   function myRowFor(stage?: StageId): StandingRow | undefined {
@@ -59,7 +64,7 @@ function StatisticsContent() {
               <TabsTrigger value="general" className="flex-1">
                 General
               </TabsTrigger>
-              {STAGES.map((s) => (
+              {stages.map((s) => (
                 <TabsTrigger key={s.id} value={String(s.id)} className="flex-1">
                   {s.short}
                 </TabsTrigger>
@@ -69,7 +74,7 @@ function StatisticsContent() {
             <TabsContent value="general" className="mt-4">
               <StatsView row={myRowFor(undefined)} />
             </TabsContent>
-            {STAGES.map((s) => (
+            {stages.map((s) => (
               <TabsContent key={s.id} value={String(s.id)} className="mt-4">
                 <p className="mb-3 text-sm font-medium text-muted-foreground">
                   {s.label}

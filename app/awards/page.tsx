@@ -3,8 +3,10 @@
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
 import { computeStandings } from '@/lib/data'
-import { STAGES, type StageId } from '@/lib/types'
+import { type StageId } from '@/lib/types'
+import { stagesForEdition } from '@/lib/stages'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Medal } from 'lucide-react'
@@ -20,6 +22,9 @@ export default function AwardsPage() {
 
 function AwardsContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
+  // Etapele competiției curente (World Cup = 5, Champions League = 11).
+  const stages = stagesForEdition(editionId)
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
@@ -98,7 +103,7 @@ function AwardsContent() {
 
           {/* Stage winners */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {STAGES.map((s) => {
+            {stages.map((s) => {
               const winners = stageWinners(s.id as StageId)
               return (
                 <Card key={s.id}>

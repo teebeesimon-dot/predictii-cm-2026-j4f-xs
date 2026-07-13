@@ -5,13 +5,13 @@ import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
+import { buildScheduler, type Scheduler } from '@/lib/schedule'
 import {
-  STAGES,
   type StageId,
   type Match,
   type Prediction,
   type AppUser,
-  isLocked,
   isViewOnly,
   scorePrediction,
 } from '@/lib/types'
@@ -33,12 +33,17 @@ export default function ColleaguesPage() {
 
 function ColleaguesContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
+  // Scheduler-ul competiției curente: decide etapele și când se dezvăluie
+  // pronosticurile (World Cup = termene fixe; Champions League = 1h înainte
+  // de primul meci al etapei).
+  const scheduler = buildScheduler(editionId, matches ?? [])
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,6 +67,7 @@ function ColleaguesContent() {
           matches={matches}
           predictions={predictions}
           currentUserId={user?.id}
+          scheduler={scheduler}
         />
       )}
     </div>
@@ -73,22 +79,25 @@ function StageTabs({
   matches,
   predictions,
   currentUserId,
+  scheduler,
 }: {
   users: AppUser[]
   matches: Match[]
   predictions: Prediction[]
   currentUserId?: string
+  scheduler: Scheduler
 }) {
+  const stages = scheduler.stages
   // Prima etapă care are meciuri devine tab-ul implicit.
-  const stagesWithMatches = STAGES.filter((s) =>
+  const stagesWithMatches = stages.filter((s) =>
     matches.some((m) => m.stage === s.id),
   )
-  const defaultTab = String(stagesWithMatches[0]?.id ?? 1)
+  const defaultTab = String(stagesWithMatches[0]?.id ?? stages[0]?.id ?? 1)
 
   return (
     <Tabs defaultValue={defaultTab}>
       <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-transparent p-0">
-        {STAGES.map((s) => (
+        {stages.map((s) => (
           <TabsTrigger
             key={s.id}
             value={String(s.id)}
@@ -99,7 +108,7 @@ function StageTabs({
         ))}
       </TabsList>
 
-      {STAGES.map((s) => (
+      {stages.map((s) => (
         <TabsContent key={s.id} value={String(s.id)} className="mt-4">
           <StageMatches
             stageId={s.id}
@@ -107,6 +116,7 @@ function StageTabs({
             matches={matches}
             predictions={predictions}
             currentUserId={currentUserId}
+            scheduler={scheduler}
           />
         </TabsContent>
       ))}
@@ -120,12 +130,14 @@ function StageMatches({
   matches,
   predictions,
   currentUserId,
+  scheduler,
 }: {
   stageId: StageId
   users: AppUser[]
   matches: Match[]
   predictions: Prediction[]
   currentUserId?: string
+  scheduler: Scheduler
 }) {
   const stageMatches = useMemo(
     () =>
@@ -152,6 +164,7 @@ function StageMatches({
           users={users}
           predictions={predictions}
           currentUserId={currentUserId}
+          scheduler={scheduler}
         />
       ))}
     </div>
@@ -163,13 +176,15 @@ function MatchPredictions({
   users,
   predictions,
   currentUserId,
+  scheduler,
 }: {
   match: Match
   users: AppUser[]
   predictions: Prediction[]
   currentUserId?: string
+  scheduler: Scheduler
 }) {
-  const locked = isLocked(match)
+  const locked = scheduler.isLocked(match)
   const hasResult = match.homeScore !== null && match.awayScore !== null
   const matchPreds = predictions.filter((p) => p.matchId === match.id)
 

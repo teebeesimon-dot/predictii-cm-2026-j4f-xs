@@ -5,9 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
 import { computeStandings, computePositionHistory } from '@/lib/data'
 import type { AppUser, Match, Prediction } from '@/lib/types'
-import { STAGES, type StageId } from '@/lib/types'
+import { type StageId } from '@/lib/types'
+import { stagesForEdition, type StageDef } from '@/lib/stages'
 import { cn } from '@/lib/utils'
 import { StandingsTable } from '@/components/standings-table'
 import { PositionEvolutionChart } from '@/components/position-evolution-chart'
@@ -25,10 +27,13 @@ export default function StandingsPage() {
 
 function StandingsContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
+  // Etapele competiției curente (World Cup = 5, Champions League = 11).
+  const stages = stagesForEdition(editionId)
   const searchParams = useSearchParams()
   const stageParam = searchParams.get('stage')
   const initialTab =
-    stageParam && ['1', '2', '3', '4', '5'].includes(stageParam)
+    stageParam && stages.some((s) => String(s.id) === stageParam)
       ? stageParam
       : 'general'
 
@@ -60,7 +65,7 @@ function StandingsContent() {
                 <TabsTrigger value="general" className="flex-1">
                   General
                 </TabsTrigger>
-                {STAGES.map((s) => (
+                {stages.map((s) => (
                   <TabsTrigger key={s.id} value={String(s.id)} className="flex-1">
                     {s.short}
                   </TabsTrigger>
@@ -83,7 +88,7 @@ function StandingsContent() {
                 />
               </TabsContent>
 
-              {STAGES.map((s) => (
+              {stages.map((s) => (
                 <TabsContent key={s.id} value={String(s.id)} className="mt-4">
                   <p className="mb-3 text-sm font-medium text-muted-foreground">
                     {s.label}
@@ -108,6 +113,7 @@ function StandingsContent() {
                   predictions={predictions}
                   viewer={viewer}
                   highlightUserId={user?.id}
+                  stages={stages}
                 />
               </TabsContent>
             </Tabs>
@@ -126,19 +132,21 @@ function EvolutionTab({
   predictions,
   viewer,
   highlightUserId,
+  stages,
 }: {
   users: AppUser[]
   matches: Match[]
   predictions: Prediction[]
   viewer: { id?: string; isAdmin?: boolean }
   highlightUserId?: string
+  stages: StageDef[]
 }) {
   // 'general' = clasament cumulat pe tot turneul; altfel o etapă (StageId).
   const [scope, setScope] = useState<'general' | StageId>('general')
 
   const scopes: { key: 'general' | StageId; label: string }[] = [
     { key: 'general', label: 'General' },
-    ...STAGES.map((s) => ({ key: s.id as StageId, label: s.short })),
+    ...stages.map((s) => ({ key: s.id as StageId, label: s.short })),
   ]
 
   const history = computePositionHistory(

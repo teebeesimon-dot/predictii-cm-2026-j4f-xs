@@ -14,17 +14,13 @@ import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  STAGES,
-  getActiveStage,
-  getLiveStage,
-  getStageDeadline,
-  isLocked,
   isViewOnly,
   scorePrediction,
   type Match,
   type Prediction,
   type AppUser,
 } from '@/lib/types'
+import { buildScheduler, type Scheduler } from '@/lib/schedule'
 import { computeStandings } from '@/lib/data'
 import { cn, formatKickoff } from '@/lib/utils'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2 } from 'lucide-react'
@@ -47,9 +43,13 @@ function DashboardContent() {
   const { data: predictions } = useAllPredictions(10_000)
   const { data: users } = useUsers(10_000)
 
-  const activeStage = getActiveStage()
-  const activeDeadline = getStageDeadline(activeStage)
-  const activeStageInfo = STAGES.find((s) => s.id === activeStage)
+  // Scheduler-ul competiției curente: etape, termene, blocare/dezvăluire
+  // (World Cup = termene fixe; Champions League = 1h înainte de primul meci).
+  const scheduler = buildScheduler(edition.id, matches ?? [])
+
+  const activeStage = scheduler.getActiveStage()
+  const activeDeadline = scheduler.getStageDeadline(activeStage)
+  const activeStageInfo = scheduler.stages.find((s) => s.id === activeStage)
   const stageMatches = (matches ?? [])
     .filter((m) => m.stage === activeStage)
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))

@@ -12,7 +12,10 @@ export const STAGES = [
   },
 ] as const
 
-export type StageId = 1 | 2 | 3 | 4 | 5
+// Identificatorul etapei. Numărul de etape diferă per competiție (World Cup =
+// 5, Champions League = 11), deci tipul este generic `number`. Definițiile
+// concrete de etape sunt în lib/stages.ts, per competiție.
+export type StageId = number
 
 // Runde din faza eliminatorie (doar pentru Etapa 5)
 export type KnockoutRound = 'r16' | 'qf' | 'sf' | 'final'

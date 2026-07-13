@@ -4,11 +4,10 @@ import { useMemo, useState, useEffect } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUserPredictions } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
+import { buildScheduler, type Scheduler } from '@/lib/schedule'
 import { savePrediction, PredictionLockedError } from '@/lib/data'
 import {
-  STAGES,
-  isLocked,
-  STAGE_DEADLINES,
   KNOCKOUT_ROUNDS,
   KNOCKOUT_DEADLINES,
   type Match,
@@ -38,8 +37,14 @@ export default function PredictionsPage() {
 
 function PredictionsContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
   const { data: matches, isLoading, mutate: refreshMatches } = useMatches()
   const { data: predictions, mutate } = useUserPredictions(user?.id)
+
+  // Scheduler-ul competiției curente: etapele și termenele limită (World Cup =
+  // termene fixe; Champions League = 1h înainte de primul meci al etapei).
+  const scheduler = buildScheduler(editionId, matches ?? [])
+  const isWorldCup = scheduler.competitionId === 'wc'
 
   const [entries, setEntries] = useState<Record<string, Entry>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -141,28 +146,33 @@ function PredictionsContent() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="1">
+        <Tabs defaultValue={String(scheduler.stages[0]?.id ?? 1)}>
           <TabsList className="flex w-full flex-wrap">
-            {STAGES.map((s) => (
+            {scheduler.stages.map((s) => (
               <TabsTrigger key={s.id} value={String(s.id)} className="flex-1">
                 {s.short}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {STAGES.map((s) => {
+          {scheduler.stages.map((s) => {
             const stageMatches = (byStage.get(s.id as StageId) ?? []).sort(
               (a, b) => +new Date(a.kickoff) - +new Date(b.kickoff),
             )
-            const stageDeadline =
-              s.id === 5 ? null : STAGE_DEADLINES[s.id as 1 | 2 | 3 | 4]
+            // La World Cup, Etapa 5 (faza eliminatorie) grupează meciurile pe
+            // runde, fiecare cu termenul ei — restul etapelor au un singur
+            // termen. La celelalte competiții fiecare etapă are un termen unic.
+            const isWcKnockout = isWorldCup && s.id === 5
+            const stageDeadline = isWcKnockout
+              ? null
+              : scheduler.getStageDeadline(s.id)
             return (
               <TabsContent key={s.id} value={String(s.id)} className="mt-4">
                 <p className="mb-3 text-sm font-medium text-muted-foreground">
                   {s.label}
                 </p>
 
-                {s.id !== 5 && (
+                {!isWcKnockout && (
                   <div className="mb-4">
                     <DeadlineBanner
                       deadline={stageDeadline}
@@ -175,7 +185,7 @@ function PredictionsContent() {
                   <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
                     Niciun meci în această etapă.
                   </p>
-                ) : s.id === 5 ? (
+                ) : isWcKnockout ? (
                   // Etapa 5: grupăm pe runde eliminatorii, fiecare cu termenul ei.
                   <div className="flex flex-col gap-6">
                     {KNOCKOUT_ROUNDS.map(({ round, label }) => {
@@ -205,6 +215,7 @@ function PredictionsContent() {
                                 saving={!!saving[m.id]}
                                 onChange={setEntry}
                                 onSave={handleSave}
+                                scheduler={scheduler}
                               />
                             ))
                           )}
@@ -227,6 +238,7 @@ function PredictionsContent() {
                               saving={!!saving[m.id]}
                               onChange={setEntry}
                               onSave={handleSave}
+                              scheduler={scheduler}
                             />
                           ))}
                       </div>
@@ -242,6 +254,7 @@ function PredictionsContent() {
                         saving={!!saving[m.id]}
                         onChange={setEntry}
                         onSave={handleSave}
+                        scheduler={scheduler}
                       />
                     ))}
                   </div>
@@ -261,14 +274,16 @@ function MatchRow({
   saving,
   onChange,
   onSave,
+  scheduler,
 }: {
   match: Match
   entry: Entry | undefined
   saving: boolean
   onChange: (id: string, field: 'home' | 'away', value: string) => void
   onSave: (m: Match) => void
+  scheduler: Scheduler
 }) {
-  const locked = isLocked(match)
+  const locked = scheduler.isLocked(match)
   const hasResult = match.homeScore !== null && match.awayScore !== null
 
   return (
