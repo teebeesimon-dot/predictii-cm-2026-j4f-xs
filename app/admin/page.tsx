@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
 import { useEdition } from '@/components/edition-provider'
+import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
   createMatch,
@@ -1087,6 +1088,7 @@ function UsersManager({
   onChanged: () => void
 }) {
   const { edition } = useEdition()
+  const { user: currentUser } = useAuth()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -1142,7 +1144,10 @@ function UsersManager({
     }
   }
 
-  const participants = (users ?? []).filter((u) => !u.isAdmin)
+  // Afișăm TOȚI utilizatorii, inclusiv adminii (care joacă și ei), ca să-și
+  // poată gestiona accesul la competiții și vizibilitatea. Adminii sunt marcați
+  // cu o etichetă, iar contul propriu nu poate fi șters (protecție).
+  const participants = users ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -1231,6 +1236,7 @@ function UsersManager({
                 user={u}
                 editions={accessEditions}
                 onChanged={onChanged}
+                isSelf={u.id === currentUser?.id}
               />
             ))}
         </div>
@@ -1243,10 +1249,12 @@ function UserRow({
   user,
   editions,
   onChanged,
+  isSelf = false,
 }: {
   user: AppUser
   editions: typeof EDITIONS
   onChanged: () => void
+  isSelf?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [savingAccess, setSavingAccess] = useState(false)
@@ -1337,7 +1345,16 @@ function UserRow({
       <CardContent className="flex flex-col gap-3 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate font-medium">{user.name || user.username}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate font-medium">
+                {user.name || user.username}
+              </p>
+              {user.isAdmin && (
+                <Badge variant="secondary" className="shrink-0">
+                  Admin
+                </Badge>
+              )}
+            </div>
             <p className="truncate text-xs text-muted-foreground">
               @{user.username}
             </p>
@@ -1352,16 +1369,18 @@ function UserRow({
             >
               <KeyRound className="size-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Șterge participant"
-              className="text-destructive hover:text-destructive"
-              disabled={busy}
-              onClick={handleDelete}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {!isSelf && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Șterge participant"
+                className="text-destructive hover:text-destructive"
+                disabled={busy}
+                onClick={handleDelete}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
           </div>
         </div>
 
