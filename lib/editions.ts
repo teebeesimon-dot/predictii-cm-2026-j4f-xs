@@ -58,10 +58,29 @@ export const COMPETITIONS: Record<CompetitionId, Competition> = {
   },
 }
 
+// Unele competiții au sezon care se întinde pe doi ani calendaristici
+// (Champions League: aug 2026 → mai 2027). Le afișăm ca „26-27". Restul
+// (World Cup, Euro) sunt turnee de vară într-un singur an.
+export function seasonSpansTwoYears(competitionId: CompetitionId): boolean {
+  return competitionId === 'cl'
+}
+
+// Eticheta anului pentru selector/afișare: „26-27" la sezoanele pe doi ani
+// (unde `year` = anul de start), altfel anul simplu „2026".
+export function formatSeasonYear(
+  competitionId: CompetitionId,
+  year: number,
+): string {
+  if (!seasonSpansTwoYears(competitionId)) return String(year)
+  const start = String(year % 100).padStart(2, '0')
+  const end = String((year + 1) % 100).padStart(2, '0')
+  return `${start}-${end}`
+}
+
 // Generăm edițiile predefinite pentru următorii ~9 ani.
 //  - World Cup: din 4 în 4 ani (2026, 2030, 2034)
 //  - Euro: din 4 în 4 ani (2028, 2032)
-//  - Champions League: în fiecare an (2026 → 2035)
+//  - Champions League: în fiecare sezon (2026-27 → 2035-36)
 function buildEditions(): Edition[] {
   const list: Edition[] = []
   const add = (competitionId: CompetitionId, year: number) => {
@@ -69,7 +88,7 @@ function buildEditions(): Edition[] {
       id: `${competitionId}-${year}`,
       competitionId,
       year,
-      label: `${COMPETITIONS[competitionId].name} ${year}`,
+      label: `${COMPETITIONS[competitionId].name} ${formatSeasonYear(competitionId, year)}`,
     })
   }
 

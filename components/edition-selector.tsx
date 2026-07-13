@@ -13,6 +13,7 @@ import {
   COMPETITIONS,
   COMPETITION_ORDER,
   EDITIONS,
+  formatSeasonYear,
   type CompetitionId,
 } from '@/lib/editions'
 import { hasEditionAccess } from '@/lib/types'
@@ -115,7 +116,7 @@ export function EditionSelector() {
       {/* An */}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-1 rounded-md border border-border bg-secondary px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/70">
-          {edition.year}
+          {formatSeasonYear(edition.competitionId, edition.year)}
           <ChevronDown className="size-3.5 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-24">
@@ -128,7 +129,9 @@ export function EditionSelector() {
                 y === edition.year && 'font-semibold',
               )}
             >
-              <span className="flex-1">{y}</span>
+              <span className="flex-1">
+                {formatSeasonYear(edition.competitionId, y)}
+              </span>
               {y === edition.year && <Check className="size-4 text-primary" />}
             </DropdownMenuItem>
           ))}
