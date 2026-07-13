@@ -4,12 +4,7 @@ import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
 import { useEdition } from '@/components/edition-provider'
-import {
-  useMatches,
-  useUsers,
-  useAllPredictions,
-  useAvailableEditionIds,
-} from '@/lib/hooks'
+import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
   createMatch,
   deleteMatch,
@@ -30,7 +25,7 @@ import {
   importWorldCupKnockout,
   importChampionsLeague,
 } from '@/app/actions/sync'
-import { EDITIONS, COMPETITIONS } from '@/lib/editions'
+import { EDITIONS, COMPETITIONS, formatSeasonYear } from '@/lib/editions'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
@@ -1091,20 +1086,16 @@ function UsersManager({
   loading: boolean
   onChanged: () => void
 }) {
-  const { data: availableEditionIds } = useAvailableEditionIds()
+  const { edition } = useEdition()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
 
-  // Edițiile pentru care setăm acces: cele care au meciuri încărcate. Includem
-  // mereu WC 2026. Sortate după ordinea din registru.
-  const accessEditions = EDITIONS.filter(
-    (e) =>
-      e.id === DEFAULT_EDITION_ID ||
-      (availableEditionIds ?? []).includes(e.id),
-  )
+  // Accesul se gestionează DOAR pentru ediția selectată acum (competiția + anul
+  // din selectorul din header), ca lista să reflecte liga și anul curent.
+  const accessEditions = edition ? [edition] : []
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -1429,7 +1420,9 @@ function UserRow({
                   >
                     <span className="text-sm">
                       <span className="font-medium">{comp.short}</span>{' '}
-                      <span className="text-muted-foreground">{e.year}</span>
+                      <span className="text-muted-foreground">
+                        {formatSeasonYear(e.competitionId, e.year)}
+                      </span>
                     </span>
                     <Switch
                       checked={allowed}
