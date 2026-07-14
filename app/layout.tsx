@@ -4,6 +4,7 @@ import { Geist, Geist_Mono, Oswald } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth-provider'
 import { EditionProvider } from '@/components/edition-provider'
+import { PushNotificationsProvider } from '@/components/push-notifications-provider'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -55,7 +56,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <EditionProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <PushNotificationsProvider />
+              {children}
+            </AuthProvider>
           </EditionProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

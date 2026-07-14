@@ -9,6 +9,8 @@ import {
   writeBatch,
   orderBy,
   query,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
@@ -290,6 +292,32 @@ export async function updateUserAccess(
   access: { viewOnly?: boolean; hideFromStandings?: boolean },
 ): Promise<void> {
   await updateDoc(doc(db, 'users', userId), access)
+}
+
+// Salvează un token Firebase Cloud Messaging în documentul utilizatorului.
+// Folosește arrayUnion, deci e idempotent (nu adaugă duplicate) și suportă mai
+// multe dispozitive per utilizator.
+export async function saveFcmToken(
+  userId: string,
+  token: string,
+): Promise<void> {
+  if (!userId || !token) return
+  await updateDoc(doc(db, 'users', userId), {
+    fcmTokens: arrayUnion(token),
+    fcmUpdatedAt: Date.now(),
+  })
+}
+
+// Elimină un token FCM (ex. la delogare sau când tokenul devine invalid).
+export async function removeFcmToken(
+  userId: string,
+  token: string,
+): Promise<void> {
+  if (!userId || !token) return
+  await updateDoc(doc(db, 'users', userId), {
+    fcmTokens: arrayRemove(token),
+    fcmUpdatedAt: Date.now(),
+  })
 }
 
 // Setează (sau revocă) accesul unui utilizator la o anumită ediție. Folosit de

@@ -82,6 +82,11 @@ export interface AppUser {
   // până când adminul nu bifează explicit. Ediția World Cup 2026 (cea existentă)
   // este accesibilă implicit tuturor (vezi hasEditionAccess).
   access?: Record<string, boolean>
+  // Token-uri Firebase Cloud Messaging pentru dispozitivele acestui utilizator
+  // (Android/iOS prin Capacitor). Un user poate avea mai multe dispozitive.
+  fcmTokens?: string[]
+  // Ultima actualizare a listei de token-uri FCM (epoch ms).
+  fcmUpdatedAt?: number
 }
 
 // Ediția implicită / existentă, accesibilă tuturor fără bifare specială.
