@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth-provider'
 import { EditionProvider } from '@/components/edition-provider'
 import { PushNotificationsProvider } from '@/components/push-notifications-provider'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -59,6 +60,7 @@ export default function RootLayout({
             <AuthProvider>
               <PushNotificationsProvider />
               {children}
+              <Toaster />
             </AuthProvider>
           </EditionProvider>
         </ThemeProvider>

@@ -16,6 +16,7 @@ import {
   ListOrdered,
   UserCog,
   Users,
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -92,6 +93,12 @@ export function AppNav() {
             label: 'Administrare',
             icon: Shield,
             match: (p: string) => p === '/admin',
+          },
+          {
+            href: '/admin/notifications',
+            label: 'Notificări',
+            icon: Bell,
+            match: (p: string) => p === '/admin/notifications',
           },
         ]
       : []),
