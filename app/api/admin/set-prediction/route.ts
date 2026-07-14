@@ -186,7 +186,11 @@ export async function POST(req: NextRequest) {
     updatedAt: Date.now(),
   })
 
-  const userLabel = userDoc.data().name || userDoc.data().username || userId
+  const userData = (userDoc.data() ?? {}) as {
+    name?: string
+    username?: string
+  }
+  const userLabel = userData.name || userData.username || userId
   console.log(
     `[v0] set-prediction: ${auth.actorName} a setat ${userLabel} — ${match.homeTeam} ${homeScore}-${awayScore} ${match.awayTeam} (${matchId})`,
   )
