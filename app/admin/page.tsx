@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
@@ -43,7 +44,7 @@ import {
   type Prediction,
 } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -77,6 +78,7 @@ import {
   ChevronDown,
   Check,
   Trophy,
+  Cpu,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -161,19 +163,28 @@ function AdminContent() {
             <span className="font-bold text-foreground">{edition.label}</span>
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleExport}
-          disabled={exporting || !users || !matches || !predictions}
-          className="shrink-0"
-        >
-          {exporting ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <FileSpreadsheet className="size-4" />
-          )}
-          Export Clasament Excel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/notification-engine"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <Cpu className="size-4" />
+            Notification Engine
+          </Link>
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={exporting || !users || !matches || !predictions}
+            className="shrink-0"
+          >
+            {exporting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-4" />
+            )}
+            Export Clasament Excel
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
