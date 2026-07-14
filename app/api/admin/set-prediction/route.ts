@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  try {
   const db = adminDb()
 
   // 1) Găsește utilizatorul după name sau username.
@@ -167,4 +168,11 @@ export async function POST(req: NextRequest) {
     predictionId: id,
     editionId,
   })
+  } catch (e) {
+    console.log('[v0] set-prediction ERROR:', (e as Error).message)
+    return NextResponse.json(
+      { error: 'Eroare internă', detail: (e as Error).message },
+      { status: 500 },
+    )
+  }
 }
