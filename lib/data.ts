@@ -9,6 +9,7 @@ import {
   writeBatch,
   orderBy,
   query,
+  where,
   arrayUnion,
   arrayRemove,
 } from 'firebase/firestore'
@@ -79,8 +80,22 @@ export async function getUserPredictions(
   userId: string,
   editionId?: string,
 ): Promise<Prediction[]> {
-  const all = await getAllPredictions(editionId)
-  return all.filter((p) => p.userId === userId)
+  // Interogăm DOAR pronosticurile acestui user (câteva zeci), în loc să citim
+  // întreaga colecție `predictions` și să filtrăm în client. Reduce drastic
+  // numărul de citiri Firestore pe pagina Pronosticuri.
+  const q = query(
+    collection(db, 'predictions'),
+    where('userId', '==', userId),
+  )
+  const snap = await getDocs(q)
+  const mine = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Prediction, 'id'>),
+  }))
+  // Filtrarea pe ediție rămâne în client, ca să includă și documentele vechi
+  // fără câmpul editionId (aparțin ediției World Cup implicite).
+  if (!editionId) return mine
+  return mine.filter((p) => editionOf(p) === editionId)
 }
 
 export class PredictionLockedError extends Error {

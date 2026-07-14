@@ -4,6 +4,7 @@ import { DEFAULT_EDITION_ID, type Match, type AppUser, type Prediction } from '@
 import { getEdition } from '@/lib/editions'
 import { stagesForEdition } from '@/lib/stages'
 import { buildScheduler } from '@/lib/schedule'
+import { DEADLINE_OFFSETS, stageDeadlineMs } from '@/lib/notifications/rules/_shared'
 import type { EngineData, EditionSnapshot } from '@/lib/notifications/context/EngineData'
 
 // Ediția unui document (meci/pronostic): documentele mai vechi nu au câmpul
@@ -13,39 +14,88 @@ function editionOf(doc: { editionId?: string }): string {
   return doc.editionId ?? DEFAULT_EDITION_ID
 }
 
+// Ferestre în care regulile de „deschidere"/„închidere" a etapei se pot
+// declanșa (trebuie să corespundă grace-urilor din reguli).
+const OPEN_GRACE_MS = 6 * 3600_000 // stage-opened-rule
+const CLOSE_GRACE_MS = 6 * 3600_000 // stage-closed-rule
+
 /**
- * Încarcă TOATE datele necesare regulilor, o singură dată, prin Admin SDK.
+ * Verifică IEFTIN (doar din meciuri/scheduler, fără a citi userii sau
+ * pronosticurile) dacă momentul `now` cade în vreo fereastră în care o regulă
+ * ar putea produce notificări.
  *
- * Trei citiri de colecție (matches, users, predictions) — indiferent câte
- * reguli sau ediții există. Construiește câte un `scheduler` per ediție ca
- * regulile să folosească exact programul și termenele deja existente.
+ *  - needUsers: e activă vreo fereastră de deadline / deschidere / închidere de
+ *    etapă (toate regulile au nevoie de lista participanților).
+ *  - needPredictions: e activă vreo fereastră de deadline (doar acolo avem
+ *    nevoie de pronosticuri, ca să știm cine nu a completat).
+ *
+ * Dacă nimic nu e activ, engine-ul NU citește `users`/`predictions` — ceea ce
+ * elimină citirile masive la fiecare rulare de cron. Rezultatul rămâne identic:
+ * în afara ferestrelor, toate regulile întorc oricum zero notificări.
+ */
+function windowNeeds(
+  now: number,
+  editions: EditionSnapshot[],
+): { needUsers: boolean; needPredictions: boolean } {
+  let needUsers = false
+  let needPredictions = false
+
+  for (const edition of editions) {
+    const stages = edition.stages
+    for (let i = 0; i < stages.length; i++) {
+      const stage = stages[i]
+      const deadline = stageDeadlineMs(edition.scheduler, stage.id)
+      if (deadline === null) continue
+
+      // Ferestre de reamintire a termenului (au nevoie de pronosticuri).
+      for (const key of Object.keys(DEADLINE_OFFSETS)) {
+        const { ms, grace } = DEADLINE_OFFSETS[key]
+        const marker = deadline - ms
+        if (now >= marker && now < marker + grace && now < deadline) {
+          needUsers = true
+          needPredictions = true
+        }
+      }
+
+      // Fereastră de închidere a etapei (doar useri).
+      if (now >= deadline && now < deadline + CLOSE_GRACE_MS) {
+        needUsers = true
+      }
+
+      // Fereastră de deschidere a etapei următoare = la termenul acestei etape.
+      if (i + 1 < stages.length) {
+        if (now >= deadline && now < deadline + OPEN_GRACE_MS) {
+          needUsers = true
+        }
+      }
+
+      if (needUsers && needPredictions) return { needUsers, needPredictions }
+    }
+  }
+
+  return { needUsers, needPredictions }
+}
+
+/**
+ * Încarcă datele necesare regulilor prin Admin SDK, MINIMIZÂND citirile.
+ *
+ * Întotdeauna citește `matches` (necesare pentru scheduler și pentru a decide
+ * dacă e activă vreo fereastră). Citește `users` și `predictions` DOAR când o
+ * fereastră relevantă e activă (vezi windowNeeds). Astfel, la rulările de cron
+ * din afara ferestrelor (marea majoritate) se face O SINGURĂ citire de
+ * colecție în loc de trei.
  */
 export async function loadEngineData(now: number = Date.now()): Promise<EngineData> {
   const db = adminDb()
-  const [matchesSnap, usersSnap, predsSnap] = await Promise.all([
-    db.collection('matches').get(),
-    db.collection('users').get(),
-    db.collection('predictions').get(),
-  ])
 
+  // 1) Doar meciurile (necesare pentru scheduler + verificarea ferestrelor).
+  const matchesSnap = await db.collection('matches').get()
   const matches: Match[] = matchesSnap.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<Match, 'id'>),
   }))
-  const users: AppUser[] = usersSnap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<AppUser, 'id'>),
-  }))
-  const predictions: Prediction[] = predsSnap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Prediction, 'id'>),
-  }))
 
-  // Index rapid: „userId_matchId" -> există pronostic.
-  const predictionSet = new Set<string>()
-  for (const p of predictions) predictionSet.add(`${p.userId}_${p.matchId}`)
-
-  // Grupează meciurile pe ediție.
+  // Grupează meciurile pe ediție și construiește scheduler-ul fiecărei ediții.
   const matchesByEdition = new Map<string, Match[]>()
   for (const m of matches) {
     const eid = editionOf(m)
@@ -65,6 +115,31 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
       stages: stagesForEdition(editionId),
       scheduler: buildScheduler(editionId, editionMatches),
     })
+  }
+
+  // 2) Gate ieftin: citim userii/pronosticurile doar dacă e activă o fereastră.
+  const { needUsers, needPredictions } = windowNeeds(now, editions)
+
+  let users: AppUser[] = []
+  const predictionSet = new Set<string>()
+
+  if (needUsers || needPredictions) {
+    const [usersSnap, predsSnap] = await Promise.all([
+      needUsers ? db.collection('users').get() : Promise.resolve(null),
+      needPredictions ? db.collection('predictions').get() : Promise.resolve(null),
+    ])
+    if (usersSnap) {
+      users = usersSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<AppUser, 'id'>),
+      }))
+    }
+    if (predsSnap) {
+      for (const d of predsSnap.docs) {
+        const p = d.data() as Omit<Prediction, 'id'>
+        predictionSet.add(`${p.userId}_${p.matchId}`)
+      }
+    }
   }
 
   return {

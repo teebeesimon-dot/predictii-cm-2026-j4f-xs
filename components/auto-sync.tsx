@@ -12,6 +12,12 @@ const POLL_INTERVAL_MS = 10 * 60 * 1000 // 10 minute
 const PRE_KICKOFF_MS = 5 * 60 * 1000
 const POST_KICKOFF_MS = 3 * 60 * 60 * 1000
 
+// Flag la nivel de MODUL (nu per-componentă): persistă între navigările SPA, în
+// care AppShell (și deci AutoSync) se remontează pe fiecare pagină. Astfel
+// sincronizarea de recuperare rulează O SINGURĂ DATĂ pe sesiune, nu la fiecare
+// schimbare de pagină (care altfel lovea getSyncStatus/matches de fiecare dată).
+let sessionCaughtUp = false
+
 // Componentă invizibilă: rulează doar logica de polling. O montăm o singură
 // dată în AppShell, deci pollează indiferent pe ce pagină se află userul.
 //
@@ -23,7 +29,6 @@ export function AutoSync() {
   const { data: matches } = useMatches()
   const { mutate } = useSWRConfig()
   const runningRef = useRef(false)
-  const caughtUpRef = useRef(false)
 
   useEffect(() => {
     if (!matches || matches.length === 0) return
@@ -61,8 +66,8 @@ export function AutoSync() {
     // nimeni nu era online (ex. meciuri de noapte). E sigur pentru cota API:
     // apelul real e throttled server-side (MIN_INTERVAL_MS), deci dacă altcineva
     // a sincronizat recent, nu mai lovește furnizorul.
-    if (!caughtUpRef.current) {
-      caughtUpRef.current = true
+    if (!sessionCaughtUp) {
+      sessionCaughtUp = true
       void runSync(true)
     }
 
