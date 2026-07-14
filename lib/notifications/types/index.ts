@@ -22,6 +22,12 @@ export type NotificationPriority = 'low' | 'normal' | 'high'
 export interface NotificationTask {
   // Identificator unic al sarcinii (folosit și la deduplicare / istoric).
   id: string
+  // Cheie unică ȘI deterministă a notificării: aceleași intrări (tip,
+  // destinatari, conținut, moment programat) produc mereu aceeași cheie. E
+  // folosită drept ID de document în `notification_history`, deci garantează că
+  // aceeași notificare nu se trimite de două ori între rulări. Dacă o regulă nu
+  // o setează, engine-ul o calculează automat (vezi `computeNotificationKey`).
+  notificationKey?: string
   // Tipul semantic al notificării (ex. 'stage-start', 'deadline', 'standings').
   // String liber ca regulile noi să nu necesite modificarea acestui tip.
   type: string
@@ -64,22 +70,74 @@ export interface NotificationRule {
   evaluate(context: RuleContext): Promise<NotificationTask[]> | NotificationTask[]
 }
 
+/**
+ * Modul de rulare a engine-ului:
+ *   - 'dry-run' — DOAR generează notificările (nu trimite, nu salvează nimic).
+ *     Ideal pentru inspecție/debug.
+ *   - 'live'    — trimite notificările (prin serviciul Push existent) ȘI le
+ *     salvează în `notification_history`, ca să nu fie retrimise.
+ */
+export type EngineRunMode = 'dry-run' | 'live'
+
 // Rezultatul unei rulări a engine-ului (returnat de endpoint și afișat în UI).
 export interface EngineRunResult {
   success: boolean
+  // Modul în care a rulat engine-ul.
+  mode: EngineRunMode
   // Durata rulării, în milisecunde.
   executionTime: number
   rulesExecuted: number
   // Câte notificări au produs regulile ÎNAINTE de deduplicare.
   notificationsGenerated: number
-  // Câte au fost eliminate ca duplicate.
+  // Câte au fost eliminate ca duplicate (în cadrul aceleiași rulări).
   duplicatesRemoved: number
   // Câte au fost invalidate (nu au trecut validarea).
   invalidRemoved: number
-  // Lista finală, validă și deduplicată.
+  // Câte au fost sărite fiindcă existau deja în notification_history.
+  alreadySentSkipped: number
+  // Lista finală, validă, deduplicată și NEtrimisă anterior (ce s-ar trimite).
   notifications: NotificationTask[]
+  // Câte notificări au fost trimise efectiv (doar în modul 'live').
+  dispatched: number
+  // Câte token-uri au primit push (doar 'live'; sumă pe toate notificările).
+  pushSent: number
+  pushFailed: number
   // Erorile per-regulă (nu opresc rularea celorlalte reguli).
   errors: { ruleId: string; message: string }[]
   // Momentul rulării (epoch ms).
   ranAt: number
+}
+
+/**
+ * Calculează o cheie unică ȘI deterministă pentru o notificare. Aceleași
+ * intrări produc mereu aceeași cheie, deci o notificare identică nu va fi
+ * trimisă de două ori (cheia devine ID de document în `notification_history`).
+ *
+ * Destinatarii sunt sortați ca ordinea lor să nu conteze. `scheduledFor` intră
+ * în cheie fiindcă aceeași notificare programată pentru momente diferite este
+ * considerată distinctă.
+ *
+ * Rezultatul e sanitizat pentru a fi valid ca ID de document Firestore
+ * (fără `/`, fără spații, lungime limitată).
+ */
+export function computeNotificationKey(
+  task: Pick<
+    NotificationTask,
+    'type' | 'recipientType' | 'recipientIds' | 'title' | 'body' | 'scheduledFor'
+  >,
+): string {
+  const recipients = [...task.recipientIds].sort().join(',')
+  const raw = [
+    task.type,
+    task.recipientType,
+    recipients,
+    task.title.trim(),
+    task.body.trim(),
+    task.scheduledFor ?? 'now',
+  ].join('|')
+  // Sanitizare pentru ID de document Firestore.
+  return raw
+    .replace(/\s+/g, '_')
+    .replace(/[/\\.#$[\]]/g, '-')
+    .slice(0, 400)
 }

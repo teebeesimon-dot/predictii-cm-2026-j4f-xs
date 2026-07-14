@@ -10,14 +10,20 @@ import { Button } from '@/components/ui/button'
 import {
   Cpu,
   Play,
+  Send,
   ArrowLeft,
   Loader2,
   Clock,
   ListChecks,
   Bell,
   CopyX,
+  History,
 } from 'lucide-react'
-import type { EngineRunResult, NotificationTask } from '@/lib/notifications/types'
+import type {
+  EngineRunMode,
+  EngineRunResult,
+  NotificationTask,
+} from '@/lib/notifications/types'
 
 export default function NotificationEnginePage() {
   return (
@@ -29,16 +35,23 @@ export default function NotificationEnginePage() {
 
 function NotificationEngineContent() {
   const { user } = useAuth()
-  const [running, setRunning] = useState(false)
+  const [running, setRunning] = useState<EngineRunMode | null>(null)
   const [result, setResult] = useState<EngineRunResult | null>(null)
 
-  async function handleRun() {
-    setRunning(true)
+  async function handleRun(mode: EngineRunMode) {
+    if (mode === 'live') {
+      const ok = window.confirm(
+        'Live Run: notificările vor fi TRIMISE efectiv și salvate în istoric ' +
+          '(nu vor mai fi retrimise). Continui?',
+      )
+      if (!ok) return
+    }
+    setRunning(mode)
     try {
       const res = await fetch('/api/admin/notification-engine/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorId: user?.id }),
+        body: JSON.stringify({ actorId: user?.id, mode }),
       })
       const data = (await res.json().catch(() => ({}))) as EngineRunResult & {
         error?: string
@@ -47,14 +60,21 @@ function NotificationEngineContent() {
         throw new Error(data.error || 'Eroare la rularea engine-ului.')
       }
       setResult(data)
-      toast.success(
-        `Engine rulat: ${data.notificationsGenerated} generate, ` +
-          `${data.duplicatesRemoved} duplicate eliminate.`,
-      )
+      if (mode === 'live') {
+        toast.success(
+          `Live Run: ${data.dispatched} trimise · ${data.pushSent} push · ` +
+            `${data.alreadySentSkipped} deja trimise (sărite).`,
+        )
+      } else {
+        toast.success(
+          `Dry Run: ${data.notifications.length} de trimis · ` +
+            `${data.duplicatesRemoved} duplicate · ${data.alreadySentSkipped} deja trimise.`,
+        )
+      }
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
-      setRunning(false)
+      setRunning(null)
     }
   }
 
@@ -73,30 +93,64 @@ function NotificationEngineContent() {
           Notification Engine
         </h1>
         <p className="mt-1 text-pretty text-muted-foreground">
-          Rulează engine-ul de notificări. Acesta DOAR decide ce notificări ar
-          trebui trimise — nu trimite nimic.
+          Rulează engine-ul de notificări. <strong>Dry Run</strong> doar
+          generează notificările (fără efecte). <strong>Live Run</strong> le
+          trimite și le salvează în istoric, ca să nu fie retrimise.
         </p>
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardHeader className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <CardTitle>Ultima rulare</CardTitle>
-          <Button onClick={handleRun} disabled={running}>
-            {running ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Play className="size-4" />
-            )}
-            Rulează acum
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => handleRun('dry-run')}
+              disabled={running !== null}
+            >
+              {running === 'dry-run' ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Play className="size-4" />
+              )}
+              Dry Run
+            </Button>
+            <Button
+              onClick={() => handleRun('live')}
+              disabled={running !== null}
+            >
+              {running === 'live' ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Send className="size-4" />
+              )}
+              Live Run
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {!result ? (
             <p className="rounded-lg border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
-              Nicio rulare încă. Apasă „Rulează acum" pentru a executa engine-ul.
+              Nicio rulare încă. Apasă „Dry Run" (fără efecte) sau „Live Run"
+              (trimite) pentru a executa engine-ul.
             </p>
           ) : (
             <>
+              <div className="flex items-center gap-2">
+                <span
+                  className={
+                    result.mode === 'live'
+                      ? 'rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground'
+                      : 'rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground'
+                  }
+                >
+                  {result.mode === 'live' ? 'LIVE RUN' : 'DRY RUN'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Rulat la {new Date(result.ranAt).toLocaleString('ro-RO')}
+                </span>
+              </div>
+
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Metric
                   icon={<Clock className="size-4" />}
@@ -118,11 +172,30 @@ function NotificationEngineContent() {
                   label="Duplicate eliminate"
                   value={String(result.duplicatesRemoved)}
                 />
+                <Metric
+                  icon={<History className="size-4" />}
+                  label="Deja trimise (sărite)"
+                  value={String(result.alreadySentSkipped)}
+                />
+                <Metric
+                  icon={<Send className="size-4" />}
+                  label="Trimise (live)"
+                  value={String(result.dispatched)}
+                />
+                <Metric
+                  icon={<Bell className="size-4" />}
+                  label="Push reușite"
+                  value={String(result.pushSent)}
+                />
+                <Metric
+                  icon={<CopyX className="size-4" />}
+                  label="Push eșuate"
+                  value={String(result.pushFailed)}
+                />
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Rulat la {new Date(result.ranAt).toLocaleString('ro-RO')} ·{' '}
-                {result.notifications.length} notificări valide ·{' '}
+                {result.notifications.length} de trimis ·{' '}
                 {result.invalidRemoved} invalide eliminate
               </p>
 
@@ -144,12 +217,14 @@ function NotificationEngineContent() {
 
               <div className="flex flex-col gap-2">
                 <h2 className="text-sm font-semibold">
-                  Notificări generate ({result.notifications.length})
+                  {result.mode === 'live'
+                    ? `Notificări trimise (${result.notifications.length})`
+                    : `Notificări de trimis (${result.notifications.length})`}
                 </h2>
                 {result.notifications.length === 0 ? (
                   <p className="rounded-lg border border-border bg-secondary/30 p-4 text-center text-sm text-muted-foreground">
-                    Nicio notificare generată. (Nu există reguli active care să
-                    producă notificări momentan.)
+                    Nicio notificare de trimis. (Nu există reguli active care să
+                    producă notificări noi momentan.)
                   </p>
                 ) : (
                   <ul className="flex flex-col gap-2">

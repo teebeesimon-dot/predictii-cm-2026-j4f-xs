@@ -8,15 +8,21 @@ import { notificationEngine } from '@/lib/notifications/engine/NotificationEngin
  * DOAR administratorii au acces (verificat din Firestore) sau cron (CRON_SECRET).
  * NU trimite notificări — execută engine-ul și întoarce decizia ca JSON.
  *
- * Body (JSON): { "actorId": "..." }
- * Răspuns: { success, executionTime, rulesExecuted, notificationsGenerated,
- *            duplicatesRemoved, invalidRemoved, notifications, errors, ranAt }
+ * Body (JSON): { "actorId": "...", "mode": "dry-run" | "live" }
+ *   - 'dry-run' (implicit): DOAR generează notificările, fără efecte secundare.
+ *   - 'live':   trimite notificările și le salvează în notification_history.
+ * Răspuns: EngineRunResult (JSON).
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { actorId?: string }
+  const body = (await req.json().catch(() => ({}))) as {
+    actorId?: string
+    mode?: string
+  }
+  // Orice altă valoare decât 'live' este tratată drept 'dry-run' (implicit sigur).
+  const mode = body.mode === 'live' ? 'live' : 'dry-run'
 
   let auth
   try {
@@ -33,8 +39,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    console.log(`[v0] notif-engine: rulare cerută de ${auth.actorName}`)
-    const result = await notificationEngine.run()
+    console.log(
+      `[v0] notif-engine: rulare (${mode}) cerută de ${auth.actorName}`,
+    )
+    const result = await notificationEngine.run(mode)
     return NextResponse.json(result)
   } catch (e) {
     console.log('[v0] notif-engine: eroare la rulare:', (e as Error).message)
