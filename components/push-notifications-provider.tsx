@@ -20,16 +20,38 @@ import { saveFcmToken } from '@/lib/data'
  *
  * Pe web (browser), Capacitor.isNativePlatform() e false, deci nu se execută
  * nimic — funcționalitatea existentă rămâne neatinsă.
+ *
+ * IMPORTANT (crash Android): PushNotifications.register() apelează FirebaseApp
+ * nativ. Dacă `google-services.json` NU e prezent în build, Firebase nativ nu se
+ * inițializează și register() arunca o excepție NATIVĂ fatală
+ * („Default FirebaseApp is not initialized in this process") care închide
+ * aplicația la pornire — un try/catch în JS NU o poate prinde.
+ *
+ * De aceea inițializarea e blocată în spatele unui flag și rulează DOAR când:
+ *   NEXT_PUBLIC_PUSH_ENABLED === 'true'
+ * Setează acest env var pe 'true' DOAR DUPĂ ce ai adăugat `google-services.json`
+ * real în `android/app/` și ai făcut rebuild la APK. Până atunci push-ul e
+ * dezactivat, iar aplicația pornește normal.
  */
+const PUSH_ENABLED = process.env.NEXT_PUBLIC_PUSH_ENABLED === 'true'
+
 export function PushNotificationsProvider() {
   const { user } = useAuth()
   const [token, setToken] = useState<string | null>(null)
   const initialized = useRef(false)
 
-  // Setup o singură dată, doar pe platformă nativă.
+  // Setup o singură dată, doar pe platformă nativă ȘI doar dacă Firebase e
+  // configurat (flag activat). Altfel register() ar face crash nativ.
   useEffect(() => {
     if (initialized.current) return
     if (!Capacitor.isNativePlatform()) return
+    if (!PUSH_ENABLED) {
+      console.log(
+        '[v0] Push dezactivat (NEXT_PUBLIC_PUSH_ENABLED != true). ' +
+          'Se sare peste register() ca sa nu crape fara google-services.json.',
+      )
+      return
+    }
     initialized.current = true
 
     const handles: Array<{ remove: () => void }> = []
