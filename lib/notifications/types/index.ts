@@ -9,6 +9,8 @@
  * engine-ul, iar tipurile de notificări sunt string-uri libere (nu enum rigid).
  */
 
+import type { EngineData } from '@/lib/notifications/context/EngineData'
+
 // Cui i se adresează o notificare.
 export type RecipientType = 'all' | 'user' | 'users'
 
@@ -45,13 +47,19 @@ export interface NotificationTask {
 }
 
 /**
- * Contextul pasat fiecărei reguli la evaluare. Momentan minim (doar `now`),
- * dar extensibil: aici vor apărea ulterior date precum ediția activă,
- * meciurile, clasamentul etc., fără a schimba semnătura `evaluate`.
+ * Contextul pasat fiecărei reguli la evaluare.
+ *
+ * Conține momentul rulării ȘI datele partajate ale aplicației (`data`),
+ * încărcate o singură dată per rulare și refolosite de toate regulile — deci
+ * nu se fac citiri Firestore suplimentare per regulă. `data` expune utilizatorii,
+ * edițiile cu meciuri și scheduler-ul fiecărei ediții (programul/termenele
+ * existente), plus helperi pentru pronosticuri.
  */
 export interface RuleContext {
   // Momentul rulării (epoch ms). Injectat pentru a face regulile testabile.
   now: number
+  // Datele partajate (vezi lib/notifications/context/EngineData).
+  data: EngineData
 }
 
 /**
@@ -79,6 +87,25 @@ export interface NotificationRule {
  */
 export type EngineRunMode = 'dry-run' | 'live'
 
+// Rezumatul execuției unei singure reguli (pentru panoul admin).
+export interface RuleRunSummary {
+  ruleId: string
+  description?: string
+  // Câte notificări a produs regula în această rulare.
+  generated: number
+  // Regula a eșuat? (mesajul e în `errors`)
+  failed: boolean
+}
+
+// O notificare care NU va fi trimisă, împreună cu motivul (pentru panoul admin).
+export interface SkippedNotification {
+  key: string
+  type: string
+  title: string
+  // Motivul ignorării, lizibil în română.
+  reason: 'duplicat' | 'invalidă' | 'deja trimisă'
+}
+
 // Rezultatul unei rulări a engine-ului (returnat de endpoint și afișat în UI).
 export interface EngineRunResult {
   success: boolean
@@ -87,6 +114,8 @@ export interface EngineRunResult {
   // Durata rulării, în milisecunde.
   executionTime: number
   rulesExecuted: number
+  // Rezumat per-regulă (nume + câte a generat + dacă a eșuat).
+  ruleResults: RuleRunSummary[]
   // Câte notificări au produs regulile ÎNAINTE de deduplicare.
   notificationsGenerated: number
   // Câte au fost eliminate ca duplicate (în cadrul aceleiași rulări).
@@ -95,6 +124,8 @@ export interface EngineRunResult {
   invalidRemoved: number
   // Câte au fost sărite fiindcă existau deja în notification_history.
   alreadySentSkipped: number
+  // Notificările ignorate (duplicate / invalide / deja trimise) + motivul.
+  skipped: SkippedNotification[]
   // Lista finală, validă, deduplicată și NEtrimisă anterior (ce s-ar trimite).
   notifications: NotificationTask[]
   // Câte notificări au fost trimise efectiv (doar în modul 'live').
