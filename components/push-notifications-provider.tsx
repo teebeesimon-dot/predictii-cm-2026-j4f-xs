@@ -33,24 +33,11 @@ import { saveFcmToken } from '@/lib/data'
 // Push activ dacă variabila lipsește SAU e 'true'. Pune 'false' ca să dezactivezi.
 const PUSH_ENABLED = process.env.NEXT_PUBLIC_PUSH_ENABLED !== 'false'
 
-// Alerte vizibile pe dispozitiv pentru debugging (utile în WebView, unde consola
-// nu se vede ușor). Pune 'true' ca să le activezi în timpul testării.
-const DEBUG_PUSH = process.env.NEXT_PUBLIC_PUSH_DEBUG === 'true'
-
+// Logging discret DOAR în development, pe consolă. Fără alerte/popup-uri pe
+// dispozitiv sau în browser — nimic vizibil pentru utilizator.
 function dbg(msg: string) {
-  console.log(`[v0] ${msg}`)
-  // Alertele apar DOAR pe platformă nativă (app-ul Android/iOS), niciodată pe
-  // web — ca să nu deranjeze utilizatorii din browser.
-  if (
-    DEBUG_PUSH &&
-    typeof window !== 'undefined' &&
-    Capacitor.isNativePlatform()
-  ) {
-    try {
-      window.alert(`[PUSH] ${msg}`)
-    } catch {
-      // ignore
-    }
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[v0] ${msg}`)
   }
 }
 
