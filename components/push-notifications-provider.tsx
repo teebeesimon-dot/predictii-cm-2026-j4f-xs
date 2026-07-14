@@ -22,34 +22,53 @@ import { saveFcmToken } from '@/lib/data'
  * nimic — funcționalitatea existentă rămâne neatinsă.
  *
  * IMPORTANT (crash Android): PushNotifications.register() apelează FirebaseApp
- * nativ. Dacă `google-services.json` NU e prezent în build, Firebase nativ nu se
- * inițializează și register() arunca o excepție NATIVĂ fatală
- * („Default FirebaseApp is not initialized in this process") care închide
- * aplicația la pornire — un try/catch în JS NU o poate prinde.
- *
- * De aceea inițializarea e blocată în spatele unui flag și rulează DOAR când:
- *   NEXT_PUBLIC_PUSH_ENABLED === 'true'
- * Setează acest env var pe 'true' DOAR DUPĂ ce ai adăugat `google-services.json`
- * real în `android/app/` și ai făcut rebuild la APK. Până atunci push-ul e
- * dezactivat, iar aplicația pornește normal.
+ * nativ. Fără `google-services.json` în build, Firebase nativ nu se
+ * inițializează și register() aruncă o excepție NATIVĂ fatală
+ * („Default FirebaseApp is not initialized in this process"). De aceea
+ * inițializarea e gardată de flag-ul NEXT_PUBLIC_PUSH_ENABLED: setează-l pe
+ * 'true' DOAR după ce ai adăugat google-services.json real. Implicit, dacă
+ * variabila lipsește, push-ul e ACTIV (fiindcă google-services.json este acum
+ * configurat) — pune 'false' explicit ca să-l dezactivezi.
  */
-const PUSH_ENABLED = process.env.NEXT_PUBLIC_PUSH_ENABLED === 'true'
+// Push activ dacă variabila lipsește SAU e 'true'. Pune 'false' ca să dezactivezi.
+const PUSH_ENABLED = process.env.NEXT_PUBLIC_PUSH_ENABLED !== 'false'
+
+// Alerte vizibile pe dispozitiv pentru debugging (utile în WebView, unde consola
+// nu se vede ușor). Pune 'true' ca să le activezi în timpul testării.
+const DEBUG_PUSH = process.env.NEXT_PUBLIC_PUSH_DEBUG === 'true'
+
+function dbg(msg: string) {
+  console.log(`[v0] ${msg}`)
+  // Alertele apar DOAR pe platformă nativă (app-ul Android/iOS), niciodată pe
+  // web — ca să nu deranjeze utilizatorii din browser.
+  if (
+    DEBUG_PUSH &&
+    typeof window !== 'undefined' &&
+    Capacitor.isNativePlatform()
+  ) {
+    try {
+      window.alert(`[PUSH] ${msg}`)
+    } catch {
+      // ignore
+    }
+  }
+}
 
 export function PushNotificationsProvider() {
   const { user } = useAuth()
   const [token, setToken] = useState<string | null>(null)
   const initialized = useRef(false)
 
-  // Setup o singură dată, doar pe platformă nativă ȘI doar dacă Firebase e
-  // configurat (flag activat). Altfel register() ar face crash nativ.
   useEffect(() => {
+    dbg(`useEffect intrat. native=${Capacitor.isNativePlatform()}`)
+
     if (initialized.current) return
-    if (!Capacitor.isNativePlatform()) return
+    if (!Capacitor.isNativePlatform()) {
+      dbg('Nu e platformă nativă (web) — push ignorat.')
+      return
+    }
     if (!PUSH_ENABLED) {
-      console.log(
-        '[v0] Push dezactivat (NEXT_PUBLIC_PUSH_ENABLED != true). ' +
-          'Se sare peste register() ca sa nu crape fara google-services.json.',
-      )
+      dbg('Push DEZACTIVAT (NEXT_PUBLIC_PUSH_ENABLED=false). Se sare peste.')
       return
     }
     initialized.current = true
@@ -58,39 +77,43 @@ export function PushNotificationsProvider() {
 
     async function setup() {
       try {
-        // 1. Permisiunea curentă; dacă e „prompt", afișează dialogul de sistem.
+        // 1. Permisiunea curentă.
+        dbg('Înainte de checkPermissions()')
         let perm = await PushNotifications.checkPermissions()
+        dbg(`După checkPermissions(): receive=${perm.receive}`)
+
+        // Pe Android 13+ starea inițială e „prompt" → afișăm dialogul de sistem.
         if (
           perm.receive === 'prompt' ||
           perm.receive === 'prompt-with-rationale'
         ) {
+          dbg('Înainte de requestPermissions()')
           perm = await PushNotifications.requestPermissions()
+          dbg(`După requestPermissions(): receive=${perm.receive}`)
         }
+
         if (perm.receive !== 'granted') {
-          console.log('[v0] Permisiune notificări neacordată:', perm.receive)
+          dbg(`Permisiune neacordată (${perm.receive}). Nu apelez register().`)
           return
         }
 
         // 2. Atașăm listener-ele ÎNAINTE de register().
         handles.push(
           await PushNotifications.addListener('registration', (t) => {
-            console.log('[v0] Token FCM primit')
+            dbg(`Listener registration: token primit (len=${t.value.length})`)
             setToken(t.value)
           }),
         )
         handles.push(
           await PushNotifications.addListener('registrationError', (err) => {
-            console.log('[v0] Eroare înregistrare push:', JSON.stringify(err))
+            dbg(`Listener registrationError: ${JSON.stringify(err)}`)
           }),
         )
         handles.push(
           await PushNotifications.addListener(
             'pushNotificationReceived',
             (notification) => {
-              console.log(
-                '[v0] Notificare primită (foreground):',
-                notification.title,
-              )
+              dbg(`Notificare primită (foreground): ${notification.title}`)
             },
           ),
         )
@@ -98,18 +121,17 @@ export function PushNotificationsProvider() {
           await PushNotifications.addListener(
             'pushNotificationActionPerformed',
             (action) => {
-              console.log(
-                '[v0] Notificare apăsată:',
-                action.notification.title,
-              )
+              dbg(`Notificare apăsată: ${action.notification.title}`)
             },
           ),
         )
 
         // 3. Înregistrare la FCM → declanșează evenimentul „registration".
+        dbg('Înainte de register()')
         await PushNotifications.register()
+        dbg('register() apelat (aștept evenimentul registration).')
       } catch (e) {
-        console.log('[v0] Eroare setup push:', (e as Error).message)
+        dbg(`Eroare setup push: ${(e as Error).message}`)
       }
     }
 
@@ -123,8 +145,9 @@ export function PushNotificationsProvider() {
   // Salvăm tokenul în Firestore când avem și token, și user autentificat.
   useEffect(() => {
     if (!token || !user?.id) return
+    dbg(`Salvez tokenul FCM pentru user ${user.id}`)
     saveFcmToken(user.id, token).catch((e) =>
-      console.log('[v0] Eroare salvare token FCM:', (e as Error).message),
+      dbg(`Eroare salvare token FCM: ${(e as Error).message}`),
     )
   }, [token, user?.id])
 
