@@ -215,6 +215,68 @@ function NotificationEngineContent() {
                 </div>
               )}
 
+              {result.ruleResults.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-sm font-semibold">
+                    Reguli executate ({result.ruleResults.length})
+                  </h2>
+                  <ul className="flex flex-col gap-1.5">
+                    {result.ruleResults.map((r) => (
+                      <li
+                        key={r.ruleId}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                      >
+                        <span className="min-w-0">
+                          <span className="font-mono text-xs text-primary">
+                            {r.ruleId}
+                          </span>
+                          {r.description ? (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {r.description}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span
+                          className={
+                            r.failed
+                              ? 'shrink-0 rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive'
+                              : 'shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground'
+                          }
+                        >
+                          {r.failed ? 'eroare' : `${r.generated} generate`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.skipped.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-sm font-semibold">
+                    Notificări ignorate ({result.skipped.length})
+                  </h2>
+                  <ul className="flex flex-col gap-1.5">
+                    {result.skipped.map((s) => (
+                      <li
+                        key={s.key}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2 text-sm"
+                      >
+                        <span className="min-w-0 truncate">
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {s.type}
+                          </span>
+                          <span className="block truncate">{s.title}</span>
+                        </span>
+                        <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {s.reason}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
                 <h2 className="text-sm font-semibold">
                   {result.mode === 'live'
