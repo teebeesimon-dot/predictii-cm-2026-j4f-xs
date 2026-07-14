@@ -30,6 +30,8 @@ function norm(s: unknown): string {
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
+    userId?: string
+    matchId?: string
     userQuery?: string
     homeTeam?: string
     awayTeam?: string
@@ -56,10 +58,14 @@ export async function POST(req: NextRequest) {
   const awayQuery = norm(body.awayTeam)
   const homeScore = Number(body.homeScore)
   const awayScore = Number(body.awayScore)
+  const directIds = Boolean(body.userId && body.matchId)
 
-  if (!userQuery || !homeQuery || !awayQuery) {
+  if (!directIds && (!userQuery || !homeQuery || !awayQuery)) {
     return NextResponse.json(
-      { error: 'userQuery, homeTeam și awayTeam sunt obligatorii.' },
+      {
+        error:
+          'Trimite fie (userId + matchId), fie (userQuery + homeTeam + awayTeam).',
+      },
       { status: 400 },
     )
   }
@@ -73,62 +79,87 @@ export async function POST(req: NextRequest) {
   try {
   const db = adminDb()
 
-  // 1) Găsește utilizatorul după name sau username.
-  const usersSnap = await db.collection('users').get()
-  const userMatches = usersSnap.docs.filter((d) => {
-    const x = d.data()
-    return norm(x.name).includes(userQuery) || norm(x.username).includes(userQuery)
-  })
-  if (userMatches.length === 0) {
-    return NextResponse.json({ error: `Niciun utilizator pentru „${body.userQuery}”.` }, { status: 404 })
+  // 1) Determină documentul utilizatorului.
+  //    Cu userId → o singură citire (ieftin, sigur chiar și cu cota aproape
+  //    epuizată). Fără → fallback: scanează colecția users (mai scump).
+  let userDoc
+  if (body.userId) {
+    const snap = await db.collection('users').doc(body.userId).get()
+    if (!snap.exists) {
+      return NextResponse.json({ error: `userId inexistent: ${body.userId}` }, { status: 404 })
+    }
+    userDoc = snap
+  } else {
+    const usersSnap = await db.collection('users').get()
+    const userMatches = usersSnap.docs.filter((d) => {
+      const x = d.data()
+      return norm(x.name).includes(userQuery) || norm(x.username).includes(userQuery)
+    })
+    if (userMatches.length === 0) {
+      return NextResponse.json({ error: `Niciun utilizator pentru „${body.userQuery}”.` }, { status: 404 })
+    }
+    if (userMatches.length > 1) {
+      return NextResponse.json(
+        {
+          error: `Mai mulți utilizatori pentru „${body.userQuery}”: ${userMatches
+            .map((d) => d.data().name || d.data().username)
+            .join(', ')}. Fii mai specific.`,
+        },
+        { status: 409 },
+      )
+    }
+    userDoc = userMatches[0]
   }
-  if (userMatches.length > 1) {
-    return NextResponse.json(
-      {
-        error: `Mai mulți utilizatori pentru „${body.userQuery}”: ${userMatches
-          .map((d) => d.data().name || d.data().username)
-          .join(', ')}. Fii mai specific.`,
-      },
-      { status: 409 },
-    )
-  }
-  const userDoc = userMatches[0]
   const userId = userDoc.id
 
-  // 2) Găsește meciul după echipe (ambele sensuri, ca să nu conteze ordinea).
-  const matchesSnap = await db.collection('matches').get()
-  const matchMatches = matchesSnap.docs.filter((d) => {
-    const x = d.data()
-    const h = norm(x.homeTeam)
-    const a = norm(x.awayTeam)
-    return (
-      (h.includes(homeQuery) && a.includes(awayQuery)) ||
-      (h.includes(awayQuery) && a.includes(homeQuery))
-    )
-  })
-  if (matchMatches.length === 0) {
-    return NextResponse.json(
-      { error: `Niciun meci pentru „${body.homeTeam} - ${body.awayTeam}”.` },
-      { status: 404 },
-    )
+  // 2) Determină documentul meciului (analog: matchId → o singură citire).
+  let matchDoc
+  if (body.matchId) {
+    const snap = await db.collection('matches').doc(body.matchId).get()
+    if (!snap.exists) {
+      return NextResponse.json({ error: `matchId inexistent: ${body.matchId}` }, { status: 404 })
+    }
+    matchDoc = snap
+  } else {
+    const matchesSnap = await db.collection('matches').get()
+    const matchMatches = matchesSnap.docs.filter((d) => {
+      const x = d.data()
+      const h = norm(x.homeTeam)
+      const a = norm(x.awayTeam)
+      return (
+        (h.includes(homeQuery) && a.includes(awayQuery)) ||
+        (h.includes(awayQuery) && a.includes(homeQuery))
+      )
+    })
+    if (matchMatches.length === 0) {
+      return NextResponse.json(
+        { error: `Niciun meci pentru „${body.homeTeam} - ${body.awayTeam}”.` },
+        { status: 404 },
+      )
+    }
+    if (matchMatches.length > 1) {
+      return NextResponse.json(
+        {
+          error: `Mai multe meciuri potrivite (${matchMatches.length}). Restrânge căutarea.`,
+          matches: matchMatches.map((d) => ({
+            id: d.id,
+            home: d.data().homeTeam,
+            away: d.data().awayTeam,
+            kickoff: d.data().kickoff,
+          })),
+        },
+        { status: 409 },
+      )
+    }
+    matchDoc = matchMatches[0]
   }
-  if (matchMatches.length > 1) {
-    return NextResponse.json(
-      {
-        error: `Mai multe meciuri potrivite (${matchMatches.length}). Restrânge căutarea.`,
-        matches: matchMatches.map((d) => ({
-          id: d.id,
-          home: d.data().homeTeam,
-          away: d.data().awayTeam,
-          kickoff: d.data().kickoff,
-        })),
-      },
-      { status: 409 },
-    )
-  }
-  const matchDoc = matchMatches[0]
   const matchId = matchDoc.id
-  const match = matchDoc.data()
+  const match = matchDoc.data() as Record<string, unknown> & {
+    homeTeam: string
+    awayTeam: string
+    kickoff: string
+    editionId?: string
+  }
 
   // 3) Guard: meciul nu trebuie să fi început.
   const kickoffMs = new Date(match.kickoff).getTime()
