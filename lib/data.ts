@@ -147,6 +147,42 @@ export async function savePrediction(
   })
 }
 
+// Varianta pentru ADMINISTRATOR: introduce/corectează pronosticul unui alt
+// participant la un meci care ÎNCĂ NU a început. Marchează pronosticul ca fiind
+// modificat de admin (transparent pentru toți) și reține numele adminului.
+// Menține aceeași gardă pe kickoff ca `savePrediction`, ca nimeni (nici măcar
+// adminul) să nu poată schimba un pronostic după startul meciului.
+export async function adminSetPrediction(
+  userId: string,
+  matchId: string,
+  homeScore: number,
+  awayScore: number,
+  adminName: string,
+): Promise<void> {
+  const snap = await getDoc(doc(db, 'matches', matchId))
+  if (!snap.exists()) {
+    throw new Error('Meciul nu există.')
+  }
+  const match = snap.data() as Omit<Match, 'id'>
+  const editionId = editionOf(match)
+  if (new Date(match.kickoff).getTime() <= Date.now()) {
+    throw new PredictionLockedError()
+  }
+
+  const id = `${userId}_${matchId}`
+  await setDoc(doc(db, 'predictions', id), {
+    userId,
+    matchId,
+    editionId,
+    homeScore,
+    awayScore,
+    updatedAt: Date.now(),
+    editedByAdmin: true,
+    editedByAdminName: adminName,
+    editedAt: Date.now(),
+  })
+}
+
 export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
   const id = doc(collection(db, 'matches')).id
   await setDoc(doc(db, 'matches', id), data)

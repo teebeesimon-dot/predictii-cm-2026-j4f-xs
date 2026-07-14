@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { TeamName } from '@/components/team-name'
 import { useEdition } from '@/components/edition-provider'
@@ -11,6 +11,7 @@ import {
   createMatch,
   deleteMatch,
   updateMatchResult,
+  adminSetPrediction,
   createUser,
   deleteUser,
   updateUserPassword,
@@ -79,6 +80,8 @@ import {
   Check,
   Trophy,
   Cpu,
+  PencilLine,
+  ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -102,6 +105,7 @@ function AdminContent() {
     { value: 'results', label: 'Rezultate' },
     { value: 'sync', label: 'Sincronizare' },
     { value: 'completion', label: 'Completare' },
+    { value: 'predictions', label: 'Pronosticuri' },
     { value: 'add', label: 'Adaugă meci' },
     { value: 'users', label: 'Participanți' },
   ] as const
@@ -261,6 +265,16 @@ function AdminContent() {
             matches={matches}
             predictions={predictions}
             loading={isLoading || usersLoading}
+          />
+        </TabsContent>
+
+        <TabsContent value="predictions" className="mt-4">
+          <PredictionEditor
+            users={users}
+            matches={matches}
+            predictions={predictions}
+            loading={isLoading || usersLoading}
+            onSaved={() => mutate()}
           />
         </TabsContent>
 
@@ -464,6 +478,266 @@ function CompletionOverview({
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+// Editor de pronosticuri pentru administrator: permite introducerea sau
+// corectarea scorului pronosticat de un participant, DOAR la meciuri care încă
+// nu au început. Fiecare salvare marchează pronosticul ca „modificat de admin”,
+// afișat transparent tuturor. Refolosește datele deja încărcate (matches,
+// users, predictions), deci nu face citiri suplimentare din Firestore.
+function PredictionEditor({
+  users,
+  matches,
+  predictions,
+  loading,
+  onSaved,
+}: {
+  users: AppUser[] | undefined
+  matches: Match[] | undefined
+  predictions: Prediction[] | undefined
+  loading: boolean
+  onSaved: () => void
+}) {
+  const { user: admin } = useAuth()
+  const [selectedMatchId, setSelectedMatchId] = useState<string>('')
+  const [drafts, setDrafts] = useState<
+    Record<string, { home: string; away: string }>
+  >({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  const upcoming = useMemo(
+    () =>
+      [...(matches ?? [])]
+        .filter((m) => new Date(m.kickoff).getTime() > Date.now())
+        .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff)),
+    [matches],
+  )
+
+  const participants = useMemo(
+    () =>
+      (users ?? [])
+        .filter((u) => !isUserAdmin(u) && !isViewOnly(u))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ro')),
+    [users],
+  )
+
+  const selectedMatch = upcoming.find((m) => m.id === selectedMatchId) ?? null
+  const matchPreds = (predictions ?? []).filter(
+    (p) => p.matchId === selectedMatchId,
+  )
+
+  // La schimbarea meciului, precompletează câmpurile cu pronosticurile curente.
+  useEffect(() => {
+    if (!selectedMatchId) {
+      setDrafts({})
+      return
+    }
+    const next: Record<string, { home: string; away: string }> = {}
+    for (const u of participants) {
+      const p = (predictions ?? []).find(
+        (x) => x.matchId === selectedMatchId && x.userId === u.id,
+      )
+      next[u.id] = {
+        home: p ? String(p.homeScore) : '',
+        away: p ? String(p.awayScore) : '',
+      }
+    }
+    setDrafts(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatchId])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    )
+  }
+
+  async function handleSave(userId: string, userName: string) {
+    const draft = drafts[userId]
+    if (!draft || !selectedMatch) return
+    const home = Number(draft.home)
+    const away = Number(draft.away)
+    if (
+      draft.home === '' ||
+      draft.away === '' ||
+      !Number.isInteger(home) ||
+      !Number.isInteger(away) ||
+      home < 0 ||
+      away < 0
+    ) {
+      toast.error('Introdu un scor valid (numere întregi ≥ 0).')
+      return
+    }
+    setSavingId(userId)
+    try {
+      await adminSetPrediction(
+        userId,
+        selectedMatch.id,
+        home,
+        away,
+        admin?.name || admin?.username || 'Administrator',
+      )
+      toast.success(`Pronostic salvat pentru ${userName}: ${home}-${away}.`)
+      onSaved()
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Eroare la salvarea pronosticului.',
+      )
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start gap-3 rounded-lg border border-border bg-secondary/40 p-4">
+        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          Poți introduce sau corecta pronosticul unui participant doar la
+          meciuri care <span className="font-semibold">nu au început</span>.
+          Fiecare modificare este marcată vizibil ca{' '}
+          <span className="font-semibold text-foreground">
+            „modificat de admin”
+          </span>{' '}
+          pentru toți colegii.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="pred-match">Meci (doar cele neîncepute)</Label>
+        {upcoming.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+            Niciun meci neînceput în această competiție.
+          </p>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              id="pred-match"
+              className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+            >
+              <span className="truncate">
+                {selectedMatch
+                  ? `${selectedMatch.homeTeam} - ${selectedMatch.awayTeam} · ${formatKickoff(selectedMatch.kickoff)}`
+                  : 'Alege un meci…'}
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="max-h-80 w-[--radix-dropdown-menu-trigger-width] min-w-72 overflow-y-auto"
+            >
+              {upcoming.map((m) => (
+                <DropdownMenuItem
+                  key={m.id}
+                  onClick={() => setSelectedMatchId(m.id)}
+                  className="flex flex-col items-start gap-0.5"
+                >
+                  <span className="font-medium">
+                    {m.homeTeam} - {m.awayTeam}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatKickoff(m.kickoff)}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      {selectedMatch && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-sm font-medium text-muted-foreground">
+              {participants.length} participanți ·{' '}
+              {matchPreds.length} cu pronostic
+            </p>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {participants.map((u) => {
+              const pred = matchPreds.find((p) => p.userId === u.id) ?? null
+              const draft = drafts[u.id] ?? { home: '', away: '' }
+              const isSaving = savingId === u.id
+              return (
+                <li
+                  key={u.id}
+                  className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2.5"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    {pred ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-primary" />
+                    ) : (
+                      <CircleDashed className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate text-sm font-medium">
+                      {u.name}
+                    </span>
+                    {pred?.editedByAdmin && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 px-1.5 py-0 text-[10px] font-bold"
+                      >
+                        <PencilLine className="size-3" />
+                        Admin
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      aria-label={`Scor gazde pentru ${u.name}`}
+                      value={draft.home}
+                      onChange={(e) =>
+                        setDrafts((d) => ({
+                          ...d,
+                          [u.id]: { ...draft, home: e.target.value },
+                        }))
+                      }
+                      className="w-14 text-center"
+                    />
+                    <span className="text-muted-foreground">-</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      aria-label={`Scor oaspeți pentru ${u.name}`}
+                      value={draft.away}
+                      onChange={(e) =>
+                        setDrafts((d) => ({
+                          ...d,
+                          [u.id]: { ...draft, away: e.target.value },
+                        }))
+                      }
+                      className="w-14 text-center"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleSave(u.id, u.name)}
+                      disabled={isSaving}
+                      className="shrink-0"
+                    >
+                      {isSaving ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Save className="size-4" />
+                      )}
+                      Salvează
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

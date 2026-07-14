@@ -21,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Lock, Users, CheckCircle2 } from 'lucide-react'
+import { Lock, Users, CheckCircle2, PencilLine } from 'lucide-react'
 
 export default function ColleaguesPage() {
   return (
@@ -293,6 +293,20 @@ function MatchPredictions({
                       <span className="text-xs italic text-muted-foreground">
                         fără pronostic
                       </span>
+                    )}
+                    {pred?.editedByAdmin && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 px-1.5 py-0 text-[10px] font-bold"
+                        title={
+                          pred.editedByAdminName
+                            ? `Modificat de admin (${pred.editedByAdminName})`
+                            : 'Modificat de admin'
+                        }
+                      >
+                        <PencilLine className="size-3" />
+                        Admin
+                      </Badge>
                     )}
                     {exact && (
                       <Badge className="gap-1 bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">

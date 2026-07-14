@@ -147,6 +147,14 @@ export interface Prediction {
   homeScore: number
   awayScore: number
   updatedAt: number
+  // Setat true când un administrator introduce/corectează manual pronosticul
+  // în locul participantului (ex. userul a uitat să salveze un meci). Se
+  // afișează transparent tuturor, ca să se știe că nu a fost pus de jucător.
+  editedByAdmin?: boolean
+  // Numele administratorului care a făcut modificarea (pentru transparență).
+  editedByAdminName?: string
+  // Momentul ultimei modificări făcute de admin.
+  editedAt?: number
 }
 
 export interface AwardEntry {

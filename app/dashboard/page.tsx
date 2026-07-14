@@ -23,7 +23,7 @@ import {
 import { buildScheduler, type Scheduler } from '@/lib/schedule'
 import { computeStandings } from '@/lib/data'
 import { cn, formatKickoff } from '@/lib/utils'
-import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2 } from 'lucide-react'
+import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2, PencilLine } from 'lucide-react'
 
 export default function DashboardPage() {
   return (
@@ -568,6 +568,20 @@ function LiveMatchCard({
                       <span className="text-xs italic text-muted-foreground">
                         fără pronostic
                       </span>
+                    )}
+                    {pred?.editedByAdmin && (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 px-1.5 py-0 text-[10px] font-bold"
+                        title={
+                          pred.editedByAdminName
+                            ? `Modificat de admin (${pred.editedByAdminName})`
+                            : 'Modificat de admin'
+                        }
+                      >
+                        <PencilLine className="size-3" />
+                        Admin
+                      </Badge>
                     )}
                     {exact && (
                       <Badge className="gap-1 bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
