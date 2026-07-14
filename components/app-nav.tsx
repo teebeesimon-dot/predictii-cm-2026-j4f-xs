@@ -17,6 +17,7 @@ import {
   UserCog,
   Users,
   Bell,
+  Cpu,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -99,6 +100,12 @@ export function AppNav() {
             label: 'Notificări',
             icon: Bell,
             match: (p: string) => p === '/admin/notifications',
+          },
+          {
+            href: '/admin/notification-engine',
+            label: 'Notif. Engine',
+            icon: Cpu,
+            match: (p: string) => p === '/admin/notification-engine',
           },
         ]
       : []),
