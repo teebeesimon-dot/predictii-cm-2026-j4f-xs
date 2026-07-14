@@ -148,16 +148,19 @@ export async function savePrediction(
 }
 
 // Varianta pentru ADMINISTRATOR: introduce/corectează pronosticul unui alt
-// participant la un meci care ÎNCĂ NU a început. Marchează pronosticul ca fiind
-// modificat de admin (transparent pentru toți) și reține numele adminului.
-// Menține aceeași gardă pe kickoff ca `savePrediction`, ca nimeni (nici măcar
-// adminul) să nu poată schimba un pronostic după startul meciului.
+// participant. Marchează pronosticul ca fiind modificat de admin (transparent
+// pentru toți) și reține numele adminului.
+// Implicit menține garda pe kickoff (ca la jucători). Cu `allowAfterKickoff`
+// true, adminul poate corecta pronosticul CHIAR ȘI după startul meciului — de
+// folosit responsabil (ex. cineva a uitat să salveze un pronostic completat la
+// timp). Rămâne marcat vizibil „modificat de admin”.
 export async function adminSetPrediction(
   userId: string,
   matchId: string,
   homeScore: number,
   awayScore: number,
   adminName: string,
+  allowAfterKickoff = false,
 ): Promise<void> {
   const snap = await getDoc(doc(db, 'matches', matchId))
   if (!snap.exists()) {
@@ -165,7 +168,7 @@ export async function adminSetPrediction(
   }
   const match = snap.data() as Omit<Match, 'id'>
   const editionId = editionOf(match)
-  if (new Date(match.kickoff).getTime() <= Date.now()) {
+  if (!allowAfterKickoff && new Date(match.kickoff).getTime() <= Date.now()) {
     throw new PredictionLockedError()
   }
 

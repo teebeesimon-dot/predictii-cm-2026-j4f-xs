@@ -82,6 +82,7 @@ import {
   Cpu,
   PencilLine,
   ShieldCheck,
+  TriangleAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -506,14 +507,20 @@ function PredictionEditor({
     Record<string, { home: string; away: string }>
   >({})
   const [savingId, setSavingId] = useState<string | null>(null)
+  // Când e activ, adminul poate edita pronosticuri și la meciuri deja începute.
+  const [allowAfterKickoff, setAllowAfterKickoff] = useState(false)
 
-  const upcoming = useMemo(
-    () =>
-      [...(matches ?? [])]
-        .filter((m) => new Date(m.kickoff).getTime() > Date.now())
-        .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff)),
-    [matches],
-  )
+  // Lista de meciuri selectabile: implicit doar cele neîncepute; cu opțiunea
+  // „după start” activă, toate meciurile ediției (cele mai recente primele).
+  const selectableMatches = useMemo(() => {
+    const all = [...(matches ?? [])]
+    if (allowAfterKickoff) {
+      return all.sort((a, b) => +new Date(b.kickoff) - +new Date(a.kickoff))
+    }
+    return all
+      .filter((m) => new Date(m.kickoff).getTime() > Date.now())
+      .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
+  }, [matches, allowAfterKickoff])
 
   const participants = useMemo(
     () =>
@@ -523,10 +530,14 @@ function PredictionEditor({
     [users],
   )
 
-  const selectedMatch = upcoming.find((m) => m.id === selectedMatchId) ?? null
+  const selectedMatch =
+    selectableMatches.find((m) => m.id === selectedMatchId) ?? null
   const matchPreds = (predictions ?? []).filter(
     (p) => p.matchId === selectedMatchId,
   )
+  const selectedStarted = selectedMatch
+    ? new Date(selectedMatch.kickoff).getTime() <= Date.now()
+    : false
 
   // La schimbarea meciului, precompletează câmpurile cu pronosticurile curente.
   useEffect(() => {
@@ -582,6 +593,7 @@ function PredictionEditor({
         home,
         away,
         admin?.name || admin?.username || 'Administrator',
+        allowAfterKickoff,
       )
       toast.success(`Pronostic salvat pentru ${userName}: ${home}-${away}.`)
       onSaved()
@@ -599,9 +611,8 @@ function PredictionEditor({
       <div className="flex flex-wrap items-start gap-3 rounded-lg border border-border bg-secondary/40 p-4">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          Poți introduce sau corecta pronosticul unui participant doar la
-          meciuri care <span className="font-semibold">nu au început</span>.
-          Fiecare modificare este marcată vizibil ca{' '}
+          Poți introduce sau corecta pronosticul unui participant. Fiecare
+          modificare este marcată vizibil ca{' '}
           <span className="font-semibold text-foreground">
             „modificat de admin”
           </span>{' '}
@@ -609,11 +620,35 @@ function PredictionEditor({
         </p>
       </div>
 
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-4">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="allow-after-kickoff" className="font-medium">
+            Permite editarea și după startul meciului
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Folosește responsabil: ocolește blocarea normală. Util când cineva a
+            uitat să salveze un pronostic completat la timp.
+          </p>
+        </div>
+        <Switch
+          id="allow-after-kickoff"
+          checked={allowAfterKickoff}
+          onCheckedChange={(v) => {
+            setAllowAfterKickoff(v)
+            setSelectedMatchId('')
+          }}
+        />
+      </div>
+
       <div className="flex flex-col gap-2">
-        <Label htmlFor="pred-match">Meci (doar cele neîncepute)</Label>
-        {upcoming.length === 0 ? (
+        <Label htmlFor="pred-match">
+          {allowAfterKickoff ? 'Meci (toate)' : 'Meci (doar cele neîncepute)'}
+        </Label>
+        {selectableMatches.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-            Niciun meci neînceput în această competiție.
+            {allowAfterKickoff
+              ? 'Niciun meci în această competiție.'
+              : 'Niciun meci neînceput în această competiție.'}
           </p>
         ) : (
           <DropdownMenu>
@@ -632,20 +667,24 @@ function PredictionEditor({
               align="start"
               className="max-h-80 w-[--radix-dropdown-menu-trigger-width] min-w-72 overflow-y-auto"
             >
-              {upcoming.map((m) => (
-                <DropdownMenuItem
-                  key={m.id}
-                  onClick={() => setSelectedMatchId(m.id)}
-                  className="flex flex-col items-start gap-0.5"
-                >
-                  <span className="font-medium">
-                    {m.homeTeam} - {m.awayTeam}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatKickoff(m.kickoff)}
-                  </span>
-                </DropdownMenuItem>
-              ))}
+              {selectableMatches.map((m) => {
+                const started = new Date(m.kickoff).getTime() <= Date.now()
+                return (
+                  <DropdownMenuItem
+                    key={m.id}
+                    onClick={() => setSelectedMatchId(m.id)}
+                    className="flex flex-col items-start gap-0.5"
+                  >
+                    <span className="font-medium">
+                      {m.homeTeam} - {m.awayTeam}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatKickoff(m.kickoff)}
+                      {started && ' · început'}
+                    </span>
+                  </DropdownMenuItem>
+                )
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -653,6 +692,16 @@ function PredictionEditor({
 
       {selectedMatch && (
         <div className="flex flex-col gap-2">
+          {selectedStarted && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Acest meci a început deja. Modificările sunt permise doar pentru
+                că opțiunea de mai sus este activă și rămân marcate „modificat de
+                admin”.
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between px-1">
             <p className="text-sm font-medium text-muted-foreground">
               {participants.length} participanți ·{' '}
