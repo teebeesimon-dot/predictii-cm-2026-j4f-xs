@@ -17,9 +17,17 @@ import {
   UserCog,
   Users,
   Bell,
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/components/auth-provider'
 import { EditionSelector } from '@/components/edition-selector'
@@ -78,8 +86,7 @@ export function AppNav() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
 
-  const items: NavItem[] = [
-    ...NAV,
+  const secondaryItems: NavItem[] = [
     {
       href: '/account',
       label: 'Contul meu',
@@ -92,7 +99,8 @@ export function AppNav() {
             href: '/admin',
             label: 'Administrare',
             icon: Shield,
-            match: (p: string) => p === '/admin',
+            match: (p: string) =>
+              p.startsWith('/admin') && p !== '/admin/notifications',
           },
           {
             href: '/admin/notifications',
@@ -103,6 +111,10 @@ export function AppNav() {
         ]
       : []),
   ]
+  const items = [...NAV, ...secondaryItems]
+  const secondaryActive = secondaryItems.some((item) =>
+    item.match(pathname, stage),
+  )
 
   function handleLogout() {
     logout()
@@ -130,7 +142,7 @@ export function AppNav() {
         </div>
 
         <nav className="hidden items-center gap-0.5 xl:flex">
-          {items.map((item) => {
+          {NAV.map((item) => {
             const active = item.match(pathname, stage)
             return (
               <Link
@@ -148,6 +160,39 @@ export function AppNav() {
               </Link>
             )
           })}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium transition-colors',
+                secondaryActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+              )}
+            >
+              <MoreHorizontal className="size-4" />
+              Mai mult
+              <ChevronDown className="size-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              {secondaryItems.map((item) => {
+                const active = item.match(pathname, stage)
+                return (
+                  <DropdownMenuItem
+                    key={item.href}
+                    onClick={() => router.push(item.href)}
+                    className={cn(
+                      'gap-2 py-2',
+                      active && 'bg-accent font-semibold text-accent-foreground',
+                    )}
+                  >
+                    <item.icon className="size-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
 
         <div className="flex items-center gap-1">
