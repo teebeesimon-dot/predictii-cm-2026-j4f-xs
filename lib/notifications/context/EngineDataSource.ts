@@ -137,6 +137,9 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
   }
 
   // 2) Gate ieftin: citim userii/pronosticurile doar dacă e activă o fereastră.
+  // Optimizarea ferestrelor rămâne intactă — reducătoarele de citiri Firestore.
+  // Plugin-ul de achievements se bazează pe `_predictions`; dacă nu e activă
+  // nicio fereastră, `_predictions` va fi [] și pluginul returnează 0 drafts.
   const { needUsers, needPredictions, predictionEditionIds } = windowNeeds(
     now,
     editions,
@@ -144,6 +147,7 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
 
   let users: AppUser[] = []
   const predictionSet = new Set<string>()
+  const predictionsArr: Prediction[] = []
 
   if (needUsers || needPredictions) {
     const predictionQueries = needPredictions
@@ -165,8 +169,9 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
     }
     for (const snap of predictionSnaps) {
       for (const d of snap.docs) {
-        const p = d.data() as Omit<Prediction, 'id'>
+        const p = { id: d.id, ...(d.data() as Omit<Prediction, 'id'>) }
         predictionSet.add(`${p.userId}_${p.matchId}`)
+        predictionsArr.push(p)
       }
     }
   }
@@ -175,6 +180,7 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
     now,
     users,
     editions,
+    _predictions: predictionsArr,
     hasPrediction: (userId, matchId) =>
       predictionSet.has(`${userId}_${matchId}`),
     matchesForStage: (editionId, stage) =>

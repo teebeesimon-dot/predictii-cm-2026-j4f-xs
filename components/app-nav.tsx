@@ -19,6 +19,8 @@ import {
   Bell,
   MoreHorizontal,
   ChevronDown,
+  Award,
+  BarChart2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -92,6 +94,18 @@ export function AppNav() {
   const unread = unreadCount(notifications, appUser?.preferences)
 
   const secondaryItems: NavItem[] = [
+    {
+      href: '/trophy',
+      label: 'Vitrina trofeelor',
+      icon: Award,
+      match: (p: string) => p === '/trophy',
+    },
+    {
+      href: '/leaderboards',
+      label: 'Clasamente extinse',
+      icon: BarChart2,
+      match: (p: string) => p === '/leaderboards',
+    },
     {
       href: '/account',
       label: 'Contul meu',

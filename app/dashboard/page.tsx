@@ -36,6 +36,7 @@ import { buildScheduler, type Scheduler } from '@/lib/schedule'
 import { computeStandings } from '@/lib/data'
 import { cn, formatKickoff } from '@/lib/utils'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2, PencilLine } from 'lucide-react'
+import { AchievementsSummaryCard } from '@/components/achievements-summary-card'
 
 export default function DashboardPage() {
   return (
@@ -501,6 +502,9 @@ function DashboardContent() {
           icon={ListChecks}
         />
       </div>
+
+      {/* Achievements summary card */}
+      {!isLoading && <AchievementsSummaryCard />}
 
       {/* Nav cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,5 +1,5 @@
 import type { CompetitionId } from '@/lib/editions'
-import type { Match, AppUser } from '@/lib/types'
+import type { Match, AppUser, Prediction } from '@/lib/types'
 import type { StageDef } from '@/lib/stages'
 import type { Scheduler } from '@/lib/schedule'
 
@@ -36,4 +36,8 @@ export interface EngineData {
   hasPrediction(userId: string, matchId: string): boolean
   // Meciurile unei etape dintr-o ediție.
   matchesForStage(editionId: string, stage: number): Match[]
+  // Lista completă de pronosticuri (opțional; încărcată doar când e nevoie de
+  // calculul achievement-urilor). Regulile care au nevoie de ea citesc câmpul
+  // `_predictions`; dacă e gol, sar calculul și nu produc notificări.
+  _predictions?: Prediction[]
 }

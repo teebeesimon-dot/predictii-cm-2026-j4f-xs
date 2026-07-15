@@ -7,6 +7,7 @@ import plugin3 from '@/lib/notifications/rules/deadline-3h-rule'
 import plugin4 from '@/lib/notifications/rules/example-rule'
 import plugin5 from '@/lib/notifications/rules/stage-closed-rule'
 import plugin6 from '@/lib/notifications/rules/stage-opened-rule'
+import plugin7 from '@/lib/notifications/rules/achievement-unlocked-rule'
 
 export const notificationPlugins = [
   plugin0,
@@ -16,4 +17,5 @@ export const notificationPlugins = [
   plugin4,
   plugin5,
   plugin6,
+  plugin7,
 ] as const
