@@ -15,7 +15,13 @@ import {
   limit,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
+import type {
+  AppUser,
+  Match,
+  Prediction,
+  StageId,
+  NotificationCategory,
+} from '@/lib/types'
 import {
   scorePrediction,
   PARTICIPANTS,
@@ -636,4 +642,159 @@ export function computePositionHistory(
   }
 
   return { points, players }
+}
+
+// =============================================================================
+// Preferințe utilizator (Faza 3). Se scriu pe documentul `users`, deci nu e
+// nevoie de o colecție nouă. Toate folosesc updateDoc cu căi „punctate", ca să
+// atingă doar câmpul vizat, fără să rescrie tot documentul.
+// =============================================================================
+
+export async function setResumeCardEnabled(
+  userId: string,
+  enabled: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.showResumeCard': enabled,
+  })
+}
+
+export async function setFavouriteTeam(
+  userId: string,
+  team: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.favouriteTeam': team.trim(),
+  })
+}
+
+export async function setDisplayNamePref(
+  userId: string,
+  name: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.displayName': name.trim(),
+  })
+}
+
+export async function setNotificationPreference(
+  userId: string,
+  channel: 'push' | 'inApp',
+  category: NotificationCategory,
+  enabled: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    [`preferences.notifications.${channel}.${category}`]: enabled,
+  })
+}
+
+// Reține ultima poziție de clasament văzută (pentru „schimbare rang" pe
+// rezumat). Scriere ieftină, apelată cel mult o dată la deschidere.
+export async function updateLastSeenRank(
+  userId: string,
+  rank: number,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.lastSeenRank': rank,
+    'preferences.lastSeenRankAt': Date.now(),
+  })
+}
+
+// =============================================================================
+// Centrul de notificări (Faza 3). Citește istoricul din `notification_history`
+// (scris de engine) pentru un utilizator și gestionează starea citit/șters în
+// preferințele lui. Reutilizează colecția existentă — fără colecție nouă.
+// =============================================================================
+
+export interface StoredNotification {
+  key: string
+  type: string
+  title: string
+  body: string
+  recipientType: 'all' | 'user' | 'users'
+  metadata: Record<string, unknown>
+  sentAt: number
+}
+
+function mapNotificationDoc(
+  id: string,
+  data: Record<string, unknown>,
+): StoredNotification {
+  return {
+    key: (data.notificationKey as string) ?? id,
+    type: (data.type as string) ?? 'general',
+    title: (data.title as string) ?? '',
+    body: (data.body as string) ?? '',
+    recipientType:
+      (data.recipientType as StoredNotification['recipientType']) ?? 'all',
+    metadata: (data.metadata as Record<string, unknown>) ?? {},
+    sentAt: typeof data.sentAt === 'number' ? (data.sentAt as number) : 0,
+  }
+}
+
+// Notificările destinate unui utilizator: cele trimise „tuturor" + cele care îl
+// au explicit în recipientIds. Două interogări cu un singur `where` fiecare
+// (fără index compus), îmbinate și sortate în client — exact ca celelalte
+// interogări optimizate din aplicație.
+export async function getUserNotifications(
+  userId: string,
+  max = 100,
+): Promise<StoredNotification[]> {
+  if (!userId) return []
+  try {
+    const [allSnap, mineSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, 'notification_history'),
+          where('recipientType', '==', 'all'),
+        ),
+      ),
+      getDocs(
+        query(
+          collection(db, 'notification_history'),
+          where('recipientIds', 'array-contains', userId),
+        ),
+      ),
+    ])
+    const byKey = new Map<string, StoredNotification>()
+    for (const d of [...allSnap.docs, ...mineSnap.docs]) {
+      const n = mapNotificationDoc(d.id, d.data() as Record<string, unknown>)
+      byKey.set(n.key, n)
+    }
+    return Array.from(byKey.values())
+      .sort((a, b) => b.sentAt - a.sentAt)
+      .slice(0, max)
+  } catch {
+    // Colecția poate lipsi sau regulile pot bloca citirea în anumite medii;
+    // întoarcem gol în loc să aruncăm (Centrul afișează starea „gol").
+    return []
+  }
+}
+
+export async function markNotificationRead(
+  userId: string,
+  key: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.notifications.readKeys': arrayUnion(key),
+  })
+}
+
+export async function markAllNotificationsRead(
+  userId: string,
+  before: number = Date.now(),
+): Promise<void> {
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.notifications.readAllBefore': before,
+  })
+}
+
+export async function clearReadNotifications(
+  userId: string,
+  keys: string[],
+): Promise<void> {
+  if (keys.length === 0) return
+  await updateDoc(doc(db, 'users', userId), {
+    'preferences.notifications.clearedKeys': arrayUnion(...keys),
+  })
 }

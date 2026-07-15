@@ -87,6 +87,94 @@ export interface AppUser {
   fcmTokens?: string[]
   // Ultima actualizare a listei de token-uri FCM (epoch ms).
   fcmUpdatedAt?: number
+  // Preferințe personale (Faza 3 – experiență & implicare). Stocate pe același
+  // document `users`, deci NU necesită o colecție nouă și „călătoresc" cu
+  // datele deja încărcate prin useUsers() (zero citiri suplimentare).
+  preferences?: UserPreferences
+}
+
+// Categoriile de notificări pe care utilizatorul le poate configura
+// independent (push și in-app separat). String-uri stabile, folosite drept
+// chei atât pe client (Centrul de notificări), cât și pe server (engine).
+export type NotificationCategory =
+  | 'deadline' // reamintiri termen limită pronosticuri
+  | 'matchStarted' // meci început
+  | 'matchFinished' // meci încheiat
+  | 'standings' // schimbări de clasament
+  | 'announcements' // anunțuri competiție (etapă nouă etc.)
+  | 'resume' // mesaje de tip „rezumat" pe Acasă
+  | 'general' // notificări generale / diverse
+
+export const NOTIFICATION_CATEGORIES: {
+  id: NotificationCategory
+  label: string
+  description: string
+}[] = [
+  {
+    id: 'deadline',
+    label: 'Reamintiri termen limită',
+    description: 'Când se apropie închiderea pronosticurilor unei etape.',
+  },
+  {
+    id: 'matchStarted',
+    label: 'Meci început',
+    description: 'Când începe un meci pentru care ai pronostic.',
+  },
+  {
+    id: 'matchFinished',
+    label: 'Meci încheiat',
+    description: 'Când se încheie un meci și se actualizează scorul.',
+  },
+  {
+    id: 'standings',
+    label: 'Schimbări de clasament',
+    description: 'Când poziția ta în clasament se modifică.',
+  },
+  {
+    id: 'announcements',
+    label: 'Anunțuri competiție',
+    description: 'Etapă nouă deschisă și alte anunțuri importante.',
+  },
+  {
+    id: 'resume',
+    label: 'Rezumate Acasă',
+    description: 'Cardul de rezumat afișat la deschiderea aplicației.',
+  },
+  {
+    id: 'general',
+    label: 'Notificări generale',
+    description: 'Mesaje generale trimise de administratori.',
+  },
+]
+
+// Preferințele per-canal: fiecare categorie poate fi pornită/oprită. Absența
+// unei valori înseamnă „activat" (opt-out, nu opt-in) — comportamentul implicit
+// rămâne identic cu cel dinainte de introducerea preferințelor.
+export interface NotificationChannelPreferences {
+  push?: Partial<Record<NotificationCategory, boolean>>
+  inApp?: Partial<Record<NotificationCategory, boolean>>
+  // Chei de notificări marcate individual ca citite (Centrul de notificări).
+  readKeys?: string[]
+  // Tot ce a fost trimis înainte de acest moment e considerat citit
+  // („marchează toate ca citite").
+  readAllBefore?: number
+  // Chei ascunse din listă („șterge notificările citite").
+  clearedKeys?: string[]
+}
+
+export interface UserPreferences {
+  // Cardul de rezumat de pe Acasă este vizibil? Implicit true.
+  showResumeCard?: boolean
+  // Echipa favorită (opțional), afișată pe profil.
+  favouriteTeam?: string
+  // Nume afișat opțional, distinct de `name` (ex. poreclă). Gol → se folosește
+  // `name`.
+  displayName?: string
+  // Ultima poziție de clasament văzută (pentru „schimbare rang" pe rezumat).
+  lastSeenRank?: number
+  lastSeenRankAt?: number
+  // Preferințe de notificări (push/in-app) + stare de citire.
+  notifications?: NotificationChannelPreferences
 }
 
 // Ediția implicită / existentă, accesibilă tuturor fără bifare specială.

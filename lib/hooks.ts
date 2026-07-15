@@ -7,8 +7,10 @@ import {
   getAllPredictions,
   getUserPredictions,
   getAvailableEditionIds,
+  getUserNotifications,
 } from '@/lib/data'
 import { useEdition } from '@/components/edition-provider'
+import type { AppUser } from '@/lib/types'
 
 // Datele Firestore sunt reîmprospătate explicit după scrieri și după AutoSync.
 // Nu revalidăm la fiecare focus/reconnect: pe mobil asta genera în rafală trei
@@ -69,6 +71,31 @@ export function useUserPredictions(userId: string | undefined) {
   return useSWR(
     userId ? ['user-predictions', userId, editionId] : null,
     () => getUserPredictions(userId as string, editionId),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshWhenHidden: false,
+      dedupingInterval: DATA_DEDUPE_MS,
+    },
+  )
+}
+
+// Documentul COMPLET al utilizatorului curent (inclusiv `preferences`), extras
+// din lista deja încărcată de useUsers(). Nu face nicio citire suplimentară —
+// refolosește cache-ul SWR existent al colecției `users`.
+export function useCurrentAppUser(userId: string | undefined): AppUser | undefined {
+  const { data: users } = useUsers()
+  if (!userId) return undefined
+  return users?.find((u) => u.id === userId)
+}
+
+// Notificările utilizatorului curent pentru Centrul de notificări. O singură
+// interogare pe sesiune (dedupe lung, fără revalidare la focus), deci nu adaugă
+// citiri repetate pe fiecare pagină.
+export function useUserNotifications(userId: string | undefined) {
+  return useSWR(
+    userId ? ['user-notifications', userId] : null,
+    () => getUserNotifications(userId as string),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
