@@ -34,7 +34,7 @@ import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
   isLocked,
-  isUserAdmin,
+  isDedicatedAdmin,
   isViewOnly,
   getActiveStage,
   KNOCKOUT_ROUNDS,
@@ -335,7 +335,7 @@ function CompletionOverview({
   }
 
   const participants = (users ?? []).filter(
-    (u) => !isUserAdmin(u) && !isViewOnly(u),
+    (u) => !isDedicatedAdmin(u) && !isViewOnly(u),
   )
   const allMatches = matches ?? []
   const allPreds = predictions ?? []
@@ -525,7 +525,7 @@ function PredictionEditor({
   const participants = useMemo(
     () =>
       (users ?? [])
-        .filter((u) => !isUserAdmin(u) && !isViewOnly(u))
+        .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
         .sort((a, b) => a.name.localeCompare(b.name, 'ro')),
     [users],
   )

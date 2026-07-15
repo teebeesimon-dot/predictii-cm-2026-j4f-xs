@@ -115,6 +115,18 @@ export function isViewOnly(u: Pick<AppUser, 'viewOnly'>): boolean {
   return u.viewOnly === true
 }
 
+// Contul de administrare DEDICAT (nu joacă): username „admin” / nume
+// „Administrator”. Acesta e singurul cont exclus din listele de participanți.
+// ATENȚIE: un admin care e și jucător (ex. Simon) NU intră aici — el trebuie să
+// apară în pronosticuri, clasamente și uneltele de admin, ca orice participant.
+export function isDedicatedAdmin(
+  u: Pick<AppUser, 'username' | 'name'>,
+): boolean {
+  return (
+    u.username === 'admin' || (u.name ?? '').toLowerCase() === 'administrator'
+  )
+}
+
 export interface Match {
   id: string
   // Ediția (competiție + an) căreia îi aparține meciul. Documentele mai vechi
