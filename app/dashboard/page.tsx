@@ -6,10 +6,21 @@ import Image from 'next/image'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useEdition } from '@/components/edition-provider'
-import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
+import {
+  useMatches,
+  useAllPredictions,
+  useUsers,
+  useCurrentAppUser,
+  useUserNotifications,
+} from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { TeamName } from '@/components/team-name'
 import { StandingsTable } from '@/components/standings-table'
+import { HomeResume } from '@/components/home-resume'
+import { SmartActions, SmartActionIcons, type SmartAction } from '@/components/smart-actions'
+import { isResumeCardEnabled, displayNameOf } from '@/lib/preferences'
+import { computeLatestMatchPoints, computeRankDelta } from '@/lib/resume'
+import { unreadCount as countUnread } from '@/lib/notifications-read'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +99,19 @@ function DashboardContent() {
   const myRow = standings.find((r) => r.userId === user?.id)
   const myRank = myRow?.rank ?? -1
 
+  // Documentul complet al userului (cu preferințe), din lista deja încărcată —
+  // fără citire suplimentară. Notificările se încarcă o singură dată pe sesiune
+  // (SWR le partajează cu clopoțelul și Centrul de notificări).
+  const appUser = useCurrentAppUser(user?.id)
+  const { data: notifications } = useUserNotifications(user?.id)
+  const showResume = isResumeCardEnabled(appUser?.preferences)
+  const latest = useMemo(
+    () => computeLatestMatchPoints(matches ?? [], predictions ?? [], user?.id),
+    [matches, predictions, user?.id],
+  )
+  const rankDelta = computeRankDelta(myRank, appUser?.preferences?.lastSeenRank)
+  const unread = countUnread(notifications, appUser?.preferences)
+
   const totalMatches = matches?.length ?? 0
   const playedMatches = (matches ?? []).filter(
     (m) => m.homeScore !== null && m.awayScore !== null,
@@ -127,6 +151,41 @@ function DashboardContent() {
       .filter((m) => +new Date(m.kickoff) > now)
       .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))[0] ?? null
 
+  // Acțiuni contextuale: afișăm doar ce e relevant pentru utilizatorul curent.
+  const smartActions: SmartAction[] = []
+  if (remaining > 0) {
+    smartActions.push({
+      href: '/predictions',
+      label: `Completează pronosticuri (${remaining})`,
+      icon: SmartActionIcons.predictions,
+      tone: 'accent',
+    })
+  }
+  if (playedMatches > 0) {
+    smartActions.push({
+      href: '/standings',
+      label: 'Vezi clasamentul',
+      icon: SmartActionIcons.standings,
+      tone: 'primary',
+    })
+    smartActions.push({
+      href: '/colleagues',
+      label: 'Rezultate recente',
+      icon: SmartActionIcons.results,
+    })
+  }
+  smartActions.push({
+    href: '/statistics',
+    label: 'Statisticile mele',
+    icon: SmartActionIcons.stage,
+  })
+  smartActions.push({
+    href: '/notifications',
+    label: 'Notificări',
+    icon: SmartActionIcons.notifications,
+    badge: unread > 0 ? String(unread) : undefined,
+  })
+
   return (
     <div className="flex flex-col gap-6">
       {/* Hero welcome banner — deasupra a tot */}
@@ -158,6 +217,25 @@ function DashboardContent() {
           />
         </div>
       </div>
+
+      {/* Rezumat (Faza 3) — afișat dacă utilizatorul nu l-a dezactivat */}
+      {!isLoading && user && showResume && (
+        <HomeResume
+          userId={user.id}
+          displayName={appUser ? displayNameOf(appUser) : user.name ?? user.username}
+          editionLabel={edition.label}
+          remaining={remaining}
+          myRank={myRank}
+          myPoints={myRow?.points ?? 0}
+          rankDelta={rankDelta}
+          latestPoints={latest.points}
+          latestMatch={latest.match}
+          nextMatch={nextMatch}
+        />
+      )}
+
+      {/* Acțiuni contextuale */}
+      {!isLoading && <SmartActions actions={smartActions} />}
 
       {/* Meci în desfășurare — afișat primul, split: pronosticuri + clasament live */}
       {!isLoading && liveMatches.length > 0 && users && predictions && (

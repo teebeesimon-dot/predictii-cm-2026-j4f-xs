@@ -31,6 +31,8 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/components/auth-provider'
 import { EditionSelector } from '@/components/edition-selector'
+import { useCurrentAppUser, useUserNotifications } from '@/lib/hooks'
+import { unreadCount } from '@/lib/notifications-read'
 
 type NavItem = {
   href: string
@@ -85,6 +87,9 @@ export function AppNav() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  const appUser = useCurrentAppUser(user?.id)
+  const { data: notifications } = useUserNotifications(user?.id)
+  const unread = unreadCount(notifications, appUser?.preferences)
 
   const secondaryItems: NavItem[] = [
     {
@@ -199,6 +204,20 @@ export function AppNav() {
           <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
             {user?.name ?? user?.username}
           </span>
+          <Link
+            href="/notifications"
+            aria-label={
+              unread > 0 ? `Notificări (${unread} necitite)` : 'Notificări'
+            }
+            className="relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <Bell className="size-5" />
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold leading-4 text-accent-foreground">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </Link>
           <ThemeToggle />
           <Button
             variant="ghost"

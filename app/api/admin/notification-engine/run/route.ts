@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authorizeAdminRequest } from '@/lib/admin-auth'
 import { notificationEngine } from '@/lib/notifications/engine/NotificationEngine'
+import { recordRun } from '@/lib/notifications/history/EngineRunLog'
 
 /**
  * Endpoint de debug pentru Notification Engine.
@@ -43,6 +44,8 @@ export async function POST(req: NextRequest) {
       `[v0] notif-engine: rulare (${mode}) cerută de ${auth.actorName}`,
     )
     const result = await notificationEngine.run(mode)
+    // Jurnalizăm doar rulările reale (live) pentru panoul de administrare.
+    if (mode === 'live') await recordRun(result)
     return NextResponse.json(result)
   } catch (e) {
     console.log('[v0] notif-engine: eroare la rulare:', (e as Error).message)

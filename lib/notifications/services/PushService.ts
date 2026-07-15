@@ -8,6 +8,8 @@ import {
   type PushResult,
 } from '@/lib/push/sendPushNotification'
 import type { AppUser } from '@/lib/types'
+import { categoryForNotification } from '@/lib/notifications/categories'
+import { isNotificationEnabled } from '@/lib/preferences'
 
 /**
  * Adaptor între o `NotificationTask` și serviciul Push EXISTENT.
@@ -30,24 +32,47 @@ export class PushService {
       data: normalizeMetadata(task.metadata),
     }
 
+    // Categoria notificării (dedusă din tip/metadata) → respectăm preferințele
+    // push per-utilizator. Filtrarea se face aici, în adaptor, folosind userii
+    // deja încărcați de engine, deci NU adaugă citiri Firestore. Absența unei
+    // preferințe înseamnă „activat" (opt-out), deci comportamentul implicit
+    // rămâne neschimbat față de înainte.
+    const category = categoryForNotification(
+      task.type,
+      typeof task.metadata.kind === 'string' ? task.metadata.kind : undefined,
+    )
+    const pushAllowed = (user: AppUser | undefined): boolean =>
+      user ? isNotificationEnabled(user.preferences, 'push', category) : true
+
     const knownById = knownUsers
       ? new Map(knownUsers.map((user) => [user.id, user]))
       : null
 
     switch (task.recipientType) {
-      case 'all':
-        return knownUsers ? sendToKnownUsers(knownUsers, payload) : sendToAll(payload)
+      case 'all': {
+        if (knownUsers) {
+          return sendToKnownUsers(knownUsers.filter(pushAllowed), payload)
+        }
+        // Fără useri cunoscuți (ex. broadcast manual): trimitem tuturor.
+        // Filtrarea per-preferință necesită userii, care nu sunt disponibili
+        // aici fără o citire suplimentară; păstrăm comportamentul existent.
+        return sendToAll(payload)
+      }
       case 'user': {
         const known = knownById?.get(task.recipientIds[0])
-        return known
-          ? sendToKnownUsers([known], payload)
-          : sendToUser(task.recipientIds[0], payload)
+        if (known) {
+          return pushAllowed(known)
+            ? sendToKnownUsers([known], payload)
+            : { sent: 0, failed: 0, invalidTokensRemoved: 0 }
+        }
+        return sendToUser(task.recipientIds[0], payload)
       }
       case 'users': {
         if (knownById) {
           const recipients = task.recipientIds
             .map((id) => knownById.get(id))
             .filter((user): user is AppUser => Boolean(user))
+            .filter(pushAllowed)
           return sendToKnownUsers(recipients, payload)
         }
         const results = await Promise.all(

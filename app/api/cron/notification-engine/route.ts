@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { notificationEngine } from '@/lib/notifications/engine/NotificationEngine'
+import { recordRun } from '@/lib/notifications/history/EngineRunLog'
 
 /**
  * Cron: rulează Notification Engine în mod LIVE (trimite + salvează în istoric).
@@ -44,6 +45,7 @@ async function handle(req: NextRequest) {
 
   try {
     const result = await notificationEngine.run('live')
+    await recordRun(result)
     console.log(
       `[v0] cron notif-engine: ${result.dispatched} trimise, ` +
         `${result.alreadySentSkipped} deja trimise, ${result.pushSent} push.`,
