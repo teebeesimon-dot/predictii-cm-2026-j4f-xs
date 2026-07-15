@@ -1,5 +1,4 @@
-import type { NotificationTask } from '@/lib/notifications/types'
-import { createTemplatedNotificationTask } from '@/lib/notifications/templates'
+import type { NotificationDraft } from '@/lib/notifications/plugins/define-plugin'
 import type {
   EngineData,
   EditionSnapshot,
@@ -82,13 +81,13 @@ export const DEADLINE_OFFSETS = {
  * (nu depinde de cine anume lipsește), deci nu se retrimite la rulările
  * următoare chiar dacă între timp unii completează.
  */
-export function buildDeadlineTasks(
+export function buildDeadlineDrafts(
   data: EngineData,
   offsetKey: keyof typeof DEADLINE_OFFSETS,
-): NotificationTask[] {
+): NotificationDraft[] {
   const { label, ms: offsetMs, grace } = DEADLINE_OFFSETS[offsetKey]
   const now = data.now
-  const tasks: NotificationTask[] = []
+  const drafts: NotificationDraft[] = []
 
   for (const edition of data.editions) {
     for (const stage of edition.stages) {
@@ -102,34 +101,31 @@ export function buildDeadlineTasks(
       const missing = usersMissingPredictions(data, edition.editionId, stage.id)
       if (missing.length === 0) continue
 
-      tasks.push(
-        createTemplatedNotificationTask({
-          templateId: `deadline-${label}`,
-          values: {
-            editionLabel: edition.label,
-            stageName: stage.name,
-          },
-          id: `deadline-${label}-${edition.editionId}-${stage.id}-${deadline}`,
-          // Cheie STABILĂ: nu include destinatarii, deci rămâne aceeași între
-          // rulări → istoricul împiedică retrimiterea.
-          notificationKey: `deadline|${edition.editionId}|${stage.id}|${label}|${deadline}`,
-          recipientType: 'users',
-          recipientIds: missing.map((u) => u.id),
-          metadata: {
-            kind: 'deadline',
-            editionId: edition.editionId,
-            competitionId: edition.competitionId,
-            stage: stage.id,
-            offset: label,
-            deadline: new Date(deadline).toISOString(),
-          },
-          createdAt: now,
-        }),
-      )
+      drafts.push({
+        values: {
+          editionLabel: edition.label,
+          stageName: stage.name,
+        },
+        id: `deadline-${label}-${edition.editionId}-${stage.id}-${deadline}`,
+        // Cheie STABILĂ: nu include destinatarii, deci rămâne aceeași între
+        // rulări → istoricul împiedică retrimiterea.
+        notificationKey: `deadline|${edition.editionId}|${stage.id}|${label}|${deadline}`,
+        recipientType: 'users',
+        recipientIds: missing.map((u) => u.id),
+        metadata: {
+          kind: 'deadline',
+          editionId: edition.editionId,
+          competitionId: edition.competitionId,
+          stage: stage.id,
+          offset: label,
+          deadline: new Date(deadline).toISOString(),
+        },
+        createdAt: now,
+      })
     }
   }
 
-  return tasks
+  return drafts
 }
 
 // Reexport pentru comoditate în reguli.
