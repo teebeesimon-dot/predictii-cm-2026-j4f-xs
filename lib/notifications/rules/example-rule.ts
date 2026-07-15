@@ -3,6 +3,7 @@ import type {
   NotificationTask,
   RuleContext,
 } from '@/lib/notifications/types'
+import { createTemplatedNotificationTask } from '@/lib/notifications/templates'
 
 /**
  * REGULĂ-ȘABLON (dezactivată implicit).
@@ -21,18 +22,16 @@ export const exampleRule: NotificationRule = {
   evaluate(context: RuleContext): NotificationTask[] {
     // O regulă reală ar inspecta contextul și ar întoarce sarcini. Aici întoarcem
     // un exemplu doar ca referință de formă.
-    const task: NotificationTask = {
+    const task: NotificationTask = createTemplatedNotificationTask({
+      templateId: 'example',
+      values: {},
       id: `example-${context.now}`,
-      type: 'example',
-      title: 'Notificare exemplu',
-      body: 'Aceasta este o notificare generată de regula-șablon.',
+      notificationKey: `example|${context.now}`,
       recipientType: 'all',
       recipientIds: [],
-      priority: 'low',
-      scheduledFor: null,
       metadata: { source: 'example-template' },
       createdAt: context.now,
-    }
+    })
     return [task]
   },
 }

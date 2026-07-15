@@ -15,6 +15,8 @@ import {
   setDoc,
   getDoc,
   serverTimestamp,
+  query,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { DEFAULT_EDITION_ID, type Match } from '@/lib/types'
@@ -46,10 +48,23 @@ export interface SyncStatus {
   lastError: string | null
 }
 
-// Citește toate meciurile din Firestore.
+// Citește doar meciurile care pot necesita sincronizare:
+// - orice meci fără scor (recuperare chiar dacă cron-ul a lipsit mult timp);
+// - meciurile recente/viitoare (live, finalizări și corecții API întârziate).
+// Meciurile istorice cu rezultat complet nu mai sunt facturate la fiecare cron.
 async function getFirestoreMatches(): Promise<Match[]> {
-  const snap = await getDocs(collection(db, 'matches'))
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Match, 'id'>) }))
+  const recentCutoff = new Date(Date.now() - 72 * 3600_000).toISOString()
+  const [unscoredSnap, recentSnap] = await Promise.all([
+    getDocs(query(collection(db, 'matches'), where('homeScore', '==', null))),
+    getDocs(
+      query(collection(db, 'matches'), where('kickoff', '>=', recentCutoff)),
+    ),
+  ])
+  const byId = new Map<string, Match>()
+  for (const d of [...unscoredSnap.docs, ...recentSnap.docs]) {
+    byId.set(d.id, { id: d.id, ...(d.data() as Omit<Match, 'id'>) })
+  }
+  return Array.from(byId.values())
 }
 
 // Salvează starea ultimei sincronizări (pentru afișare în admin).

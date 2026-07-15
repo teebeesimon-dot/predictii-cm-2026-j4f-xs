@@ -90,11 +90,30 @@ export async function POST(req: NextRequest) {
     }
     userDoc = snap
   } else {
-    const usersSnap = await db.collection('users').get()
-    const userMatches = usersSnap.docs.filter((d) => {
-      const x = d.data()
-      return norm(x.name).includes(userQuery) || norm(x.username).includes(userQuery)
-    })
+    // Cazul comun (nume/username complet) folosește query-uri selective. Doar
+    // căutările parțiale/insensibile la diacritice cad pe scanarea legacy.
+    const rawUserQuery = String(body.userQuery ?? '').trim()
+    const [byName, byUsername] = await Promise.all([
+      db.collection('users').where('name', '==', rawUserQuery).limit(2).get(),
+      db
+        .collection('users')
+        .where('username', '==', rawUserQuery.toLowerCase())
+        .limit(2)
+        .get(),
+    ])
+    const exact = new Map(
+      [...byName.docs, ...byUsername.docs].map((d) => [d.id, d]),
+    )
+    const userMatches =
+      exact.size > 0
+        ? Array.from(exact.values())
+        : (await db.collection('users').get()).docs.filter((d) => {
+            const x = d.data()
+            return (
+              norm(x.name).includes(userQuery) ||
+              norm(x.username).includes(userQuery)
+            )
+          })
     if (userMatches.length === 0) {
       return NextResponse.json({ error: `Niciun utilizator pentru „${body.userQuery}”.` }, { status: 404 })
     }
@@ -121,16 +140,35 @@ export async function POST(req: NextRequest) {
     }
     matchDoc = snap
   } else {
-    const matchesSnap = await db.collection('matches').get()
-    const matchMatches = matchesSnap.docs.filter((d) => {
+    const rawHome = String(body.homeTeam ?? '').trim()
+    const rawAway = String(body.awayTeam ?? '').trim()
+    // Query după gazdă restrânge drastic candidații fără index compus; filtrăm
+    // oaspetele local. Verificăm și ordinea inversă, apoi păstrăm fallback-ul
+    // global numai pentru căutări parțiale/diacritice diferite.
+    const [homeFirst, awayFirst] = await Promise.all([
+      db.collection('matches').where('homeTeam', '==', rawHome).get(),
+      db.collection('matches').where('homeTeam', '==', rawAway).get(),
+    ])
+    const exactCandidates = [...homeFirst.docs, ...awayFirst.docs]
+    const exactMatches = exactCandidates.filter((d) => {
       const x = d.data()
-      const h = norm(x.homeTeam)
-      const a = norm(x.awayTeam)
       return (
-        (h.includes(homeQuery) && a.includes(awayQuery)) ||
-        (h.includes(awayQuery) && a.includes(homeQuery))
+        (x.homeTeam === rawHome && x.awayTeam === rawAway) ||
+        (x.homeTeam === rawAway && x.awayTeam === rawHome)
       )
     })
+    const matchMatches =
+      exactMatches.length > 0
+        ? exactMatches
+        : (await db.collection('matches').get()).docs.filter((d) => {
+            const x = d.data()
+            const h = norm(x.homeTeam)
+            const a = norm(x.awayTeam)
+            return (
+              (h.includes(homeQuery) && a.includes(awayQuery)) ||
+              (h.includes(awayQuery) && a.includes(homeQuery))
+            )
+          })
     if (matchMatches.length === 0) {
       return NextResponse.json(
         { error: `Niciun meci pentru „${body.homeTeam} - ${body.awayTeam}”.` },

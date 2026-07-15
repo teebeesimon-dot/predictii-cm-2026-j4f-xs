@@ -59,7 +59,20 @@ export async function triggerSync(options?: {
   }
 
   const result = await runResultsSync({ includeLive })
-  const newStatus = await getSyncStatus()
+  // runResultsSync tocmai a scris meta/sync; nu recitim același document.
+  const newStatus: SyncStatus = result.ok
+    ? {
+        lastRunAt: result.ranAt,
+        lastUpdatedCount: result.updated,
+        lastCheckedCount: result.checked,
+        lastMessage: result.message,
+        lastError: null,
+      }
+    : {
+        ...status,
+        lastRunAt: result.ranAt,
+        lastError: result.message,
+      }
   return { ran: true, result, status: newStatus }
 }
 

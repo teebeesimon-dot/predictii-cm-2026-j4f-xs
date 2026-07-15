@@ -12,6 +12,7 @@ import {
   where,
   arrayUnion,
   arrayRemove,
+  limit,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import type { AppUser, Match, Prediction, StageId } from '@/lib/types'
@@ -23,6 +24,7 @@ import {
   hasEditionAccess,
 } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
+import { EDITIONS } from '@/lib/editions'
 
 // Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
 // a detecta conturile mai vechi care nu și-au schimbat încă parola.
@@ -64,13 +66,23 @@ export async function getUsers(): Promise<AppUser[]> {
 // Id-urile edițiilor care au cel puțin un meci încărcat. Edițiile fără meciuri
 // sunt ascunse jucătorilor (selectorul le afișează doar adminilor).
 export async function getAvailableEditionIds(): Promise<string[]> {
-  const snap = await getDocs(collection(db, 'matches'))
-  const set = new Set<string>()
-  snap.docs.forEach((d) => {
-    const data = d.data() as Omit<Match, 'id'>
-    set.add(editionOf(data))
-  })
-  return Array.from(set)
+  // Ediția implicită include documentele legacy fără editionId și este mereu
+  // disponibilă. Pentru celelalte ediții citim cel mult un document, în loc să
+  // scanăm întregul program la fiecare încărcare a selectorului.
+  const candidates = EDITIONS.filter((e) => e.id !== DEFAULT_EDITION_ID)
+  const checks = await Promise.all(
+    candidates.map(async (edition) => {
+      const snap = await getDocs(
+        query(
+          collection(db, 'matches'),
+          where('editionId', '==', edition.id),
+          limit(1),
+        ),
+      )
+      return snap.empty ? null : edition.id
+    }),
+  )
+  return [DEFAULT_EDITION_ID, ...checks.filter((id): id is string => Boolean(id))]
 }
 
 export async function getAllPredictions(

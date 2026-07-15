@@ -11,6 +11,7 @@ export type NotificationTemplateId =
   | 'deadline-15m'
   | 'stage-opened'
   | 'stage-closed'
+  | 'example'
 
 export interface NotificationTemplate {
   title: string
@@ -58,6 +59,12 @@ export const NOTIFICATION_TEMPLATES: Record<
     body: 'Pronosticurile pentru {{stageName}} s-au închis. Poți vedea acum ce au pariat colegii. Mult succes!',
     placeholders: ['editionLabel', 'stageName'],
     priority: 'normal',
+  },
+  example: {
+    title: 'Notificare exemplu',
+    body: 'Aceasta este o notificare generată de regula-șablon.',
+    placeholders: [],
+    priority: 'low',
   },
 }
 
