@@ -16,6 +16,7 @@ export interface NotificationHistory {
   has(key: string): Promise<boolean>
   // Marchează o notificare drept trimisă (persistă în istoric).
   record(task: NotificationTask): Promise<void>
+  recordMany(tasks: NotificationTask[]): Promise<void>
   // Din lista dată, întoarce DOAR notificările care nu au fost încă trimise.
   filterNew(tasks: NotificationTask[]): Promise<NotificationTask[]>
 }
@@ -59,15 +60,41 @@ export class FirestoreNotificationHistory implements NotificationHistory {
       )
   }
 
+  async recordMany(tasks: NotificationTask[]): Promise<void> {
+    if (tasks.length === 0) return
+    const db = adminDb()
+    const batch = db.batch()
+    const sentAt = Date.now()
+    for (const task of tasks) {
+      const key = keyOf(task)
+      batch.set(
+        db.collection(COLLECTION).doc(key),
+        {
+          notificationKey: key,
+          type: task.type,
+          title: task.title,
+          body: task.body,
+          recipientType: task.recipientType,
+          recipientIds: task.recipientIds,
+          metadata: task.metadata ?? {},
+          sentAt,
+        },
+        { merge: true },
+      )
+    }
+    await batch.commit()
+  }
+
   async filterNew(tasks: NotificationTask[]): Promise<NotificationTask[]> {
-    // Verificăm în paralel existența fiecărei chei în istoric.
-    const checks = await Promise.all(
-      tasks.map(async (task) => ({
-        task,
-        exists: await this.has(keyOf(task)),
-      })),
+    if (tasks.length === 0) return []
+    // getAll păstrează aceleași citiri facturate, dar le face într-un singur RPC
+    // în loc de câte un request HTTP per notificare.
+    const db = adminDb()
+    const refs = tasks.map((task) =>
+      db.collection(COLLECTION).doc(keyOf(task)),
     )
-    return checks.filter((c) => !c.exists).map((c) => c.task)
+    const snaps = await db.getAll(...refs)
+    return tasks.filter((_, index) => !snaps[index].exists)
   }
 }
 

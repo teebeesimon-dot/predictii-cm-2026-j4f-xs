@@ -132,6 +132,25 @@ export async function sendToUser(
   return sendToTokens(tokens, payload, owners)
 }
 
+// Trimite către useri deja încărcați de apelant (ex. NotificationEngine).
+// Evită câte un get(users/{id}) pentru fiecare destinatar și păstrează maparea
+// token → owner, astfel încât token-urile invalide se curăță în continuare.
+export async function sendToKnownUsers(
+  users: Array<{ id: string; fcmTokens?: string[] }>,
+  payload: PushPayload,
+): Promise<PushResult> {
+  const owners = new Map<string, Set<string>>()
+  const tokens: string[] = []
+  for (const user of users) {
+    for (const token of user.fcmTokens ?? []) {
+      tokens.push(token)
+      if (!owners.has(token)) owners.set(token, new Set())
+      owners.get(token)?.add(user.id)
+    }
+  }
+  return sendToTokens(tokens, payload, owners)
+}
+
 // Trimite către o listă explicită de token-uri (fără proprietar cunoscut).
 export async function sendToMany(
   tokens: string[],

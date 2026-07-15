@@ -4,8 +4,10 @@ import {
   sendToAll,
   sendToUser,
   sendToMany,
+  sendToKnownUsers,
   type PushResult,
 } from '@/lib/push/sendPushNotification'
+import type { AppUser } from '@/lib/types'
 
 /**
  * Adaptor între o `NotificationTask` și serviciul Push EXISTENT.
@@ -18,20 +20,36 @@ import {
  */
 export class PushService {
   // Trimite o singură sarcină folosind serviciul Push existent.
-  async dispatch(task: NotificationTask): Promise<PushResult> {
+  async dispatch(
+    task: NotificationTask,
+    knownUsers?: AppUser[],
+  ): Promise<PushResult> {
     const payload = {
       title: task.title,
       body: task.body,
       data: normalizeMetadata(task.metadata),
     }
 
+    const knownById = knownUsers
+      ? new Map(knownUsers.map((user) => [user.id, user]))
+      : null
+
     switch (task.recipientType) {
       case 'all':
-        return sendToAll(payload)
-      case 'user':
-        return sendToUser(task.recipientIds[0], payload)
+        return knownUsers ? sendToKnownUsers(knownUsers, payload) : sendToAll(payload)
+      case 'user': {
+        const known = knownById?.get(task.recipientIds[0])
+        return known
+          ? sendToKnownUsers([known], payload)
+          : sendToUser(task.recipientIds[0], payload)
+      }
       case 'users': {
-        // Nu avem token-uri aici; delegăm per-utilizator și agregăm rezultatele.
+        if (knownById) {
+          const recipients = task.recipientIds
+            .map((id) => knownById.get(id))
+            .filter((user): user is AppUser => Boolean(user))
+          return sendToKnownUsers(recipients, payload)
+        }
         const results = await Promise.all(
           task.recipientIds.map((id) => sendToUser(id, payload)),
         )

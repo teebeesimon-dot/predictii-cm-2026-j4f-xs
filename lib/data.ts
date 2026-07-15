@@ -34,17 +34,26 @@ function editionOf(doc: { editionId?: string }): string {
   return doc.editionId ?? DEFAULT_EDITION_ID
 }
 
-// Toate meciurile unei ediții. Dacă editionId lipsește, întoarce toate
-// meciurile (folosit doar la sincronizare/migrare internă).
+// Meciurile unei ediții. Pentru edițiile moderne folosim query selectiv pe
+// `editionId`, nu scanarea întregii colecții. Doar WC 2026 păstrează scanarea
+// legacy, fiindcă documentele istorice fără editionId aparțin acestei ediții.
 export async function getMatches(editionId?: string): Promise<Match[]> {
-  const q = query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
-  const snap = await getDocs(q)
-  const all = snap.docs.map((d) => ({
+  const source =
+    editionId && editionId !== DEFAULT_EDITION_ID
+      ? query(collection(db, 'matches'), where('editionId', '==', editionId))
+      : query(collection(db, 'matches'), orderBy('kickoff', 'asc'))
+  const snap = await getDocs(source)
+  const matches = snap.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<Match, 'id'>),
   }))
-  if (!editionId) return all
-  return all.filter((m) => editionOf(m) === editionId)
+  const selected = editionId
+    ? matches.filter((m) => editionOf(m) === editionId)
+    : matches
+  // Query-ul selectiv nu folosește orderBy ca să nu impună un index compus.
+  return selected.sort(
+    (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime(),
+  )
 }
 
 export async function getUsers(): Promise<AppUser[]> {
@@ -67,13 +76,20 @@ export async function getAvailableEditionIds(): Promise<string[]> {
 export async function getAllPredictions(
   editionId?: string,
 ): Promise<Prediction[]> {
-  const snap = await getDocs(collection(db, 'predictions'))
-  const all = snap.docs.map((d) => ({
+  const source =
+    editionId && editionId !== DEFAULT_EDITION_ID
+      ? query(
+          collection(db, 'predictions'),
+          where('editionId', '==', editionId),
+        )
+      : collection(db, 'predictions')
+  const snap = await getDocs(source)
+  const predictions = snap.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<Prediction, 'id'>),
   }))
-  if (!editionId) return all
-  return all.filter((p) => editionOf(p) === editionId)
+  if (!editionId) return predictions
+  return predictions.filter((p) => editionOf(p) === editionId)
 }
 
 export async function getUserPredictions(
@@ -83,10 +99,17 @@ export async function getUserPredictions(
   // Interogăm DOAR pronosticurile acestui user (câteva zeci), în loc să citim
   // întreaga colecție `predictions` și să filtrăm în client. Reduce drastic
   // numărul de citiri Firestore pe pagina Pronosticuri.
-  const q = query(
-    collection(db, 'predictions'),
-    where('userId', '==', userId),
-  )
+  const q =
+    editionId && editionId !== DEFAULT_EDITION_ID
+      ? query(
+          collection(db, 'predictions'),
+          where('userId', '==', userId),
+          where('editionId', '==', editionId),
+        )
+      : query(
+          collection(db, 'predictions'),
+          where('userId', '==', userId),
+        )
   const snap = await getDocs(q)
   const mine = snap.docs.map((d) => ({
     id: d.id,

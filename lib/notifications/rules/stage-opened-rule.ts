@@ -4,6 +4,7 @@ import type {
   RuleContext,
 } from '@/lib/notifications/types'
 import { participants, stageDeadlineMs } from '@/lib/notifications/rules/_shared'
+import { createTemplatedNotificationTask } from '@/lib/notifications/templates'
 
 // Cât timp după deschiderea unei etape mai are voie să se declanșeze
 // notificarea (ca o etapă deschisă demult să nu se anunțe cu întârziere).
@@ -49,24 +50,27 @@ export const stageOpenedRule: NotificationRule = {
         const recipients = participants(data, edition.editionId)
         if (recipients.length === 0) continue
 
-        tasks.push({
-          id: `stage-opened-${edition.editionId}-${stage.id}`,
-          notificationKey: `stage-opened|${edition.editionId}|${stage.id}`,
-          type: 'stage-opened',
-          title: `${edition.label} — ${stage.name}`,
-          body: `S-a deschis ${stage.name} (${stage.label}). Intră și pune-ți pronosticurile!`,
-          recipientType: 'users',
-          recipientIds: recipients.map((u) => u.id),
-          priority: 'normal',
-          scheduledFor: null,
-          metadata: {
-            kind: 'stage-opened',
-            editionId: edition.editionId,
-            competitionId: edition.competitionId,
-            stage: stage.id,
-          },
-          createdAt: now,
-        })
+        tasks.push(
+          createTemplatedNotificationTask({
+            templateId: 'stage-opened',
+            values: {
+              editionLabel: edition.label,
+              stageName: stage.name,
+              stageLabel: stage.label,
+            },
+            id: `stage-opened-${edition.editionId}-${stage.id}`,
+            notificationKey: `stage-opened|${edition.editionId}|${stage.id}`,
+            recipientType: 'users',
+            recipientIds: recipients.map((u) => u.id),
+            metadata: {
+              kind: 'stage-opened',
+              editionId: edition.editionId,
+              competitionId: edition.competitionId,
+              stage: stage.id,
+            },
+            createdAt: now,
+          }),
+        )
       }
     }
 

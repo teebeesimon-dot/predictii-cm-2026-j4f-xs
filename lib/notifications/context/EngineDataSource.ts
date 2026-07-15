@@ -19,6 +19,25 @@ function editionOf(doc: { editionId?: string }): string {
 const OPEN_GRACE_MS = 6 * 3600_000 // stage-opened-rule
 const CLOSE_GRACE_MS = 6 * 3600_000 // stage-closed-rule
 
+// Programul meciurilor se schimbă rar, dar cron-ul rulează la 5 minute.
+// Cache-ul per instanță elimină scanările repetate ale colecției matches fără
+// risc de a rata ferestrele (TTL-ul este mult sub grace-ul minim de 12 minute).
+const MATCH_CACHE_MS = 10 * 60_000
+let matchCache: { loadedAt: number; matches: Match[] } | null = null
+
+async function loadMatches(): Promise<Match[]> {
+  if (matchCache && Date.now() - matchCache.loadedAt < MATCH_CACHE_MS) {
+    return matchCache.matches
+  }
+  const snap = await adminDb().collection('matches').get()
+  const matches = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Match, 'id'>),
+  }))
+  matchCache = { loadedAt: Date.now(), matches }
+  return matches
+}
+
 /**
  * Verifică IEFTIN (doar din meciuri/scheduler, fără a citi userii sau
  * pronosticurile) dacă momentul `now` cade în vreo fereastră în care o regulă
@@ -36,9 +55,14 @@ const CLOSE_GRACE_MS = 6 * 3600_000 // stage-closed-rule
 function windowNeeds(
   now: number,
   editions: EditionSnapshot[],
-): { needUsers: boolean; needPredictions: boolean } {
+): {
+  needUsers: boolean
+  needPredictions: boolean
+  predictionEditionIds: Set<string>
+} {
   let needUsers = false
   let needPredictions = false
+  const predictionEditionIds = new Set<string>()
 
   for (const edition of editions) {
     const stages = edition.stages
@@ -48,12 +72,12 @@ function windowNeeds(
       if (deadline === null) continue
 
       // Ferestre de reamintire a termenului (au nevoie de pronosticuri).
-      for (const key of Object.keys(DEADLINE_OFFSETS)) {
-        const { ms, grace } = DEADLINE_OFFSETS[key]
+      for (const { ms, grace } of Object.values(DEADLINE_OFFSETS)) {
         const marker = deadline - ms
         if (now >= marker && now < marker + grace && now < deadline) {
           needUsers = true
           needPredictions = true
+          predictionEditionIds.add(edition.editionId)
         }
       }
 
@@ -69,11 +93,10 @@ function windowNeeds(
         }
       }
 
-      if (needUsers && needPredictions) return { needUsers, needPredictions }
     }
   }
 
-  return { needUsers, needPredictions }
+  return { needUsers, needPredictions, predictionEditionIds }
 }
 
 /**
@@ -88,12 +111,8 @@ function windowNeeds(
 export async function loadEngineData(now: number = Date.now()): Promise<EngineData> {
   const db = adminDb()
 
-  // 1) Doar meciurile (necesare pentru scheduler + verificarea ferestrelor).
-  const matchesSnap = await db.collection('matches').get()
-  const matches: Match[] = matchesSnap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Match, 'id'>),
-  }))
+  // 1) Programul meciurilor, reutilizat între rulările apropiate de cron.
+  const matches = await loadMatches()
 
   // Grupează meciurile pe ediție și construiește scheduler-ul fiecărei ediții.
   const matchesByEdition = new Map<string, Match[]>()
@@ -118,15 +137,25 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
   }
 
   // 2) Gate ieftin: citim userii/pronosticurile doar dacă e activă o fereastră.
-  const { needUsers, needPredictions } = windowNeeds(now, editions)
+  const { needUsers, needPredictions, predictionEditionIds } = windowNeeds(
+    now,
+    editions,
+  )
 
   let users: AppUser[] = []
   const predictionSet = new Set<string>()
 
   if (needUsers || needPredictions) {
-    const [usersSnap, predsSnap] = await Promise.all([
+    const predictionQueries = needPredictions
+      ? Array.from(predictionEditionIds).map((editionId) =>
+          editionId === DEFAULT_EDITION_ID
+            ? db.collection('predictions')
+            : db.collection('predictions').where('editionId', '==', editionId),
+        )
+      : []
+    const [usersSnap, predictionSnaps] = await Promise.all([
       needUsers ? db.collection('users').get() : Promise.resolve(null),
-      needPredictions ? db.collection('predictions').get() : Promise.resolve(null),
+      Promise.all(predictionQueries.map((q) => q.get())),
     ])
     if (usersSnap) {
       users = usersSnap.docs.map((d) => ({
@@ -134,8 +163,8 @@ export async function loadEngineData(now: number = Date.now()): Promise<EngineDa
         ...(d.data() as Omit<AppUser, 'id'>),
       }))
     }
-    if (predsSnap) {
-      for (const d of predsSnap.docs) {
+    for (const snap of predictionSnaps) {
+      for (const d of snap.docs) {
         const p = d.data() as Omit<Prediction, 'id'>
         predictionSet.add(`${p.userId}_${p.matchId}`)
       }

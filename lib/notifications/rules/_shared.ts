@@ -1,4 +1,5 @@
 import type { NotificationTask } from '@/lib/notifications/types'
+import { createTemplatedNotificationTask } from '@/lib/notifications/templates'
 import type {
   EngineData,
   EditionSnapshot,
@@ -63,26 +64,15 @@ export function usersMissingPredictions(
   )
 }
 
-// Etichetă umană pentru un offset față de termenul limită.
-const HUMAN_OFFSET: Record<string, string> = {
-  '24h': '24 de ore',
-  '3h': '3 ore',
-  '1h': '1 oră',
-  '15m': '15 minute',
-}
-
 // Fereastra de „prindere" (grace) per offset: trebuie să fie mai mare decât
 // intervalul cron-ului (5 min) ca notificarea să nu fie ratată, dar suficient
 // de mică încât o notificare veche să nu se declanșeze cu întârziere.
-export const DEADLINE_OFFSETS: Record<
-  string,
-  { label: string; ms: number; grace: number }
-> = {
+export const DEADLINE_OFFSETS = {
   '24h': { label: '24h', ms: 24 * 3600_000, grace: 3 * 3600_000 },
   '3h': { label: '3h', ms: 3 * 3600_000, grace: 45 * 60_000 },
   '1h': { label: '1h', ms: 1 * 3600_000, grace: 25 * 60_000 },
   '15m': { label: '15m', ms: 15 * 60_000, grace: 12 * 60_000 },
-}
+} as const
 
 /**
  * Constructor comun pentru regulile de reamintire a termenului limită
@@ -112,28 +102,30 @@ export function buildDeadlineTasks(
       const missing = usersMissingPredictions(data, edition.editionId, stage.id)
       if (missing.length === 0) continue
 
-      tasks.push({
-        id: `deadline-${label}-${edition.editionId}-${stage.id}-${deadline}`,
-        // Cheie STABILĂ: nu include destinatarii, deci rămâne aceeași între
-        // rulări → istoricul împiedică retrimiterea.
-        notificationKey: `deadline|${edition.editionId}|${stage.id}|${label}|${deadline}`,
-        type: `deadline-${label}`,
-        title: `${edition.label} — pronosticuri`,
-        body: `Mai ai ${HUMAN_OFFSET[label]} până la închiderea etapei „${stage.name}". Încă nu ai completat toate pronosticurile!`,
-        recipientType: 'users',
-        recipientIds: missing.map((u) => u.id),
-        priority: 'high',
-        scheduledFor: null,
-        metadata: {
-          kind: 'deadline',
-          editionId: edition.editionId,
-          competitionId: edition.competitionId,
-          stage: stage.id,
-          offset: label,
-          deadline: new Date(deadline).toISOString(),
-        },
-        createdAt: now,
-      })
+      tasks.push(
+        createTemplatedNotificationTask({
+          templateId: `deadline-${label}`,
+          values: {
+            editionLabel: edition.label,
+            stageName: stage.name,
+          },
+          id: `deadline-${label}-${edition.editionId}-${stage.id}-${deadline}`,
+          // Cheie STABILĂ: nu include destinatarii, deci rămâne aceeași între
+          // rulări → istoricul împiedică retrimiterea.
+          notificationKey: `deadline|${edition.editionId}|${stage.id}|${label}|${deadline}`,
+          recipientType: 'users',
+          recipientIds: missing.map((u) => u.id),
+          metadata: {
+            kind: 'deadline',
+            editionId: edition.editionId,
+            competitionId: edition.competitionId,
+            stage: stage.id,
+            offset: label,
+            deadline: new Date(deadline).toISOString(),
+          },
+          createdAt: now,
+        }),
+      )
     }
   }
 

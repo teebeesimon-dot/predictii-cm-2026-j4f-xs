@@ -1,6 +1,14 @@
 'use server'
 
-import { collection, getDocs, doc, writeBatch } from 'firebase/firestore'
+import {
+  collection,
+  getDocs,
+  doc,
+  writeBatch,
+  query,
+  where,
+  limit,
+} from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { runResultsSync, getSyncStatus, type SyncResult, type SyncStatus } from '@/lib/sync-results'
 import {
@@ -85,10 +93,14 @@ export async function importEditionMatches(
 
   try {
     // Nu importăm dacă ediția are deja meciuri (evităm duplicatele).
-    const snap = await getDocs(collection(db, 'matches'))
-    const already = snap.docs.some(
-      (d) => (d.data() as Match).editionId === editionId,
+    const snap = await getDocs(
+      query(
+        collection(db, 'matches'),
+        where('editionId', '==', editionId),
+        limit(1),
+      ),
     )
+    const already = !snap.empty
     if (already) {
       return {
         ok: false,
@@ -218,9 +230,11 @@ export async function importWorldCupKnockout(): Promise<ImportStageResult> {
       }
     }
 
-    // Meciurile eliminatorii existente deja în ediția World Cup, indexate după
-    // etapă + perechea de echipe (neordonată) ca să evităm duplicatele.
-    const snap = await getDocs(collection(db, 'matches'))
+    // Citim doar etapele eliminatorii, inclusiv documentele WC legacy fără
+    // editionId, în loc să scanăm toate meciurile tuturor competițiilor.
+    const snap = await getDocs(
+      query(collection(db, 'matches'), where('stage', 'in', [4, 5])),
+    )
     const existingPairs = new Set<string>()
     for (const d of snap.docs) {
       const m = d.data() as Match
@@ -366,9 +380,10 @@ export async function importChampionsLeague(
       }
     }
 
-    // Meciurile existente ale acestei ediții, indexate după etapă + gazdă|oaspete
-    // (ORDONAT) ca să evităm duplicatele, dar să permitem ambele manșe tur-retur.
-    const snap = await getDocs(collection(db, 'matches'))
+    // Citim doar meciurile ediției curente, nu toate competițiile.
+    const snap = await getDocs(
+      query(collection(db, 'matches'), where('editionId', '==', editionId)),
+    )
     const existingPairs = new Set<string>()
     for (const d of snap.docs) {
       const m = d.data() as Match

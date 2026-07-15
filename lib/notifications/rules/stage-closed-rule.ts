@@ -4,6 +4,7 @@ import type {
   RuleContext,
 } from '@/lib/notifications/types'
 import { participants, stageDeadlineMs } from '@/lib/notifications/rules/_shared'
+import { createTemplatedNotificationTask } from '@/lib/notifications/templates'
 
 // Cât timp după închiderea etapei mai are voie să se declanșeze notificarea.
 const CLOSE_GRACE_MS = 6 * 3600_000 // 6 ore
@@ -39,25 +40,27 @@ export const stageClosedRule: NotificationRule = {
         const recipients = participants(data, edition.editionId)
         if (recipients.length === 0) continue
 
-        tasks.push({
-          id: `stage-closed-${edition.editionId}-${stage.id}-${deadline}`,
-          notificationKey: `stage-closed|${edition.editionId}|${stage.id}|${deadline}`,
-          type: 'stage-closed',
-          title: `${edition.label} — ${stage.name}`,
-          body: `Pronosticurile pentru ${stage.name} s-au închis. Poți vedea acum ce au pariat colegii. Mult succes!`,
-          recipientType: 'users',
-          recipientIds: recipients.map((u) => u.id),
-          priority: 'normal',
-          scheduledFor: null,
-          metadata: {
-            kind: 'stage-closed',
-            editionId: edition.editionId,
-            competitionId: edition.competitionId,
-            stage: stage.id,
-            deadline: new Date(deadline).toISOString(),
-          },
-          createdAt: now,
-        })
+        tasks.push(
+          createTemplatedNotificationTask({
+            templateId: 'stage-closed',
+            values: {
+              editionLabel: edition.label,
+              stageName: stage.name,
+            },
+            id: `stage-closed-${edition.editionId}-${stage.id}-${deadline}`,
+            notificationKey: `stage-closed|${edition.editionId}|${stage.id}|${deadline}`,
+            recipientType: 'users',
+            recipientIds: recipients.map((u) => u.id),
+            metadata: {
+              kind: 'stage-closed',
+              editionId: edition.editionId,
+              competitionId: edition.competitionId,
+              stage: stage.id,
+              deadline: new Date(deadline).toISOString(),
+            },
+            createdAt: now,
+          }),
+        )
       }
     }
 

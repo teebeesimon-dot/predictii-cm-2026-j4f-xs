@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AppShell } from '@/components/app-shell'
@@ -36,18 +37,17 @@ export default function DashboardPage() {
 function DashboardContent() {
   const { user } = useAuth()
   const { edition, competition } = useEdition()
-  // NU mai reîmprospătăm în fundal la fiecare 10s (asta recitea TOATE
-  // meciurile + pronosticurile + userii de 6 ori/minut și epuiza cota
-  // Firestore). Datele se actualizează oricum: la revenirea pe tab
-  // (revalidateOnFocus) și atunci când AutoSync detectează scoruri noi și
-  // reîmprospătează toate cheile SWR. Fără efect vizibil pentru utilizator.
+  // Fără polling/focus refetch; AutoSync și salvările fac mutate explicit.
   const { data: matches, isLoading } = useMatches()
   const { data: predictions } = useAllPredictions()
   const { data: users } = useUsers()
 
   // Scheduler-ul competiției curente: etape, termene, blocare/dezvăluire
   // (World Cup = termene fixe; Champions League = 1h înainte de primul meci).
-  const scheduler = buildScheduler(edition.id, matches ?? [])
+  const scheduler = useMemo(
+    () => buildScheduler(edition.id, matches ?? []),
+    [edition.id, matches],
+  )
 
   const activeStage = scheduler.getActiveStage()
   const activeDeadline = scheduler.getStageDeadline(activeStage)
@@ -56,13 +56,16 @@ function DashboardContent() {
     .filter((m) => m.stage === activeStage)
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
 
-  const standings =
-    users && matches && predictions
-      ? computeStandings(users, matches, predictions, undefined, {
-          id: user?.id,
-          isAdmin: user?.isAdmin,
-        })
-      : []
+  const standings = useMemo(
+    () =>
+      users && matches && predictions
+        ? computeStandings(users, matches, predictions, undefined, {
+            id: user?.id,
+            isAdmin: user?.isAdmin,
+          })
+        : [],
+    [users, matches, predictions, user?.id, user?.isAdmin],
+  )
   // Etapa care se joacă efectiv acum (poate diferi de etapa „activă" pentru
   // pronosticuri, care sare la următoarea etapă imediat ce termenul expiră).
   const liveStage = scheduler.getLiveStage()
@@ -72,13 +75,16 @@ function DashboardContent() {
     .filter((m) => m.stage === liveStage)
     .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
   // Clasamentul doar pe etapa live (se actualizează pe măsură ce intră scorurile).
-  const stageStandings =
-    users && matches && predictions
-      ? computeStandings(users, matches, predictions, liveStage, {
-          id: user?.id,
-          isAdmin: user?.isAdmin,
-        })
-      : []
+  const stageStandings = useMemo(
+    () =>
+      users && matches && predictions
+        ? computeStandings(users, matches, predictions, liveStage, {
+            id: user?.id,
+            isAdmin: user?.isAdmin,
+          })
+        : [],
+    [users, matches, predictions, liveStage, user?.id, user?.isAdmin],
+  )
   const myRow = standings.find((r) => r.userId === user?.id)
   const myRank = myRow?.rank ?? -1
 

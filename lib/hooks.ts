@@ -10,23 +10,21 @@ import {
 } from '@/lib/data'
 import { useEdition } from '@/components/edition-provider'
 
-// Fereastră de deduplicare: SWR nu re-execută fetcher-ul pentru aceeași cheie
-// mai des de atât. Fiecare fetch citește colecții întregi din Firestore, deci
-// asta previne recitirile la navigarea între pagini (dashboard, clasament,
-// statistici, premii, colegii folosesc aceleași chei) și la focus-urile
-// repetate pe tab. Datele rămân proaspete: AutoSync reîmprospătează explicit
-// toate cheile când apar scoruri noi.
-const DEDUPE_MS = 5 * 60 * 1000 // 5 minute
+// Datele Firestore sunt reîmprospătate explicit după scrieri și după AutoSync.
+// Nu revalidăm la fiecare focus/reconnect: pe mobil asta genera în rafală trei
+// query-uri identice (meciuri, useri, pronosticuri) la fiecare revenire în app.
+const DATA_DEDUPE_MS = 15 * 60 * 1000
+const STRUCTURE_DEDUPE_MS = 60 * 60 * 1000
 
 // Edițiile care au meciuri încărcate (pentru selector). Reîmprospătare lejeră
 // ca o ediție nou populată să apară fără reîncărcarea paginii.
 export function useAvailableEditionIds(refreshMs?: number) {
   return useSWR('available-editions', getAvailableEditionIds, {
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,
     refreshWhenHidden: false,
-    dedupingInterval: DEDUPE_MS,
+    dedupingInterval: STRUCTURE_DEDUPE_MS,
   })
 }
 
@@ -37,34 +35,32 @@ export function useAvailableEditionIds(refreshMs?: number) {
 export function useMatches(refreshMs?: number) {
   const { editionId } = useEdition()
   return useSWR(['matches', editionId], () => getMatches(editionId), {
-    // Reîmprospătează imediat când utilizatorul redeschide aplicația/tab-ul sau
-    // revine online, ca să nu vadă scoruri vechi din cache (mai ales pe mobil).
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,
     refreshWhenHidden: false,
-    dedupingInterval: DEDUPE_MS,
+    dedupingInterval: DATA_DEDUPE_MS,
   })
 }
 
 export function useUsers(refreshMs?: number) {
   return useSWR('users', getUsers, {
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,
     refreshWhenHidden: false,
-    dedupingInterval: DEDUPE_MS,
+    dedupingInterval: DATA_DEDUPE_MS,
   })
 }
 
 export function useAllPredictions(refreshMs?: number) {
   const { editionId } = useEdition()
   return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
-    revalidateOnFocus: true,
-    revalidateOnReconnect: true,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,
     refreshWhenHidden: false,
-    dedupingInterval: DEDUPE_MS,
+    dedupingInterval: DATA_DEDUPE_MS,
   })
 }
 
@@ -74,10 +70,10 @@ export function useUserPredictions(userId: string | undefined) {
     userId ? ['user-predictions', userId, editionId] : null,
     () => getUserPredictions(userId as string, editionId),
     {
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
       refreshWhenHidden: false,
-      dedupingInterval: DEDUPE_MS,
+      dedupingInterval: DATA_DEDUPE_MS,
     },
   )
 }

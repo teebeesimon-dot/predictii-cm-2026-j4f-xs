@@ -171,14 +171,14 @@ export class NotificationEngine {
     let pushSent = 0
     let pushFailed = 0
     if (mode === 'live') {
+      const delivered: NotificationTask[] = []
       for (const task of toSend) {
         try {
-          const res = await pushService.dispatch(task)
+          const res = await pushService.dispatch(task, data.users)
           pushSent += res.sent
           pushFailed += res.failed
           dispatched += 1
-          // Salvează în istoric DOAR după o trimitere reușită (fără excepție).
-          await notificationHistory.record(task)
+          delivered.push(task)
         } catch (e) {
           const message = (e as Error).message
           errors.push({ ruleId: `dispatch:${task.notificationKey}`, message })
@@ -186,6 +186,14 @@ export class NotificationEngine {
             `[v0] notif-engine: trimiterea a eșuat pentru "${task.notificationKey}": ${message}`,
           )
         }
+      }
+      try {
+        // Un singur commit Firestore pentru toate notificările livrate.
+        await notificationHistory.recordMany(delivered)
+      } catch (e) {
+        const message = (e as Error).message
+        errors.push({ ruleId: '__history_write__', message })
+        console.log(`[v0] notif-engine: salvarea istoricului a eșuat: ${message}`)
       }
     }
 
