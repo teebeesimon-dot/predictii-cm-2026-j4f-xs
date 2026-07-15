@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Send,
   Loader2,
+  Info,
 } from 'lucide-react'
 
 interface SyncStatus {
@@ -114,12 +115,25 @@ function OverviewContent() {
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
-          <span className="text-foreground">{error}</span>
-        </div>
-      )}
+      {error &&
+        (error.includes('FIREBASE_SERVICE_ACCOUNT') ? (
+          // Lipsa service account-ului server este normală în preview; în
+          // producție variabila e setată, deci datele se încarcă. Afișăm o
+          // notă informativă, nu o eroare alarmantă.
+          <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/50 p-4 text-sm">
+            <Info className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              Datele de administrare (istoric engine, sincronizare) necesită
+              service account-ul server, disponibil doar în producție. În acest
+              mediu de previzualizare secțiunea rămâne goală.
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+            <span className="text-foreground">{error}</span>
+          </div>
+        ))}
 
       {/* Rezumat rapid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
