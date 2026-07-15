@@ -101,3 +101,44 @@ export class FirestoreNotificationHistory implements NotificationHistory {
 // Instanță partajată folosită de engine.
 export const notificationHistory: NotificationHistory =
   new FirestoreNotificationHistory()
+
+export interface RecentNotificationEntry {
+  key: string
+  type: string
+  title: string
+  body: string
+  recipientType: string
+  recipientCount: number
+  sentAt: number
+}
+
+// Ultimele notificări trimise (pentru panoul de administrare). Citire separată
+// de engine — nu afectează arhitectura acestuia. Sortare pe sentAt desc.
+export async function getRecentNotifications(
+  max = 30,
+): Promise<RecentNotificationEntry[]> {
+  try {
+    const snap = await adminDb()
+      .collection(COLLECTION)
+      .orderBy('sentAt', 'desc')
+      .limit(max)
+      .get()
+    return snap.docs.map((d) => {
+      const data = d.data()
+      const recipientIds = Array.isArray(data.recipientIds)
+        ? (data.recipientIds as unknown[])
+        : []
+      return {
+        key: (data.notificationKey as string) ?? d.id,
+        type: (data.type as string) ?? 'general',
+        title: (data.title as string) ?? '',
+        body: (data.body as string) ?? '',
+        recipientType: (data.recipientType as string) ?? 'all',
+        recipientCount: recipientIds.length,
+        sentAt: typeof data.sentAt === 'number' ? (data.sentAt as number) : 0,
+      }
+    })
+  } catch {
+    return []
+  }
+}

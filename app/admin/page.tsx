@@ -83,6 +83,7 @@ import {
   PencilLine,
   ShieldCheck,
   TriangleAlert,
+  Activity,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -169,6 +170,13 @@ function AdminContent() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/overview"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <Activity className="size-4" />
+            Prezentare generală
+          </Link>
           <Link
             href="/admin/notification-engine"
             className={buttonVariants({ variant: 'outline' })}

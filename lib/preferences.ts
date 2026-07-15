@@ -45,6 +45,11 @@ export function displayNameOf(
   return user.name || user.username
 }
 
+// Echipa favorită (opțional). Gol → string gol.
+export function favouriteTeamOf(prefs: UserPreferences | undefined): string {
+  return prefs?.favouriteTeam?.trim() ?? ''
+}
+
 // Inițialele pentru avatar (max 2 litere), din numele afișat.
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)

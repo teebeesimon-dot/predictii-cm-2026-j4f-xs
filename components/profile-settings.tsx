@@ -13,6 +13,7 @@ import {
   setDisplayNamePref,
   setResumeCardEnabled,
   setNotificationPreference,
+  setFavouriteTeam,
 } from '@/lib/data'
 import { isNotificationEnabled, isResumeCardEnabled } from '@/lib/preferences'
 import {
@@ -20,7 +21,7 @@ import {
   type AppUser,
   type NotificationCategory,
 } from '@/lib/types'
-import { Loader2, UserCog, Bell, Sparkles } from 'lucide-react'
+import { Loader2, UserCog, Bell, Sparkles, Star } from 'lucide-react'
 
 /**
  * Setările utilizatorului (Faza 3). Operează pe preferințele din documentul
@@ -33,6 +34,8 @@ export function ProfileSettings({ appUser }: { appUser: AppUser }) {
   const prefs = appUser.preferences
   const [name, setName] = useState(prefs?.displayName ?? '')
   const [savingName, setSavingName] = useState(false)
+  const [team, setTeam] = useState(prefs?.favouriteTeam ?? '')
+  const [savingTeam, setSavingTeam] = useState(false)
 
   const refresh = () => mutate('users')
 
@@ -46,6 +49,19 @@ export function ProfileSettings({ appUser }: { appUser: AppUser }) {
       toast.error('Nu am putut salva numele.')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  async function saveTeam() {
+    setSavingTeam(true)
+    try {
+      await setFavouriteTeam(appUser.id, team)
+      await refresh()
+      toast.success('Echipa favorită a fost salvată.')
+    } catch {
+      toast.error('Nu am putut salva echipa.')
+    } finally {
+      setSavingTeam(false)
     }
   }
 
@@ -93,6 +109,31 @@ export function ProfileSettings({ appUser }: { appUser: AppUser }) {
             />
             <Button onClick={saveName} disabled={savingName}>
               {savingName && <Loader2 className="size-4 animate-spin" />}
+              Salvează
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Echipă favorită */}
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0">
+          <Star className="size-5 text-primary" />
+          <CardTitle className="text-base">Echipă favorită</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Opțional. Apare pe profilul tău.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={team}
+              onChange={(e) => setTeam(e.target.value)}
+              placeholder="ex. România"
+              maxLength={40}
+            />
+            <Button onClick={saveTeam} disabled={savingTeam}>
+              {savingTeam && <Loader2 className="size-4 animate-spin" />}
               Salvează
             </Button>
           </div>
