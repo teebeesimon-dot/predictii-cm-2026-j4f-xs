@@ -37,15 +37,13 @@ export const STAGE_DEADLINES: Record<Exclude<StageId, 5>, string> = {
 }
 
 // Etapa 5 are termene separate per rundă eliminatorie.
-// Termenul fiecărei runde = înainte de PRIMUL meci al rundei.
-// Finala mică (locul 3) e sâmbătă 18.07 la 22:00 RO → termenul e vineri 17.07.
-// Finala mare e duminică 19.07 la 22:00 RO, dar pronosticurile se blochează
-// la același termen cu finala mică (un singur deadline comun pentru ambele).
+// REGULA: termenul = ora primului meci al rundei − 1 oră (verificat cu orele
+// reale de start din Firestore, ediția wc-2026).
 export const KNOCKOUT_DEADLINES: Record<KnockoutRound, string> = {
-  r16: '2026-07-04T16:00:00.000Z', // 04.07.2026 19:00 RO (înainte de primul r16 sâm 04.07)
-  qf: '2026-07-09T18:00:00.000Z', // 09.07.2026 21:00 RO (înainte de primul sf joi 09.07)
-  sf: '2026-07-14T18:00:00.000Z', // 14.07.2026 21:00 RO (înainte de SF1 mar 14.07)
-  final: '2026-07-19T17:00:00.000Z', // 19.07.2026 20:00 RO (duminică, cu ~4h înainte de finala mică dum 19.07→lun 20.07 00:00 RO)
+  r16: '2026-07-04T16:00:00.000Z', // primul meci sâm 04.07 20:00 RO → termen 19:00 RO
+  qf: '2026-07-09T19:00:00.000Z', // primul meci joi 09.07 23:00 RO → termen 22:00 RO
+  sf: '2026-07-14T18:00:00.000Z', // primul meci mar 14.07 22:00 RO → termen 21:00 RO
+  final: '2026-07-18T20:00:00.000Z', // finala mică (primul meci) sâm 18→dum 19 00:00 RO → termen sâm 18.07 23:00 RO
 }
 
 // Participanți fixați ai ligii J4F
