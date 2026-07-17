@@ -45,7 +45,7 @@ export const KNOCKOUT_DEADLINES: Record<KnockoutRound, string> = {
   r16: '2026-07-04T16:00:00.000Z', // 04.07.2026 19:00 RO (înainte de primul r16 sâm 04.07)
   qf: '2026-07-09T18:00:00.000Z', // 09.07.2026 21:00 RO (înainte de primul sf joi 09.07)
   sf: '2026-07-14T18:00:00.000Z', // 14.07.2026 21:00 RO (înainte de SF1 mar 14.07)
-  final: '2026-07-17T18:00:00.000Z', // 17.07.2026 21:00 RO (vineri, înainte de finala mică sâm 18.07 22:00 RO)
+  final: '2026-07-19T17:00:00.000Z', // 19.07.2026 20:00 RO (duminică, cu ~4h înainte de finala mică dum 19.07→lun 20.07 00:00 RO)
 }
 
 // Participanți fixați ai ligii J4F
