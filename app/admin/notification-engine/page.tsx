@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { AppShell } from '@/components/app-shell'
@@ -24,6 +24,7 @@ import type {
   EngineRunResult,
   NotificationTask,
 } from '@/lib/notifications/types'
+import type { EngineRunLogEntry } from '@/lib/notifications/history/EngineRunLog'
 
 export default function NotificationEnginePage() {
   return (
@@ -37,6 +38,37 @@ function NotificationEngineContent() {
   const { user } = useAuth()
   const [running, setRunning] = useState<EngineRunMode | null>(null)
   const [result, setResult] = useState<EngineRunResult | null>(null)
+  // Ultima rulare persistată (din Firestore) — supraviețuiește navigării.
+  const [lastRun, setLastRun] = useState<EngineRunLogEntry | null>(null)
+  const [loadingLast, setLoadingLast] = useState(true)
+
+  // La montare, încărcăm ultima rulare din jurnal ca să afișăm starea „live"
+  // chiar și după ce administratorul iese și revine pe pagină.
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/notification-engine/run', {
+          headers: { 'x-actor-id': user.id },
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          runLog?: EngineRunLogEntry[]
+        }
+        if (!cancelled) {
+          const live = (data.runLog ?? []).find((e) => e.mode === 'live')
+          setLastRun(live ?? (data.runLog ?? [])[0] ?? null)
+        }
+      } catch {
+        // Ignorăm: e doar afișarea istoricului.
+      } finally {
+        if (!cancelled) setLoadingLast(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
 
   async function handleRun(mode: EngineRunMode) {
     if (mode === 'live') {
@@ -61,6 +93,21 @@ function NotificationEngineContent() {
       }
       setResult(data)
       if (mode === 'live') {
+        // Reflectăm imediat ultima rulare live persistată (fără re-fetch).
+        setLastRun({
+          ranAt: data.ranAt,
+          mode: data.mode,
+          success: data.success,
+          rulesExecuted: data.rulesExecuted,
+          notificationsGenerated: data.notificationsGenerated,
+          dispatched: data.dispatched,
+          pushSent: data.pushSent,
+          pushFailed: data.pushFailed,
+          alreadySentSkipped: data.alreadySentSkipped,
+          errorCount: data.errors.length,
+          errors: data.errors.slice(0, 10),
+          executionTime: data.executionTime,
+        })
         toast.success(
           `Live Run: ${data.dispatched} trimise · ${data.pushSent} push · ` +
             `${data.alreadySentSkipped} deja trimise (sărite).`,
@@ -130,10 +177,63 @@ function NotificationEngineContent() {
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {!result ? (
-            <p className="rounded-lg border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
-              Nicio rulare încă. Apasă „Dry Run" (fără efecte) sau „Live Run"
-              (trimite) pentru a executa engine-ul.
-            </p>
+            loadingLast ? (
+              <p className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Se încarcă ultima rulare…
+              </p>
+            ) : lastRun ? (
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/30 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={
+                      lastRun.mode === 'live'
+                        ? 'rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground'
+                        : 'rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground'
+                    }
+                  >
+                    {lastRun.mode === 'live' ? 'ULTIMA RULARE LIVE' : 'ULTIMA RULARE (DRY)'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(lastRun.ranAt).toLocaleString('ro-RO')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Metric
+                    icon={<Send className="size-4" />}
+                    label="Trimise"
+                    value={String(lastRun.dispatched)}
+                  />
+                  <Metric
+                    icon={<Bell className="size-4" />}
+                    label="Push reușite"
+                    value={String(lastRun.pushSent)}
+                  />
+                  <Metric
+                    icon={<History className="size-4" />}
+                    label="Deja trimise"
+                    value={String(lastRun.alreadySentSkipped)}
+                  />
+                  <Metric
+                    icon={<ListChecks className="size-4" />}
+                    label="Generate"
+                    value={String(lastRun.notificationsGenerated)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Momentan nu există notificări noi de trimis. Reamintirile de
+                  termen se trimit doar în ferestrele dinaintea deadline-ului
+                  (24h/3h/1h/15m) și doar utilizatorilor cu pronosticuri
+                  incomplete. Rulează din nou oricând — cele deja trimise nu se
+                  repetă.
+                </p>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border bg-secondary/30 p-6 text-center text-sm text-muted-foreground">
+                Nicio rulare încă. Apasă „Dry Run" (fără efecte) sau „Live Run"
+                (trimite) pentru a executa engine-ul.
+              </p>
+            )
           ) : (
             <>
               <div className="flex items-center gap-2">

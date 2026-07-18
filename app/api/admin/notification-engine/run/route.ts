@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { authorizeAdminRequest } from '@/lib/admin-auth'
 import { notificationEngine } from '@/lib/notifications/engine/NotificationEngine'
-import { recordRun } from '@/lib/notifications/history/EngineRunLog'
+import { recordRun, getRunLog } from '@/lib/notifications/history/EngineRunLog'
 
 /**
  * Endpoint de debug pentru Notification Engine.
@@ -16,6 +16,28 @@ import { recordRun } from '@/lib/notifications/history/EngineRunLog'
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+/**
+ * GET: întoarce jurnalul rulărilor (persistat în Firestore), ca pagina să poată
+ * afișa ULTIMA rulare live chiar și după ce administratorul iese și revine.
+ * Identitatea se dă prin header `x-actor-id`.
+ */
+export async function GET(req: NextRequest) {
+  let auth
+  try {
+    auth = await authorizeAdminRequest(req)
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+  }
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.reason ?? 'Neautorizat' },
+      { status: 401 },
+    )
+  }
+  const runLog = await getRunLog()
+  return NextResponse.json({ runLog })
+}
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
