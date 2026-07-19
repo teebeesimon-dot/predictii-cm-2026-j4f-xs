@@ -60,10 +60,23 @@ interface ApiMatch {
 // nu se iau în calcul prelungirile sau loviturile de departajare. Când meciul a
 // mers în prelungiri, folosim `regularTime`; altfel `fullTime` este deja scorul
 // de la finalul celor 90 de minute (grupe + eliminatorii decise în timp regul.).
+//
+// ATENȚIE — caz special: API-ul poate marca meciul FINISHED cu duration=
+// EXTRA_TIME/PENALTY_SHOOTOUT dar să nu populeze încă `regularTime` (latență
+// API). În acel caz NU folosim `fullTime` (care ar conține golurile din ET) —
+// returnăm null/null astfel încât `diffScores` să ignoreze meciul până sosesc
+// datele corecte. La cron-ul următor, când API-ul populează `regularTime`,
+// scorul corect va fi salvat automat.
 export function extractRegulationScore(score: ApiMatch['score']): ApiScoreLine {
   const reg = score.regularTime
   if (reg && reg.home !== null && reg.home !== undefined && reg.away !== null && reg.away !== undefined) {
     return { home: reg.home, away: reg.away }
+  }
+  // Dacă meciul a trecut în prelungiri/penalty-uri dar regularTime nu e încă
+  // disponibil, returnăm null — nu scriem scorul greșit în Firestore.
+  const duration = score.duration
+  if (duration === 'EXTRA_TIME' || duration === 'PENALTY_SHOOTOUT') {
+    return { home: null, away: null }
   }
   return { home: score.fullTime.home, away: score.fullTime.away }
 }

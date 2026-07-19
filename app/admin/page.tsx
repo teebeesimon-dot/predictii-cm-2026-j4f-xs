@@ -84,6 +84,7 @@ import {
   ShieldCheck,
   TriangleAlert,
   Activity,
+  RotateCcw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -1318,6 +1319,27 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
     }
   }
 
+  // Resetează scorul la null și eliberează scoreOverride — la cron-ul următor
+  // sincronizarea va prelua scorul corect (la 90 de minute) din API.
+  async function handleReset() {
+    if (
+      !window.confirm(
+        `Resetezi scorul meciului ${match.homeTeam} - ${match.awayTeam}?\n\nScorul va deveni necunoscut și va fi re-preluat automat de sincronizare (scor la 90 de minute, fără prelungiri).`,
+      )
+    )
+      return
+    setSaving(true)
+    try {
+      await updateMatchResult(match.id, null, null)
+      toast.success('Scor resetat. Va fi re-sincronizat automat.')
+      onSaved()
+    } catch {
+      toast.error('Eroare la resetare.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function clean(v: string) {
     return v.replace(/[^0-9]/g, '').slice(0, 2)
   }
@@ -1403,8 +1425,25 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
           <TeamName team={match.awayTeam} className="flex-1 font-semibold" />
         </div>
 
-        <div className="flex justify-end">
-          <Button size="sm" onClick={save} disabled={saving}>
+        <p className="text-xs text-muted-foreground">
+          Scor la 90 de minute (fără prelungiri/penalty-uri)
+        </p>
+
+        <div className="flex items-center justify-between gap-2">
+          {match.homeScore !== null && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-destructive hover:text-destructive"
+              onClick={handleReset}
+              disabled={saving}
+              title="Șterge scorul și lasă sincronizarea automată să preia scorul corect la 90'"
+            >
+              <RotateCcw className="size-3.5" />
+              Resetează (re-sync)
+            </Button>
+          )}
+          <Button size="sm" onClick={save} disabled={saving} className="ml-auto">
             {saving ? (
               <Loader2 className="size-4 animate-spin" />
             ) : match.homeScore !== null ? (
