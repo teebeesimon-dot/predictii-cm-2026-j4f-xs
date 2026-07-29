@@ -252,17 +252,20 @@ interface ApiMatchStaged extends ApiMatch {
 
 // Preia toate meciurile unei competiții împreună cu faza (stage), etapa
 // (matchday) și ora fiecăruia. Folosit la importul care CREEAZĂ meciuri.
+// `season` (ex. 2026 pentru CL 2026-27) selectează sezonul pe football-data.org;
+// dacă lipsește, API-ul întoarce sezonul curent/implicit al competiției.
 export async function fetchStagedMatches(
   token: string,
   competitionCode: number,
+  season?: number,
 ): Promise<StagedApiMatch[]> {
-  const res = await fetch(
-    `${API_BASE}/competitions/${competitionCode}/matches`,
-    {
-      headers: { 'X-Auth-Token': token },
-      cache: 'no-store',
-    },
-  )
+  const url = new URL(`${API_BASE}/competitions/${competitionCode}/matches`)
+  if (season !== undefined) url.searchParams.set('season', String(season))
+
+  const res = await fetch(url.toString(), {
+    headers: { 'X-Auth-Token': token },
+    cache: 'no-store',
+  })
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')

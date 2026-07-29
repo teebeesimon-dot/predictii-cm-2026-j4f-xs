@@ -381,7 +381,12 @@ export async function importChampionsLeague(
   }
 
   try {
-    const all = await fetchStagedMatches(token, competition.footballDataCode)
+    // football-data.org: season=2026 → sezonul 2026-27 (anul de start al ediției).
+    const all = await fetchStagedMatches(
+      token,
+      competition.footballDataCode,
+      edition.year,
+    )
     if (all.length === 0) {
       return {
         ok: false,
