@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUserPredictions } from '@/lib/hooks'
@@ -21,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { TeamName } from '@/components/team-name'
-import { formatKickoff } from '@/lib/utils'
+import { cn, formatKickoff } from '@/lib/utils'
 import { Lock, Save, Loader2, Flag, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,6 +39,7 @@ export default function PredictionsPage() {
 function PredictionsContent() {
   const { user } = useAuth()
   const { editionId } = useEdition()
+  const searchParams = useSearchParams()
   const { data: matches, isLoading, mutate: refreshMatches } = useMatches()
   const { data: predictions, mutate } = useUserPredictions(user?.id)
 
@@ -48,6 +50,13 @@ function PredictionsContent() {
 
   const [entries, setEntries] = useState<Record<string, Entry>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [activeStage, setActiveStage] = useState(
+    String(scheduler.stages[0]?.id ?? 1),
+  )
+  const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(
+    null,
+  )
+  const selectedMatchId = searchParams.get('match')
 
   // seed entries from saved predictions
   useEffect(() => {
@@ -62,6 +71,34 @@ function PredictionsContent() {
       return next
     })
   }, [predictions])
+
+  useEffect(() => {
+    if (!selectedMatchId || !matches) return
+
+    const selectedMatch = matches.find((match) => match.id === selectedMatchId)
+    if (!selectedMatch) return
+
+    setActiveStage(String(selectedMatch.stage))
+    setHighlightedMatchId(selectedMatchId)
+
+    let nestedFrame = 0
+    const frame = requestAnimationFrame(() => {
+      nestedFrame = requestAnimationFrame(() => {
+        document
+          .getElementById(`prediction-match-${selectedMatchId}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    })
+    const timer = window.setTimeout(() => {
+      setHighlightedMatchId(null)
+    }, 2500)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      cancelAnimationFrame(nestedFrame)
+      window.clearTimeout(timer)
+    }
+  }, [matches, selectedMatchId])
 
   const byStage = useMemo(() => {
     const map = new Map<StageId, Match[]>()
@@ -111,7 +148,7 @@ function PredictionsContent() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold">Pronosticuri</h1>
+        <h1 className="font-heading text-3xl font-bold">Scorurile mele</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Completează scorurile. Fiecare etapă se blochează automat la termenul
           limită afișat (ora României).
@@ -146,7 +183,7 @@ function PredictionsContent() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue={String(scheduler.stages[0]?.id ?? 1)}>
+        <Tabs value={activeStage} onValueChange={setActiveStage}>
           <TabsList className="flex w-full flex-wrap">
             {scheduler.stages.map((s) => (
               <TabsTrigger key={s.id} value={String(s.id)} className="flex-1">
@@ -211,6 +248,7 @@ function PredictionsContent() {
                               <MatchRow
                                 key={m.id}
                                 match={m}
+                                highlighted={highlightedMatchId === m.id}
                                 entry={entries[m.id]}
                                 saving={!!saving[m.id]}
                                 onChange={setEntry}
@@ -234,6 +272,7 @@ function PredictionsContent() {
                             <MatchRow
                               key={m.id}
                               match={m}
+                              highlighted={highlightedMatchId === m.id}
                               entry={entries[m.id]}
                               saving={!!saving[m.id]}
                               onChange={setEntry}
@@ -250,6 +289,7 @@ function PredictionsContent() {
                       <MatchRow
                         key={m.id}
                         match={m}
+                        highlighted={highlightedMatchId === m.id}
                         entry={entries[m.id]}
                         saving={!!saving[m.id]}
                         onChange={setEntry}
@@ -270,6 +310,7 @@ function PredictionsContent() {
 
 function MatchRow({
   match,
+  highlighted,
   entry,
   saving,
   onChange,
@@ -277,6 +318,7 @@ function MatchRow({
   scheduler,
 }: {
   match: Match
+  highlighted: boolean
   entry: Entry | undefined
   saving: boolean
   onChange: (id: string, field: 'home' | 'away', value: string) => void
@@ -287,7 +329,13 @@ function MatchRow({
   const hasResult = match.homeScore !== null && match.awayScore !== null
 
   return (
-    <Card className={locked ? 'opacity-90' : ''}>
+    <Card
+      id={`prediction-match-${match.id}`}
+      className={cn(
+        locked && 'opacity-90',
+        highlighted && 'bg-primary/5 ring-2 ring-primary',
+      )}
+    >
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
@@ -305,6 +353,7 @@ function MatchRow({
         <div className="flex items-center gap-2">
           <TeamName
             team={match.homeTeam}
+            competition={scheduler.competitionId}
             align="right"
             className="flex-1 justify-end font-semibold"
           />
@@ -327,7 +376,11 @@ function MatchRow({
               onChange={(e) => onChange(match.id, 'away', e.target.value)}
             />
           </div>
-          <TeamName team={match.awayTeam} className="flex-1 font-semibold" />
+          <TeamName
+            team={match.awayTeam}
+            competition={scheduler.competitionId}
+            className="flex-1 font-semibold"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-2">
