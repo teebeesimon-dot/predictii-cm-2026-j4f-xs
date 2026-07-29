@@ -28,7 +28,12 @@ import {
   importWorldCupKnockout,
   importChampionsLeague,
 } from '@/app/actions/sync'
-import { EDITIONS, COMPETITIONS, formatSeasonYear } from '@/lib/editions'
+import {
+  EDITIONS,
+  COMPETITIONS,
+  formatSeasonYear,
+  type CompetitionId,
+} from '@/lib/editions'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
@@ -308,7 +313,12 @@ function AdminContent() {
               {[...(matches ?? [])]
                 .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
                 .map((m) => (
-                  <ResultRow key={m.id} match={m} onSaved={() => mutate()} />
+                  <ResultRow
+                    key={m.id}
+                    match={m}
+                    competition={edition.competitionId}
+                    onSaved={() => mutate()}
+                  />
                 ))}
             </div>
           )}
@@ -1291,7 +1301,15 @@ function AddMatchForm({
   )
 }
 
-function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
+function ResultRow({
+  match,
+  competition,
+  onSaved,
+}: {
+  match: Match
+  competition: CompetitionId
+  onSaved: () => void
+}) {
   const [home, setHome] = useState(
     match.homeScore !== null ? String(match.homeScore) : '',
   )
@@ -1382,6 +1400,7 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
         <div className="flex items-center gap-2">
           <TeamName
             team={match.homeTeam}
+            competition={competition}
             align="right"
             className="flex-1 justify-end font-semibold"
           />
@@ -1400,7 +1419,11 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
             value={away}
             onChange={(e) => setAway(clean(e.target.value))}
           />
-          <TeamName team={match.awayTeam} className="flex-1 font-semibold" />
+          <TeamName
+            team={match.awayTeam}
+            competition={competition}
+            className="flex-1 font-semibold"
+          />
         </div>
 
         <div className="flex justify-end">
@@ -1751,7 +1774,7 @@ function UserRow({
               <span>
                 <span className="font-medium">Ascuns din clasamente</span>
                 <span className="block text-xs text-muted-foreground">
-                  Joacă normal și apare la „Colegii", dar nu în clasamente
+                  Joacă normal și apare la „Scorurile tuturor", dar nu în clasamente
                   (se vede doar pe sine).
                 </span>
               </span>

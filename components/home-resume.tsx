@@ -18,10 +18,12 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type { Match } from '@/lib/types'
+import type { CompetitionId } from '@/lib/editions'
 import { setResumeCardEnabled, updateLastSeenRank } from '@/lib/data'
 
 export interface HomeResumeProps {
   userId: string
+  competition: CompetitionId
   displayName: string
   editionLabel: string
   remaining: number
@@ -40,6 +42,7 @@ export interface HomeResumeProps {
  */
 export function HomeResume({
   userId,
+  competition,
   displayName,
   editionLabel,
   remaining,
@@ -134,6 +137,7 @@ export function HomeResume({
             <div className="flex items-center gap-2">
               <TeamName
                 team={nextMatch.homeTeam}
+                competition={competition}
                 align="right"
                 className="flex-1 justify-end text-sm font-semibold"
               />
@@ -142,6 +146,7 @@ export function HomeResume({
               </span>
               <TeamName
                 team={nextMatch.awayTeam}
+                competition={competition}
                 className="flex-1 text-sm font-semibold"
               />
             </div>

@@ -7,6 +7,19 @@ export type CompetitionId = 'wc' | 'euro' | 'cl'
 // Cheia temei aplicată prin atributul data-competition pe <html>.
 export type CompetitionTheme = 'wc' | 'euro' | 'cl'
 
+export type EditionLayout = 'group' | 'champions'
+
+export type TeamImagesStrategy = 'flags' | 'clubs'
+
+export const TEAM_IMAGES_BY_COMPETITION: Record<
+  CompetitionId,
+  TeamImagesStrategy
+> = {
+  wc: 'flags',
+  euro: 'flags',
+  cl: 'clubs',
+}
+
 export interface Competition {
   id: CompetitionId
   name: string // nume complet, afișat
@@ -22,6 +35,8 @@ export interface Competition {
 export interface Edition {
   id: string // `${competitionId}-${year}`, ex. "wc-2026"
   competitionId: CompetitionId
+  layout: EditionLayout
+  teamImages: TeamImagesStrategy
   year: number
   label: string // ex. "World Cup 2026"
 }
@@ -87,6 +102,8 @@ function buildEditions(): Edition[] {
     list.push({
       id: `${competitionId}-${year}`,
       competitionId,
+      layout: competitionId === 'cl' ? 'champions' : 'group',
+      teamImages: TEAM_IMAGES_BY_COMPETITION[competitionId],
       year,
       label: `${COMPETITIONS[competitionId].name} ${formatSeasonYear(competitionId, year)}`,
     })

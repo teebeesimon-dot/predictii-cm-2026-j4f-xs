@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
-import { TeamName } from '@/components/team-name'
+import { MatchCard } from '@/components/match/MatchCard'
+import { MatchPredictionsList } from '@/components/match/MatchPredictionsList'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
@@ -12,16 +14,11 @@ import {
   type Match,
   type Prediction,
   type AppUser,
-  isViewOnly,
-  scorePrediction,
 } from '@/lib/types'
-import { formatKickoff } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Lock, Users, CheckCircle2, PencilLine } from 'lucide-react'
+import { Lock } from 'lucide-react'
 
 export default function ColleaguesPage() {
   return (
@@ -34,9 +31,11 @@ export default function ColleaguesPage() {
 function ColleaguesContent() {
   const { user } = useAuth()
   const { editionId } = useEdition()
+  const searchParams = useSearchParams()
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
+  const selectedMatchId = searchParams.get('match')
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
@@ -48,9 +47,9 @@ function ColleaguesContent() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-heading text-3xl font-bold">Pronosticurile colegilor</h1>
+        <h1 className="font-heading text-3xl font-bold">Scorurile tuturor</h1>
         <p className="mt-1 text-sm text-muted-foreground text-pretty">
-          Vezi ce a pronosticat fiecare coleg. Pronosticurile unui meci se
+          Vezi scorul ales de fiecare participant. Scorurile unui meci se
           dezvăluie abia după ce s-a închis completarea pentru acea etapă.
         </p>
       </div>
@@ -68,6 +67,7 @@ function ColleaguesContent() {
           predictions={predictions}
           currentUserId={user?.id}
           scheduler={scheduler}
+          selectedMatchId={selectedMatchId}
         />
       )}
     </div>
@@ -80,19 +80,33 @@ function StageTabs({
   predictions,
   currentUserId,
   scheduler,
+  selectedMatchId,
 }: {
   users: AppUser[]
   matches: Match[]
   predictions: Prediction[]
   currentUserId?: string
   scheduler: Scheduler
+  selectedMatchId: string | null
 }) {
   const stages = scheduler.stages
   // Prima etapă care are meciuri devine tab-ul implicit.
   const stagesWithMatches = stages.filter((s) =>
     matches.some((m) => m.stage === s.id),
   )
-  const defaultTab = String(stagesWithMatches[0]?.id ?? stages[0]?.id ?? 1)
+  const selectedMatch = matches.find((match) => match.id === selectedMatchId)
+  const defaultTab = String(
+    selectedMatch?.stage ?? stagesWithMatches[0]?.id ?? stages[0]?.id ?? 1,
+  )
+
+  useEffect(() => {
+    if (!selectedMatchId) return
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`match-${selectedMatchId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [selectedMatchId])
 
   return (
     <Tabs defaultValue={defaultTab}>
@@ -117,6 +131,7 @@ function StageTabs({
             predictions={predictions}
             currentUserId={currentUserId}
             scheduler={scheduler}
+            selectedMatchId={selectedMatchId}
           />
         </TabsContent>
       ))}
@@ -131,6 +146,7 @@ function StageMatches({
   predictions,
   currentUserId,
   scheduler,
+  selectedMatchId,
 }: {
   stageId: StageId
   users: AppUser[]
@@ -138,6 +154,7 @@ function StageMatches({
   predictions: Prediction[]
   currentUserId?: string
   scheduler: Scheduler
+  selectedMatchId: string | null
 }) {
   const stageMatches = useMemo(
     () =>
@@ -165,6 +182,7 @@ function StageMatches({
           predictions={predictions}
           currentUserId={currentUserId}
           scheduler={scheduler}
+          selected={m.id === selectedMatchId}
         />
       ))}
     </div>
@@ -177,158 +195,43 @@ function MatchPredictions({
   predictions,
   currentUserId,
   scheduler,
+  selected,
 }: {
   match: Match
   users: AppUser[]
   predictions: Prediction[]
   currentUserId?: string
   scheduler: Scheduler
+  selected: boolean
 }) {
   const locked = scheduler.isLocked(match)
-  const hasResult = match.homeScore !== null && match.awayScore !== null
-  const matchPreds = predictions.filter((p) => p.matchId === match.id)
-
-  // Sortăm participanții alfabetic; cei fără pronostic apar la final.
-  // Excludem conturile de supraveghere și adminul dedicat (nu joacă, nu apar
-  // nici aici). Jucătorii „ascunși din clasamente" (ex. vasilescu) rămân
-  // vizibili aici, ca un coleg normal.
-  const rows = useMemo(() => {
-    return [...users]
-      .filter(
-        (u) =>
-          !isViewOnly(u) &&
-          u.username !== 'admin' &&
-          (u.name ?? '').toLowerCase() !== 'administrator',
-      )
-      .map((u) => ({
-        user: u,
-        pred: matchPreds.find((p) => p.userId === u.id) ?? null,
-      }))
-      .sort((a, b) => {
-        if (!!a.pred !== !!b.pred) return a.pred ? -1 : 1
-        return a.user.name.localeCompare(b.user.name, 'ro')
-      })
-  }, [users, matchPreds])
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        {/* Header meci */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <TeamName
-              team={match.homeTeam}
-              align="right"
-              className="font-heading font-bold"
-            />
-            {hasResult ? (
-              <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
-                {match.homeScore} - {match.awayScore}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">vs</span>
-            )}
-            <TeamName team={match.awayTeam} className="font-heading font-bold" />
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {formatKickoff(match.kickoff)}
-          </span>
-        </div>
-
-        {/* Conținut: blocat → arată pronosticurile, altfel ascuns */}
+    <div
+      id={`match-${match.id}`}
+      className={cn(
+        'rounded-xl',
+        selected && 'ring-1 ring-primary/30',
+      )}
+    >
+      <MatchCard match={match} competition={scheduler.competitionId}>
         {!locked ? (
           <div className="mt-3 flex items-center gap-2 rounded-md border border-dashed border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
             <Lock className="size-4 shrink-0" />
             <span className="text-pretty">
-              Pronosticurile se dezvăluie după închiderea completării pentru
+              Scorurile se dezvăluie după închiderea completării pentru
               această etapă.
             </span>
           </div>
-        ) : matchPreds.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Niciun pronostic înregistrat pentru acest meci.
-          </p>
         ) : (
-          <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {rows.map(({ user, pred }) => {
-              const isMe = user.id === currentUserId
-              const points = hasResult ? scorePrediction(pred, match) : null
-              const exact = points === 3
-              const correct1x2 = points === 1
-              return (
-                <li
-                  key={user.id}
-                  className={cn(
-                    'flex items-center justify-between gap-3 rounded-md border px-3 py-2',
-                    isMe
-                      ? 'border-l-4 border-l-primary bg-primary/10'
-                      : 'border-border',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex items-center gap-1.5 truncate text-sm',
-                      isMe && 'font-bold',
-                    )}
-                  >
-                    {user.name}
-                    {isMe && (
-                      <Badge className="bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
-                        Tu
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {pred ? (
-                      <span
-                        className={cn(
-                          'rounded font-mono text-sm font-bold tabular-nums',
-                          exact && 'text-primary',
-                          correct1x2 && 'text-accent',
-                        )}
-                      >
-                        {pred.homeScore} - {pred.awayScore}
-                      </span>
-                    ) : (
-                      <span className="text-xs italic text-muted-foreground">
-                        fără pronostic
-                      </span>
-                    )}
-                    {pred?.editedByAdmin && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 px-1.5 py-0 text-[10px] font-bold"
-                        title={
-                          pred.editedByAdminName
-                            ? `Modificat de admin (${pred.editedByAdminName})`
-                            : 'Modificat de admin'
-                        }
-                      >
-                        <PencilLine className="size-3" />
-                        Admin
-                      </Badge>
-                    )}
-                    {exact && (
-                      <Badge className="gap-1 bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
-                        <CheckCircle2 className="size-3" />
-                        Exact
-                      </Badge>
-                    )}
-                    {correct1x2 && (
-                      <Badge
-                        variant="secondary"
-                        className="px-1.5 py-0 text-[10px] font-bold"
-                      >
-                        1X2
-                      </Badge>
-                    )}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+          <MatchPredictionsList
+            match={match}
+            users={users}
+            predictions={predictions}
+            currentUserId={currentUserId}
+          />
         )}
-      </CardContent>
-    </Card>
+      </MatchCard>
+    </div>
   )
 }

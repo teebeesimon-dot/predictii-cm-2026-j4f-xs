@@ -52,7 +52,7 @@ const NAV: NavItem[] = [
   },
   {
     href: '/predictions',
-    label: 'Pronosticuri',
+    label: 'Scorurile mele',
     icon: ListChecks,
     match: (p) => p === '/predictions',
   },
@@ -70,7 +70,7 @@ const NAV: NavItem[] = [
   },
   {
     href: '/colleagues',
-    label: 'Colegii',
+    label: 'Scorurile tuturor',
     icon: Users,
     match: (p) => p === '/colleagues',
   },

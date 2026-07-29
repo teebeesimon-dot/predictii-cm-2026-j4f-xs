@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AppShell } from '@/components/app-shell'
@@ -14,7 +14,8 @@ import {
   useUserNotifications,
 } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
-import { TeamName } from '@/components/team-name'
+import { MatchCard } from '@/components/match/MatchCard'
+import { MatchList } from '@/components/match/MatchList'
 import { StandingsTable } from '@/components/standings-table'
 import { HomeResume } from '@/components/home-resume'
 import { SmartActions, SmartActionIcons, type SmartAction } from '@/components/smart-actions'
@@ -26,17 +27,25 @@ import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  isViewOnly,
-  scorePrediction,
-  type Match,
-  type Prediction,
-  type AppUser,
-} from '@/lib/types'
-import { buildScheduler, type Scheduler } from '@/lib/schedule'
+  getActiveMatchBatch,
+  getMatchDisplayStatus,
+} from '@/lib/match-display'
+import { buildScheduler } from '@/lib/schedule'
 import { computeStandings } from '@/lib/data'
-import { cn, formatKickoff } from '@/lib/utils'
-import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2, PencilLine } from 'lucide-react'
+import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, ClipboardList, Radio } from 'lucide-react'
 import { AchievementsSummaryCard } from '@/components/achievements-summary-card'
+
+function getActiveMatchesTitle(
+  matches: NonNullable<ReturnType<typeof getActiveMatchBatch>>,
+  now: number,
+) {
+  const liveCount = matches.filter(
+    (match) => getMatchDisplayStatus(match, now) === 'live',
+  ).length
+
+  if (liveCount > 0) return liveCount === 1 ? 'Meci LIVE' : 'Meciuri LIVE'
+  return matches.length === 1 ? 'Următorul meci' : 'Următoarele meciuri'
+}
 
 export default function DashboardPage() {
   return (
@@ -49,6 +58,15 @@ export default function DashboardPage() {
 function DashboardContent() {
   const { user } = useAuth()
   const { edition, competition } = useEdition()
+  const [now, setNow] = useState(0)
+
+  useEffect(() => {
+    const updateNow = () => setNow(Date.now())
+    updateNow()
+    const timer = window.setInterval(updateNow, 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   // Fără polling/focus refetch; AutoSync și salvările fac mutate explicit.
   const { data: matches, isLoading } = useMatches()
   const { data: predictions } = useAllPredictions()
@@ -132,25 +150,24 @@ function DashboardContent() {
     (m) => !scheduler.isLocked(m) && !myPredictedMatchIds.has(m.id),
   ).length
 
-  // Meciuri „în desfășurare": au început (kickoff a trecut) și sunt în fereastra
-  // de ~2,5 ore de la start. Rămân afișate chiar dacă adminul a introdus deja un
-  // scor live. Sunt afișate primele, în stilul paginii „Colegi", cu
-  // pronosticurile tuturor.
-  const now = Date.now()
-  const LIVE_WINDOW_MS = 2.5 * 60 * 60 * 1000
-  const liveMatches = (matches ?? [])
-    .filter((m) => {
-      const ko = +new Date(m.kickoff)
-      return ko <= now && now - ko <= LIVE_WINDOW_MS
-    })
-    .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
+  const activeMatches =
+    now === 0 ? [] : getActiveMatchBatch(matches ?? [], now)
+  const singleActiveMatch =
+    activeMatches.length === 1 ? activeMatches[0] : null
+  const activeMatchesTitle = getActiveMatchesTitle(activeMatches, now)
+  const hasLiveActiveMatches = activeMatches.some(
+    (match) => getMatchDisplayStatus(match, now) === 'live',
+  )
 
-  // Următorul meci: cel mai apropiat meci din viitor (kickoff încă nu a trecut).
-  // Folosit doar când nu există niciun meci în desfășurare.
+  // HomeResume still receives the nearest future match independently of the
+  // Dashboard batch, so the target's newer resume behavior remains unchanged.
   const nextMatch =
-    [...(matches ?? [])]
-      .filter((m) => +new Date(m.kickoff) > now)
-      .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))[0] ?? null
+    now === 0
+      ? null
+      : [...(matches ?? [])]
+          .filter((m) => +new Date(m.kickoff) > now)
+          .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))[0] ??
+        null
 
   // Acțiuni contextuale: afișăm doar ce e relevant pentru utilizatorul curent.
   const smartActions: SmartAction[] = []
@@ -223,6 +240,7 @@ function DashboardContent() {
       {!isLoading && user && showResume && (
         <HomeResume
           userId={user.id}
+          competition={competition.id}
           displayName={appUser ? displayNameOf(appUser) : user.name ?? user.username}
           editionLabel={edition.label}
           remaining={remaining}
@@ -238,86 +256,28 @@ function DashboardContent() {
       {/* Acțiuni contextuale */}
       {!isLoading && <SmartActions actions={smartActions} />}
 
-      {/* Meci în desfășurare — afișat primul, split: pronosticuri + clasament live */}
-      {!isLoading && liveMatches.length > 0 && users && predictions && (
+      {/* Un singur meci activ: card navigabil + clasamentele existente. */}
+      {!isLoading && singleActiveMatch && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-destructive" />
-            </span>
+            {getMatchDisplayStatus(singleActiveMatch, now) === 'live' ? (
+              <span className="relative flex size-2.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive opacity-75" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-destructive" />
+              </span>
+            ) : (
+              <CalendarClock className="size-5 text-primary" />
+            )}
             <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
-              Se joacă acum
+              {activeMatchesTitle}
             </h2>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* Stânga: meciul/meciurile live cu pronosticurile tuturor */}
-            <div className="flex flex-col gap-3">
-              {liveMatches.map((m) => (
-                <LiveMatchCard
-                  key={m.id}
-                  match={m}
-                  users={users}
-                  predictions={predictions}
-                  currentUserId={user?.id}
-                  scheduler={scheduler}
-                />
-              ))}
-            </div>
-            {/* Dreapta: mai întâi clasamentul live pe etapa curentă, apoi cel general */}
-            <div className="flex flex-col gap-4">
-              <Card className="border-destructive/30">
-                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="size-5 text-destructive" />
-                    <CardTitle className="text-base">Clasament live etapă</CardTitle>
-                  </div>
-                  <Badge variant="secondary" className="hidden sm:inline-flex">
-                    {liveStageInfo?.short}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <StandingsTable rows={stageStandings} highlightUserId={user?.id} />
-                </CardContent>
-              </Card>
-              <Card className="border-primary/30">
-                <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="size-5 text-primary" />
-                    <CardTitle className="text-base">Clasament general</CardTitle>
-                  </div>
-                  <Badge variant="secondary" className="hidden sm:inline-flex">
-                    General
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <StandingsTable rows={standings} highlightUserId={user?.id} />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-      )}
-      {/* Niciun meci live → următorul meci + clasament, în același layout split */}
-      {!isLoading && liveMatches.length === 0 && nextMatch && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="size-5 text-primary" />
-            <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
-              Următorul meci
-            </h2>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* Stânga: următorul meci cu pronosticurile tuturor */}
-            <LiveMatchCard
-              match={nextMatch}
-              users={users ?? []}
-              predictions={predictions ?? []}
-              currentUserId={user?.id}
-              variant="next"
-              scheduler={scheduler}
+            <MatchCard
+              match={singleActiveMatch}
+              competition={competition.id}
+              now={now}
             />
-            {/* Dreapta: mai întâi clasamentul pe etapa curentă, apoi cel general */}
             <div className="flex flex-col gap-4">
               <Card className="border-primary/30">
                 <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
@@ -351,6 +311,32 @@ function DashboardContent() {
           </div>
         </section>
       )}
+
+      {/* Kickoff-uri suprapuse: listă cronologică de carduri navigabile. */}
+      {!isLoading && activeMatches.length >= 2 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            {hasLiveActiveMatches ? (
+              <Radio className="size-5 text-destructive" />
+            ) : (
+              <CalendarClock className="size-5 text-primary" />
+            )}
+            <h2 className="font-heading text-lg font-bold uppercase tracking-wide">
+              {activeMatchesTitle}
+            </h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            {activeMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                competition={competition.id}
+                now={now}
+              />
+            ))}
+          </div>
+        </section>
+      )}
       {/* Current stage + deadline countdown */}
       <Card className="overflow-hidden border-primary/30">
         <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
@@ -374,49 +360,7 @@ function DashboardContent() {
                 label="Pronosticurile se închid în"
               />
 
-              {liveStageMatches.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <Flag className="size-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Meciurile acestei etape nu au fost adăugate încă.
-                  </p>
-                </div>
-              ) : (
-                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
-                  {liveStageMatches.map((m) => {
-                    const locked = scheduler.isLocked(m)
-                    return (
-                      <li
-                        key={m.id}
-                        className="flex flex-col gap-1 px-3 py-2.5 text-sm"
-                      >
-                        <div className="flex items-center gap-3">
-                          <TeamName
-                            team={m.homeTeam}
-                            align="right"
-                            className="flex-1 justify-end font-medium"
-                          />
-                          <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
-                            {m.homeScore !== null && m.awayScore !== null
-                              ? `${m.homeScore} - ${m.awayScore}`
-                              : 'vs'}
-                          </span>
-                          <TeamName
-                            team={m.awayTeam}
-                            className="flex-1 font-medium"
-                          />
-                          {locked && (
-                            <Lock className="size-3.5 shrink-0 text-muted-foreground" />
-                          )}
-                        </div>
-                        <span className="text-center text-xs capitalize text-muted-foreground">
-                          {formatKickoff(m.kickoff)}
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+              <MatchList matches={liveStageMatches} edition={edition} />
 
               <Link
                 href="/predictions"
@@ -510,7 +454,7 @@ function DashboardContent() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <NavCard
           href="/predictions"
-          title="Pronosticuri"
+          title="Scorurile mele"
           desc="Completează scorurile meciurilor"
           icon={ListChecks}
         />
@@ -528,171 +472,6 @@ function DashboardContent() {
         />
       </div>
     </div>
-  )
-}
-
-function LiveMatchCard({
-  match,
-  users,
-  predictions,
-  currentUserId,
-  variant = 'live',
-  scheduler,
-}: {
-  match: Match
-  users: AppUser[]
-  predictions: Prediction[]
-  currentUserId?: string
-  variant?: 'live' | 'next'
-  scheduler: Scheduler
-}) {
-  // Pronosticurile se dezvăluie doar după ce meciul e blocat (a început sau a
-  // trecut termenul limită), exact ca pe pagina „Colegi". Un meci live este
-  // mereu blocat; pentru următorul meci, dezvăluim doar dacă deja e blocat.
-  const hasResult = match.homeScore !== null && match.awayScore !== null
-  const revealed = variant === 'live' || scheduler.isLocked(match)
-  const matchPreds = predictions.filter((p) => p.matchId === match.id)
-
-  const rows = [...users]
-    .filter(
-      (u) =>
-        !isViewOnly(u) &&
-        u.username !== 'admin' &&
-        (u.name ?? '').toLowerCase() !== 'administrator',
-    )
-    .map((u) => ({
-      user: u,
-      pred: matchPreds.find((p) => p.userId === u.id) ?? null,
-    }))
-    .sort((a, b) => {
-      if (!!a.pred !== !!b.pred) return a.pred ? -1 : 1
-      return a.user.name.localeCompare(b.user.name, 'ro')
-    })
-
-  return (
-    <Card className={variant === 'live' ? 'border-destructive/40' : 'border-primary/30'}>
-      <CardContent className="p-4">
-        {/* Header meci */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <TeamName
-              team={match.homeTeam}
-              align="right"
-              className="font-heading font-bold"
-            />
-            {hasResult ? (
-              <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
-                {match.homeScore} - {match.awayScore}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">vs</span>
-            )}
-            <TeamName team={match.awayTeam} className="font-heading font-bold" />
-          </div>
-          {variant === 'live' ? (
-            <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
-              <Radio className="size-3" />
-              Live
-            </Badge>
-          ) : (
-            <span className="flex items-center gap-1 text-xs capitalize text-muted-foreground">
-              <CalendarClock className="size-3.5" />
-              {formatKickoff(match.kickoff)}
-            </span>
-          )}
-        </div>
-
-        {!revealed ? (
-          <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock className="size-4" />
-            Pronosticurile se afișează după ce începe meciul.
-          </p>
-        ) : matchPreds.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Niciun pronostic înregistrat pentru acest meci.
-          </p>
-        ) : (
-          <ul className="mt-3 grid grid-cols-1 gap-1.5">
-            {rows.map(({ user, pred }) => {
-              const isMe = user.id === currentUserId
-              const points = hasResult ? scorePrediction(pred, match) : null
-              const exact = points === 3
-              const correct1x2 = points === 1
-              return (
-                <li
-                  key={user.id}
-                  className={cn(
-                    'flex items-center justify-between gap-3 rounded-md border px-3 py-2',
-                    isMe
-                      ? 'border-l-4 border-l-primary bg-primary/10'
-                      : 'border-border',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex items-center gap-1.5 truncate text-sm',
-                      isMe && 'font-bold',
-                    )}
-                  >
-                    {user.name}
-                    {isMe && (
-                      <Badge className="bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
-                        Tu
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {pred ? (
-                      <span
-                        className={cn(
-                          'rounded font-mono text-sm font-bold tabular-nums',
-                          exact && 'text-primary',
-                          correct1x2 && 'text-accent',
-                        )}
-                      >
-                        {pred.homeScore} - {pred.awayScore}
-                      </span>
-                    ) : (
-                      <span className="text-xs italic text-muted-foreground">
-                        fără pronostic
-                      </span>
-                    )}
-                    {pred?.editedByAdmin && (
-                      <Badge
-                        variant="secondary"
-                        className="gap-1 px-1.5 py-0 text-[10px] font-bold"
-                        title={
-                          pred.editedByAdminName
-                            ? `Modificat de admin (${pred.editedByAdminName})`
-                            : 'Modificat de admin'
-                        }
-                      >
-                        <PencilLine className="size-3" />
-                        Admin
-                      </Badge>
-                    )}
-                    {exact && (
-                      <Badge className="gap-1 bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
-                        <CheckCircle2 className="size-3" />
-                        Exact
-                      </Badge>
-                    )}
-                    {correct1x2 && (
-                      <Badge
-                        variant="secondary"
-                        className="px-1.5 py-0 text-[10px] font-bold"
-                      >
-                        1X2
-                      </Badge>
-                    )}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
   )
 }
 
