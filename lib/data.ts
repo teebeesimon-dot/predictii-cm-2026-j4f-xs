@@ -236,6 +236,26 @@ export async function deleteMatch(matchId: string): Promise<void> {
   await deleteDoc(doc(db, 'matches', matchId))
 }
 
+// Șterge toate meciurile unei ediții. Nu atinge pronosticurile sau utilizatorii.
+// Pentru ediția implicită (WC 2026) include și documentele legacy fără editionId.
+export async function deleteEditionMatches(
+  editionId: string,
+): Promise<number> {
+  const matches = await getMatches(editionId)
+  if (matches.length === 0) return 0
+
+  // Firestore permite max 500 operații pe batch.
+  const CHUNK = 450
+  for (let i = 0; i < matches.length; i += CHUNK) {
+    const batch = writeBatch(db)
+    for (const m of matches.slice(i, i + CHUNK)) {
+      batch.delete(doc(db, 'matches', m.id))
+    }
+    await batch.commit()
+  }
+  return matches.length
+}
+
 // Seed all 72 group-stage matches if none exist yet. Returns the number added.
 export async function seedGroupMatchesIfEmpty(): Promise<number> {
   const existing = await getMatches(DEFAULT_EDITION_ID)

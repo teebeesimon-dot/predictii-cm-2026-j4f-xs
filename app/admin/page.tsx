@@ -10,6 +10,7 @@ import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import {
   createMatch,
   deleteMatch,
+  deleteEditionMatches,
   updateMatchResult,
   adminSetPrediction,
   createUser,
@@ -261,6 +262,12 @@ function AdminContent() {
                 onImported={() => mutate()}
               />
             )}
+            <DeleteEditionMatchesBanner
+              editionId={editionId}
+              editionLabel={edition.label}
+              matchCount={matches?.length ?? 0}
+              onDeleted={() => mutate()}
+            />
             <AddMatchForm editionId={editionId} onAdded={() => mutate()} />
           </div>
         </TabsContent>
@@ -1165,6 +1172,79 @@ function ImportChampionsLeagueBanner({
           <Download className="size-4" />
         )}
         {importing ? 'Se importă...' : 'Încarcă meciurile'}
+      </Button>
+    </div>
+  )
+}
+
+// Șterge toate meciurile ediției selectate (doar colecția matches). Pronosticurile
+// și utilizatorii rămân neatins. Cere confirmare explicită înainte de execuție.
+function DeleteEditionMatchesBanner({
+  editionId,
+  editionLabel,
+  matchCount,
+  onDeleted,
+}: {
+  editionId: string
+  editionLabel: string
+  matchCount: number
+  onDeleted: () => void
+}) {
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (matchCount === 0) {
+      toast.info('Nu există meciuri de șters pentru această ediție.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Ștergi toate cele ${matchCount} meciuri din „${editionLabel}” (${editionId})?\n\nPronosticurile și utilizatorii NU vor fi șterse. Această acțiune nu poate fi anulată.`,
+      )
+    ) {
+      return
+    }
+    setDeleting(true)
+    try {
+      const deleted = await deleteEditionMatches(editionId)
+      if (deleted === 0) {
+        toast.info('Nu există meciuri de șters pentru această ediție.')
+      } else {
+        toast.success(`Au fost șterse ${deleted} meciuri din ${editionLabel}.`)
+        onDeleted()
+      }
+    } catch {
+      toast.error('Eroare la ștergerea meciurilor.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-dashed border-destructive/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <Trash2 className="mt-0.5 size-5 shrink-0 text-destructive" />
+        <div>
+          <p className="font-medium">Șterge toate meciurile ediției</p>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Elimină din Firestore doar meciurile cu editionId = {editionId}
+            {matchCount > 0 ? ` (${matchCount} meciuri)` : ''}. Pronosticurile și
+            utilizatorii rămân neschimbate.
+          </p>
+        </div>
+      </div>
+      <Button
+        variant="destructive"
+        onClick={handleDelete}
+        disabled={deleting || matchCount === 0}
+        className="shrink-0"
+      >
+        {deleting ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Trash2 className="size-4" />
+        )}
+        {deleting ? 'Se șterg...' : 'Șterge toate meciurile ediției'}
       </Button>
     </div>
   )
