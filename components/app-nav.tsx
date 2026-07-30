@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { BrandLogo } from '@/components/brand-logo'
 import { useAuth } from '@/components/auth-provider'
 import { EditionSelector } from '@/components/edition-selector'
 import { useCurrentAppUser, useUserNotifications } from '@/lib/hooks'
@@ -119,7 +120,15 @@ export function AppNav() {
             label: 'Administrare',
             icon: Shield,
             match: (p: string) =>
-              p.startsWith('/admin') && p !== '/admin/notifications',
+              p.startsWith('/admin') &&
+              p !== '/admin/notifications' &&
+              p !== '/admin/groups',
+          },
+          {
+            href: '/admin/groups',
+            label: 'Grupe',
+            icon: Users,
+            match: (p: string) => p === '/admin/groups',
           },
           {
             href: '/admin/notifications',
@@ -151,11 +160,7 @@ export function AppNav() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/dashboard" className="flex shrink-0 items-center">
-            <img
-              src="/android-chrome-192x192.png"
-              alt="SKUPA"
-              className="h-9 w-auto shrink-0 object-contain lg:h-11"
-            />
+            <BrandLogo size="nav" />
           </Link>
           <EditionSelector />
         </div>

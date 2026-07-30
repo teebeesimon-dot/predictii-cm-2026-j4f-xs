@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
+import { BrandLogo } from '@/components/brand-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,11 +54,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <img
-            src="/android-chrome-512x512.png"
-            alt="SKUPA"
-            className="mb-2 h-40 w-auto object-contain drop-shadow-lg sm:h-48"
-          />
+          <BrandLogo size="hero" />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
             SKUPA
           </h1>

@@ -21,6 +21,7 @@ import type {
   Prediction,
   StageId,
   NotificationCategory,
+  Group,
 } from '@/lib/types'
 import {
   scorePrediction,
@@ -817,4 +818,58 @@ export async function clearReadNotifications(
   await updateDoc(doc(db, 'users', userId), {
     'preferences.notifications.clearedKeys': arrayUnion(...keys),
   })
+}
+
+// ---------------------------------------------------------------------------
+// Grupe (colecția `groups`) — specifică fiecărei ediții
+// ---------------------------------------------------------------------------
+
+export async function getGroups(editionId: string): Promise<Group[]> {
+  if (!editionId) return []
+  const snap = await getDocs(
+    query(collection(db, 'groups'), where('editionId', '==', editionId)),
+  )
+  const groups = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Group, 'id'>),
+  }))
+  return groups.sort((a, b) => a.name.localeCompare(b.name, 'ro'))
+}
+
+export async function createGroup(input: {
+  editionId: string
+  name: string
+  emoji: string
+  members: string[]
+}): Promise<string> {
+  const id = doc(collection(db, 'groups')).id
+  const now = Date.now()
+  await setDoc(doc(db, 'groups', id), {
+    editionId: input.editionId,
+    name: input.name.trim(),
+    emoji: input.emoji.trim(),
+    members: [...new Set(input.members)],
+    createdAt: now,
+    updatedAt: now,
+  })
+  return id
+}
+
+export async function updateGroup(
+  groupId: string,
+  patch: {
+    name?: string
+    emoji?: string
+    members?: string[]
+  },
+): Promise<void> {
+  const data: Record<string, unknown> = { updatedAt: Date.now() }
+  if (patch.name !== undefined) data.name = patch.name.trim()
+  if (patch.emoji !== undefined) data.emoji = patch.emoji.trim()
+  if (patch.members !== undefined) data.members = [...new Set(patch.members)]
+  await updateDoc(doc(db, 'groups', groupId), data)
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  await deleteDoc(doc(db, 'groups', groupId))
 }

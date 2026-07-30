@@ -177,6 +177,13 @@ function AdminContent() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/groups"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <Users className="size-4" />
+            Grupe
+          </Link>
+          <Link
             href="/admin/overview"
             className={buttonVariants({ variant: 'outline' })}
           >

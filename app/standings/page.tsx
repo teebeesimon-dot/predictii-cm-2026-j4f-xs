@@ -1,17 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
-import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useMatches, useUsers, useAllPredictions, useGroups } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
 import { computeStandings, computePositionHistory } from '@/lib/data'
 import type { AppUser, Match, Prediction } from '@/lib/types'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition, type StageDef } from '@/lib/stages'
+import {
+  buildUserGroupsMap,
+  filterStandingRowsByGroups,
+  memberIdsForSelectedGroups,
+} from '@/lib/groups'
 import { cn } from '@/lib/utils'
 import { StandingsTable } from '@/components/standings-table'
+import { GroupsFilter } from '@/components/groups/groups-filter'
 import { PositionEvolutionChart } from '@/components/position-evolution-chart'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,7 +34,6 @@ export default function StandingsPage() {
 function StandingsContent() {
   const { user } = useAuth()
   const { editionId } = useEdition()
-  // Etapele competiției curente (World Cup = 5, Champions League = 11).
   const stages = stagesForEdition(editionId)
   const searchParams = useSearchParams()
   const stageParam = searchParams.get('stage')
@@ -40,19 +45,43 @@ function StandingsContent() {
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
+  const { data: groups = [] } = useGroups()
+
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
   const viewer = { id: user?.id, isAdmin: user?.isAdmin }
 
+  const userGroups = useMemo(() => buildUserGroupsMap(groups), [groups])
+
+  function rowsFor(stage?: StageId) {
+    if (!ready) return []
+    const rows = computeStandings(
+      users,
+      matches,
+      predictions,
+      stage,
+      viewer,
+    )
+    return filterStandingRowsByGroups(rows, groups, selectedGroupIds)
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-3xl font-bold">Clasamente</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          General și pe fiecare etapă a turneului. Egalitățile împart aceeași
-          poziție.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold">Clasamente</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            General și pe fiecare etapă a turneului. Egalitățile împart aceeași
+            poziție.
+          </p>
+        </div>
+        <GroupsFilter
+          groups={groups}
+          selectedGroupIds={selectedGroupIds}
+          onChange={setSelectedGroupIds}
+        />
       </div>
 
       <Card>
@@ -77,14 +106,9 @@ function StandingsContent() {
 
               <TabsContent value="general" className="mt-4">
                 <StandingsTable
-                  rows={computeStandings(
-                    users,
-                    matches,
-                    predictions,
-                    undefined,
-                    viewer,
-                  )}
+                  rows={rowsFor(undefined)}
                   highlightUserId={user?.id}
+                  userGroups={userGroups}
                 />
               </TabsContent>
 
@@ -94,14 +118,9 @@ function StandingsContent() {
                     {s.label}
                   </p>
                   <StandingsTable
-                    rows={computeStandings(
-                      users,
-                      matches,
-                      predictions,
-                      s.id as StageId,
-                      viewer,
-                    )}
+                    rows={rowsFor(s.id as StageId)}
                     highlightUserId={user?.id}
+                    userGroups={userGroups}
                   />
                 </TabsContent>
               ))}
@@ -114,6 +133,8 @@ function StandingsContent() {
                   viewer={viewer}
                   highlightUserId={user?.id}
                   stages={stages}
+                  selectedGroupIds={selectedGroupIds}
+                  groups={groups}
                 />
               </TabsContent>
             </Tabs>
@@ -124,8 +145,6 @@ function StandingsContent() {
   )
 }
 
-// Tab-ul de evoluție, cu selector de scop: general sau o etapă anume. Graficul
-// se recalculează în funcție de scopul ales.
 function EvolutionTab({
   users,
   matches,
@@ -133,6 +152,8 @@ function EvolutionTab({
   viewer,
   highlightUserId,
   stages,
+  selectedGroupIds,
+  groups,
 }: {
   users: AppUser[]
   matches: Match[]
@@ -140,8 +161,9 @@ function EvolutionTab({
   viewer: { id?: string; isAdmin?: boolean }
   highlightUserId?: string
   stages: StageDef[]
+  selectedGroupIds: string[]
+  groups: import('@/lib/types').Group[]
 }) {
-  // 'general' = clasament cumulat pe tot turneul; altfel o etapă (StageId).
   const [scope, setScope] = useState<'general' | StageId>('general')
 
   const scopes: { key: 'general' | StageId; label: string }[] = [
@@ -149,13 +171,26 @@ function EvolutionTab({
     ...stages.map((s) => ({ key: s.id as StageId, label: s.short })),
   ]
 
-  const history = computePositionHistory(
-    users,
-    matches,
-    predictions,
-    scope === 'general' ? undefined : scope,
-    viewer,
-  )
+  const history = useMemo(() => {
+    const full = computePositionHistory(
+      users,
+      matches,
+      predictions,
+      scope === 'general' ? undefined : scope,
+      viewer,
+    )
+    const allowed = memberIdsForSelectedGroups(groups, selectedGroupIds)
+    if (!allowed) return full
+    return {
+      points: full.points.map((p) => ({
+        ...p,
+        ranks: Object.fromEntries(
+          Object.entries(p.ranks).filter(([userId]) => allowed.has(userId)),
+        ),
+      })),
+      players: full.players.filter((p) => allowed.has(p.userId)),
+    }
+  }, [users, matches, predictions, scope, viewer, selectedGroupIds, groups])
 
   return (
     <div className="flex flex-col gap-4">
@@ -164,7 +199,6 @@ function EvolutionTab({
         selectează jucătorii pe care vrei să-i compari.
       </p>
 
-      {/* Selector de scop: general sau etapă */}
       <div className="flex flex-wrap gap-2">
         {scopes.map((sc) => {
           const on = scope === sc.key
