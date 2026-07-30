@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const response = await adminMessaging().sendEachForMulticast({
       tokens,
       notification: {
-        title: body.title || 'Test Just4Fun',
+        title: body.title || 'Test SKUPA',
         body: body.body || 'Aceasta este o notificare de test FCM.',
       },
       android: {

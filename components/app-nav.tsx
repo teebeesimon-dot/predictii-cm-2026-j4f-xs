@@ -152,8 +152,8 @@ export function AppNav() {
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/dashboard" className="flex shrink-0 items-center">
             <img
-              src="/j4f-emblem.png"
-              alt="Predictii Just4Fun League"
+              src="/android-chrome-192x192.png"
+              alt="SKUPA"
               className="h-9 w-auto shrink-0 object-contain lg:h-11"
             />
           </Link>

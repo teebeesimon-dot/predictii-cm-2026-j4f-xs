@@ -1,5 +1,5 @@
 // Registrul de competiții și ediții (competiție + an) pentru platforma
-// „Predictii Just4Fun". Fiecare ediție are propria temă vizuală și propriul
+// „SKUPA". Fiecare ediție are propria temă vizuală și propriul
 // cod football-data folosit la încărcarea meciurilor.
 
 export type CompetitionId = 'wc' | 'euro' | 'cl'

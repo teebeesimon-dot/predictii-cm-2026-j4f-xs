@@ -54,15 +54,15 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
           <img
-            src="/j4f-emblem.png"
-            alt="Emblema Just4Fun League"
+            src="/android-chrome-512x512.png"
+            alt="SKUPA"
             className="mb-2 h-40 w-auto object-contain drop-shadow-lg sm:h-48"
           />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
-            Predictii Just4Fun
+            SKUPA
           </h1>
           <p className="mt-1 text-sm font-medium uppercase tracking-[0.3em] text-accent">
-            Just4Fun League
+            Competiția ne adună.
           </p>
           <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">
             Pune pronosticuri la marile competiții de fotbal, urcă în clasament

@@ -1,6 +1,7 @@
 {
   "name": "SKUPA",
   "short_name": "SKUPA",
+  "description": "Competiția ne adună.",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

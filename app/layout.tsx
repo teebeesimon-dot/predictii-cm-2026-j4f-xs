@@ -1,5 +1,5 @@
 import { Analytics } from '@vercel/analytics/next'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono, Oswald } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/components/auth-provider'
@@ -19,21 +19,24 @@ const oswald = Oswald({
   weight: ['500', '600', '700'],
 })
 
+const siteDescription = 'Competiția ne adună.'
+
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:3000',
   ),
-  title: 'SKUPA',
+  title: {
+    default: 'SKUPA',
+    template: 'SKUPA | %s',
+  },
   applicationName: 'SKUPA',
-  description:
-    'SKUPA — jocul de predicții pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
-  generator: 'v0.app',
+  description: siteDescription,
   manifest: '/site.webmanifest',
+  // Icons: app/favicon.ico + app/icon.png (file-based). Extra sizes + apple from public/.
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       {
@@ -47,7 +50,6 @@ export const metadata: Metadata = {
         type: 'image/png',
       },
     ],
-    shortcut: '/favicon.ico',
     apple: [
       {
         url: '/apple-touch-icon.png',
@@ -58,8 +60,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'SKUPA',
-    description:
-      'SKUPA — jocul de predicții pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
+    description: siteDescription,
     siteName: 'SKUPA',
     images: [
       {
@@ -75,13 +76,28 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
     title: 'SKUPA',
-    description:
-      'SKUPA — jocul de predicții pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
+    description: siteDescription,
     images: ['/android-chrome-512x512.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'SKUPA',
+    statusBarStyle: 'black-translucent',
   },
 }
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#1f9d5a' },
     { media: '(prefers-color-scheme: dark)', color: '#0f2419' },
