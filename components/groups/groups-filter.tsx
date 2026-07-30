@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -70,31 +71,37 @@ export function GroupsFilter({
         <ChevronDown className="size-3.5 opacity-70" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuLabel>Filtrează după grupe</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Filtrează după grupe</DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={allSelected}
-          onCheckedChange={(checked) => {
-            if (checked) toggleAll()
-          }}
-        >
-          Toți
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        {groups.map((g) => (
+        <DropdownMenuGroup>
           <DropdownMenuCheckboxItem
-            key={g.id}
-            checked={selectedGroupIds.includes(g.id)}
-            onCheckedChange={(checked) =>
-              toggleGroup(g.id, checked === true)
-            }
+            checked={allSelected}
+            onCheckedChange={(checked) => {
+              if (checked) toggleAll()
+            }}
           >
-            <span className="inline-flex items-center gap-2">
-              <span className="text-base leading-none">{g.emoji}</span>
-              <span>{g.name}</span>
-            </span>
+            Toți
           </DropdownMenuCheckboxItem>
-        ))}
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          {groups.map((g) => (
+            <DropdownMenuCheckboxItem
+              key={g.id}
+              checked={selectedGroupIds.includes(g.id)}
+              onCheckedChange={(checked) =>
+                toggleGroup(g.id, checked === true)
+              }
+            >
+              <span className="inline-flex items-center gap-2">
+                <span className="text-base leading-none">{g.emoji}</span>
+                <span>{g.name}</span>
+              </span>
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   )
