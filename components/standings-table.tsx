@@ -1,6 +1,7 @@
 'use client'
 
 import { type StandingRow } from '@/lib/data'
+import type { Group } from '@/lib/types'
 import {
   Table,
   TableBody,
@@ -11,14 +12,18 @@ import {
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { GroupBadges } from '@/components/groups/group-badges'
 import { Trophy } from 'lucide-react'
 
 export function StandingsTable({
   rows,
   highlightUserId,
+  userGroups,
 }: {
   rows: StandingRow[]
   highlightUserId?: string
+  /** Map userId → grupe (opțional, pentru badge-uri). */
+  userGroups?: Map<string, Group[]>
 }) {
   if (rows.length === 0) {
     return (
@@ -45,6 +50,7 @@ export function StandingsTable({
           {rows.map((row) => {
             const rank = row.rank
             const isMe = row.userId === highlightUserId
+            const groups = userGroups?.get(row.userId) ?? []
             return (
               <TableRow
                 key={row.userId}
@@ -69,13 +75,14 @@ export function StandingsTable({
                   </span>
                 </TableCell>
                 <TableCell className={cn('font-medium', isMe && 'font-bold')}>
-                  <span className="inline-flex items-center gap-2">
-                    {row.name}
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    <span>{row.name}</span>
                     {isMe && (
                       <Badge className="bg-primary px-1.5 py-0 text-[10px] font-bold text-primary-foreground">
                         Tu
                       </Badge>
                     )}
+                    <GroupBadges groups={groups} />
                   </span>
                 </TableCell>
                 <TableCell

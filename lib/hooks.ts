@@ -8,6 +8,7 @@ import {
   getUserPredictions,
   getAvailableEditionIds,
   getUserNotifications,
+  getGroups,
 } from '@/lib/data'
 import { useEdition } from '@/components/edition-provider'
 import type { AppUser } from '@/lib/types'
@@ -58,6 +59,17 @@ export function useUsers(refreshMs?: number) {
 export function useAllPredictions(refreshMs?: number) {
   const { editionId } = useEdition()
   return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
+    dedupingInterval: DATA_DEDUPE_MS,
+  })
+}
+
+export function useGroups(refreshMs?: number) {
+  const { editionId } = useEdition()
+  return useSWR(['groups', editionId], () => getGroups(editionId), {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,

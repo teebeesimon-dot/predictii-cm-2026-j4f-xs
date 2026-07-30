@@ -60,6 +60,19 @@ export const PARTICIPANTS = [
   'Harabagiu Alex',
 ] as const
 
+// Grupă de participanți (colecția Firestore `groups`), specifică unei ediții.
+// Un utilizator poate aparține mai multor grupe din aceeași competiție.
+export interface Group {
+  id: string
+  editionId: string
+  name: string
+  // Caracter Unicode emoji (ex. "🏆"), nu URL/fișier.
+  emoji: string
+  members: string[]
+  createdAt: number
+  updatedAt: number
+}
+
 export interface AppUser {
   id: string
   username: string
