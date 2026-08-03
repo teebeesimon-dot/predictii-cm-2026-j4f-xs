@@ -13,6 +13,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { PasswordCard } from '@/components/password-card'
+import { PasswordResetRequestCard } from '@/components/password-reset-request-card'
 import { PersonalDashboard } from '@/components/personal-dashboard'
 import { ProfileSettings } from '@/components/profile-settings'
 import { displayNameOf, favouriteTeamOf, initialsOf } from '@/lib/preferences'
@@ -183,6 +184,7 @@ function AccountContent() {
         <TabsContent value="settings" className="mt-4">
           <div className="flex flex-col gap-6">
             {appUser && <ProfileSettings appUser={appUser} />}
+            <PasswordResetRequestCard appUser={appUser} />
             <PasswordCard forced={forced} />
           </div>
         </TabsContent>

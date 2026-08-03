@@ -55,6 +55,7 @@ import {
   authMigrationStatus,
   authMigrationStatusLabel,
 } from '@/lib/types'
+import { isUserMigratedForPasswordReset } from '@/lib/auth-password-reset'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -79,6 +80,8 @@ import {
   RefreshCw,
   Trash2,
   KeyRound,
+  Link2,
+  Copy,
   UserPlus,
   Users,
   Download,
@@ -1745,13 +1748,17 @@ function UserRow({
   onChanged: () => void
   isSelf?: boolean
 }) {
+  const { user: currentUser } = useAuth()
   const [busy, setBusy] = useState(false)
   const [savingAccess, setSavingAccess] = useState(false)
   const [savingEmail, setSavingEmail] = useState(false)
   const [emailDraft, setEmailDraft] = useState(user.email ?? '')
+  const [resetLink, setResetLink] = useState<string | null>(null)
+  const [generatingReset, setGeneratingReset] = useState(false)
   // Stare optimistă pentru comutatoare, ca UI-ul să răspundă imediat.
   const [viewOnly, setViewOnly] = useState(user.viewOnly === true)
   const [hidden, setHidden] = useState(user.hideFromStandings === true)
+  const canAuthPasswordReset = isUserMigratedForPasswordReset(user)
 
   useEffect(() => {
     setEmailDraft(user.email ?? '')
@@ -1798,6 +1805,54 @@ function UserRow({
       toast.error('Eroare la actualizare.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleGenerateAuthResetLink() {
+    if (!currentUser?.id) {
+      toast.error('Sesiune admin invalidă.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Generezi un link de resetare parolă pentru ${user.name || user.username} (${user.email})?`,
+      )
+    ) {
+      return
+    }
+    setGeneratingReset(true)
+    setResetLink(null)
+    try {
+      const res = await fetch('/api/admin/send-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, actorId: currentUser.id }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        resetLink?: string
+        error?: string
+      }
+      if (!res.ok || !data.resetLink) {
+        toast.error(data.error ?? 'Nu am putut genera linkul de resetare.')
+        return
+      }
+      setResetLink(data.resetLink)
+      toast.success('Link generat. Copiază-l și trimite-l utilizatorului.')
+    } catch {
+      toast.error('Eroare de conexiune la generarea linkului.')
+    } finally {
+      setGeneratingReset(false)
+    }
+  }
+
+  async function handleCopyResetLink() {
+    if (!resetLink) return
+    try {
+      await navigator.clipboard.writeText(resetLink)
+      toast.success('Linkul a fost copiat în clipboard.')
+    } catch {
+      toast.error('Nu am putut copia linkul. Selectează-l manual.')
     }
   }
 
@@ -1951,6 +2006,54 @@ function UserRow({
             </p>
           )}
         </div>
+
+        {canAuthPasswordReset && (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <p className="text-sm font-medium">Resetare parolă (Firebase Auth)</p>
+            <p className="text-xs text-muted-foreground">
+              Generează un link pe server. Nu se trimite email automat — copiază
+              linkul și trimite-l manual.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={generatingReset || busy}
+              onClick={handleGenerateAuthResetLink}
+            >
+              {generatingReset ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Link2 className="size-4" />
+              )}
+              Trimite resetare parolă
+            </Button>
+            {resetLink && (
+              <div className="flex flex-col gap-2">
+                <Label className="text-xs">Copiază linkul</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    readOnly
+                    value={resetLink}
+                    className="font-mono text-xs"
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={handleCopyResetLink}
+                  >
+                    <Copy className="size-4" />
+                    Copiază
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Drepturi de acces controlate de admin */}
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
