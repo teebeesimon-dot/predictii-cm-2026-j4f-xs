@@ -12,6 +12,7 @@ import {
   where,
   arrayUnion,
   arrayRemove,
+  deleteField,
   limit,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -32,6 +33,9 @@ import {
 } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import { EDITIONS } from '@/lib/editions'
+import { isValidEmail, normalizeEmail } from '@/lib/email'
+
+export { isValidEmail, normalizeEmail } from '@/lib/email'
 
 // Parola implicită atribuită fiecărui participant la creare. Folosită și pentru
 // a detecta conturile mai vechi care nu și-au schimbat încă parola.
@@ -376,15 +380,30 @@ function slugifyUsername(name: string): string {
     .replace(/^\.+|\.+$/g, '')
 }
 
+async function findUserIdByEmail(email: string): Promise<string | null> {
+  const snap = await getDocs(
+    query(collection(db, 'users'), where('email', '==', email), limit(1)),
+  )
+  if (snap.empty) return null
+  return snap.docs[0].id
+}
+
+/**
+ * Creează un utilizator în Firestore (login custom neschimbat).
+ * `email` e opțional: dacă e prezent, trebuie să fie valid și unic.
+ * Nu creează cont Firebase Authentication.
+ */
 export async function createUser(
   name: string,
   username: string,
   password: string,
   isAdmin = false,
+  email?: string,
 ): Promise<void> {
   const uname = username.trim().toLowerCase()
   const id = doc(collection(db, 'users')).id
-  await setDoc(doc(db, 'users', id), {
+
+  const base = {
     name: name.trim(),
     username: uname,
     password,
@@ -393,7 +412,48 @@ export async function createUser(
     // Parola inițială este una implicită → utilizatorul trebuie s-o schimbe
     // la prima autentificare.
     mustChangePassword: true,
-  })
+  }
+
+  const rawEmail = email?.trim() ?? ''
+  if (!rawEmail) {
+    await setDoc(doc(db, 'users', id), base)
+    return
+  }
+
+  if (!isValidEmail(rawEmail)) {
+    throw new Error('Adresa de email nu este validă.')
+  }
+  const normalized = normalizeEmail(rawEmail)
+  const existingId = await findUserIdByEmail(normalized)
+  if (existingId) {
+    throw new Error('Acest email este deja folosit de alt utilizator.')
+  }
+  await setDoc(doc(db, 'users', id), { ...base, email: normalized })
+}
+
+/**
+ * Setează sau șterge emailul unui utilizator existent (doar Firestore).
+ * String gol → elimină câmpul. Nu creează / nu modifică Firebase Auth.
+ */
+export async function updateUserEmail(
+  userId: string,
+  email: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const raw = email.trim()
+  if (!raw) {
+    await updateDoc(doc(db, 'users', userId), { email: deleteField() })
+    return { ok: true }
+  }
+  if (!isValidEmail(raw)) {
+    return { ok: false, error: 'Adresa de email nu este validă.' }
+  }
+  const normalized = normalizeEmail(raw)
+  const existingId = await findUserIdByEmail(normalized)
+  if (existingId && existingId !== userId) {
+    return { ok: false, error: 'Acest email este deja folosit de alt utilizator.' }
+  }
+  await updateDoc(doc(db, 'users', userId), { email: normalized })
+  return { ok: true }
 }
 
 export async function deleteUser(userId: string): Promise<void> {
@@ -863,7 +923,12 @@ export async function updateGroup(
     members?: string[]
   },
 ): Promise<void> {
-  const data: Record<string, unknown> = { updatedAt: Date.now() }
+  const data: {
+    updatedAt: number
+    name?: string
+    emoji?: string
+    members?: string[]
+  } = { updatedAt: Date.now() }
   if (patch.name !== undefined) data.name = patch.name.trim()
   if (patch.emoji !== undefined) data.emoji = patch.emoji.trim()
   if (patch.members !== undefined) data.members = [...new Set(patch.members)]

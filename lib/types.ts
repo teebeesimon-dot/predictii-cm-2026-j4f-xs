@@ -106,6 +106,51 @@ export interface AppUser {
   // document `users`, deci NU necesită o colecție nouă și „călătoresc" cu
   // datele deja încărcate prin useUsers() (zero citiri suplimentare).
   preferences?: UserPreferences
+  // --- Pregătire migrare Firebase Authentication (Etapa 1) ---
+  // Email real pentru login Auth / reset parolă. Opțional până la migrare.
+  email?: string
+  // UID Firebase Auth legat de acest document. Identitatea business rămâne `id`.
+  authUid?: string
+  // Providere Auth asociate (ex. "password", "google.com").
+  authProviders?: string[]
+  // Epoch ms când contul a fost legat de Firebase Auth.
+  migratedAt?: number
+  // Ultimul provider folosit la login Auth (informativ).
+  lastLoginProvider?: string
+  // Epoch ms al ultimei autentificări Auth.
+  lastLoginAt?: number
+}
+
+/** Starea migrării către Firebase Auth, derivată din câmpurile de pe user. */
+export type AuthMigrationStatus = 'migrated' | 'email_ready' | 'pending'
+
+export function authMigrationStatus(
+  user: Pick<AppUser, 'authUid' | 'email'>,
+): AuthMigrationStatus {
+  if (user.authUid) return 'migrated'
+  if (user.email) return 'email_ready'
+  return 'pending'
+}
+
+export function authMigrationStatusLabel(status: AuthMigrationStatus): string {
+  switch (status) {
+    case 'migrated':
+      return 'Migrat (Firebase Auth)'
+    case 'email_ready':
+      return 'Email salvat — în așteptarea migrării'
+    case 'pending':
+      return 'Nemigrat'
+  }
+}
+
+export function authProvidersLabel(
+  user: Pick<AppUser, 'authProviders' | 'lastLoginProvider'>,
+): string {
+  if (user.authProviders && user.authProviders.length > 0) {
+    return user.authProviders.join(', ')
+  }
+  if (user.lastLoginProvider) return user.lastLoginProvider
+  return '—'
 }
 
 // Categoriile de notificări pe care utilizatorul le poate configura

@@ -17,7 +17,12 @@ import { PersonalDashboard } from '@/components/personal-dashboard'
 import { ProfileSettings } from '@/components/profile-settings'
 import { displayNameOf, favouriteTeamOf, initialsOf } from '@/lib/preferences'
 import { EDITIONS } from '@/lib/editions'
-import { hasEditionAccess } from '@/lib/types'
+import {
+  hasEditionAccess,
+  authMigrationStatus,
+  authMigrationStatusLabel,
+  authProvidersLabel,
+} from '@/lib/types'
 import { ShieldAlert, Star, Trophy } from 'lucide-react'
 
 export default function AccountPage() {
@@ -119,6 +124,26 @@ function AccountContent() {
                 <div className="flex justify-between gap-4 border-b border-border pb-3">
                   <span className="text-sm text-muted-foreground">Utilizator</span>
                   <span className="text-sm font-medium text-foreground">@{user.username}</span>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border pb-3">
+                  <span className="text-sm text-muted-foreground">Email</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {appUser?.email || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border pb-3">
+                  <span className="text-sm text-muted-foreground">Provider</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {appUser ? authProvidersLabel(appUser) : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border pb-3">
+                  <span className="text-sm text-muted-foreground">Status migrare</span>
+                  <span className="text-sm font-medium text-foreground">
+                    {appUser
+                      ? authMigrationStatusLabel(authMigrationStatus(appUser))
+                      : '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between gap-4">
                   <span className="text-sm text-muted-foreground">Echipă favorită</span>

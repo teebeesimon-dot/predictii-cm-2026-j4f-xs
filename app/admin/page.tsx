@@ -16,9 +16,12 @@ import {
   createUser,
   deleteUser,
   updateUserPassword,
+  updateUserEmail,
   updateUserAccess,
   setUserEditionAccess,
   seedUsersIfEmpty,
+  isValidEmail,
+  normalizeEmail,
   seedGroupMatchesIfEmpty,
   fixPlayoffTeamNames,
   resyncMatchTeams,
@@ -49,6 +52,8 @@ import {
   type KnockoutRound,
   type AppUser,
   type Prediction,
+  authMigrationStatus,
+  authMigrationStatusLabel,
 } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -1544,6 +1549,7 @@ function UsersManager({
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [seeding, setSeeding] = useState(false)
 
@@ -1564,16 +1570,30 @@ function UsersManager({
       toast.error('Acest utilizator există deja.')
       return
     }
+    const rawEmail = email.trim()
+    if (rawEmail) {
+      if (!isValidEmail(rawEmail)) {
+        toast.error('Adresa de email nu este validă.')
+        return
+      }
+      const normalized = normalizeEmail(rawEmail)
+      const emailTaken = (users ?? []).some((u) => u.email === normalized)
+      if (emailTaken) {
+        toast.error('Acest email este deja folosit de alt utilizator.')
+        return
+      }
+    }
     setSaving(true)
     try {
-      await createUser(name, username, password, false)
+      await createUser(name, username, password, false, rawEmail || undefined)
       toast.success('Participant adăugat!')
       setName('')
       setUsername('')
       setPassword('')
+      setEmail('')
       onChanged()
-    } catch {
-      toast.error('Eroare la adăugare.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Eroare la adăugare.')
     } finally {
       setSaving(false)
     }
@@ -1609,7 +1629,7 @@ function UsersManager({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAdd} className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="u-name">Nume complet</Label>
                 <Input
@@ -1630,6 +1650,18 @@ function UsersManager({
                 />
               </div>
               <div className="flex flex-col gap-2">
+                <Label htmlFor="u-email">Email</Label>
+                <Input
+                  id="u-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="ex: simon@example.com"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="u-password">Parolă</Label>
                 <Input
                   id="u-password"
@@ -1639,6 +1671,11 @@ function UsersManager({
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Emailul e opțional acum: se salvează doar în Firestore, pregătire
+              pentru migrarea la Firebase Authentication. Login-ul rămâne
+              utilizator + parolă.
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" disabled={saving} className="self-start">
                 {saving ? (
@@ -1710,9 +1747,41 @@ function UserRow({
 }) {
   const [busy, setBusy] = useState(false)
   const [savingAccess, setSavingAccess] = useState(false)
+  const [savingEmail, setSavingEmail] = useState(false)
+  const [emailDraft, setEmailDraft] = useState(user.email ?? '')
   // Stare optimistă pentru comutatoare, ca UI-ul să răspundă imediat.
   const [viewOnly, setViewOnly] = useState(user.viewOnly === true)
   const [hidden, setHidden] = useState(user.hideFromStandings === true)
+
+  useEffect(() => {
+    setEmailDraft(user.email ?? '')
+  }, [user.email])
+
+  const migrationStatus = authMigrationStatus(user)
+  const emailDirty =
+    normalizeEmail(emailDraft) !== normalizeEmail(user.email ?? '')
+
+  async function handleSaveEmail() {
+    const raw = emailDraft.trim()
+    if (raw && !isValidEmail(raw)) {
+      toast.error('Adresa de email nu este validă.')
+      return
+    }
+    setSavingEmail(true)
+    try {
+      const res = await updateUserEmail(user.id, raw)
+      if (!res.ok) {
+        toast.error(res.error ?? 'Eroare la salvarea emailului.')
+        return
+      }
+      toast.success(raw ? 'Email actualizat.' : 'Email eliminat.')
+      onChanged()
+    } catch {
+      toast.error('Eroare la salvarea emailului.')
+    } finally {
+      setSavingEmail(false)
+    }
+  }
 
   async function handleReset() {
     const pwd = window.prompt(
@@ -1810,6 +1879,9 @@ function UserRow({
             <p className="truncate text-xs text-muted-foreground">
               @{user.username}
             </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {authMigrationStatusLabel(migrationStatus)}
+            </p>
           </div>
           <div className="flex shrink-0 gap-1">
             <Button
@@ -1834,6 +1906,50 @@ function UserRow({
               </Button>
             )}
           </div>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+          <Label htmlFor={`email-${user.id}`} className="text-sm font-medium">
+            Email
+          </Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id={`email-${user.id}`}
+              type="email"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              placeholder="ex: nume@example.com"
+              autoCapitalize="none"
+              autoComplete="off"
+              disabled={savingEmail || Boolean(user.authUid)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={
+                savingEmail || !emailDirty || Boolean(user.authUid)
+              }
+              onClick={handleSaveEmail}
+              className="shrink-0"
+            >
+              {savingEmail ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
+              Salvează
+            </Button>
+          </div>
+          {user.authUid ? (
+            <p className="text-xs text-muted-foreground">
+              Cont legat de Firebase Auth — emailul nu se mai editează aici.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Opțional. Se salvează doar în Firestore, fără cont Auth.
+            </p>
+          )}
         </div>
 
         {/* Drepturi de acces controlate de admin */}
