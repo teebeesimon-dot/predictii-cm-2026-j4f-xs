@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Mail } from 'lucide-react'
 import { GoogleGlyph } from '@/components/google-glyph'
+import { ForgotPasswordDialog } from '@/components/forgot-password-dialog'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [emailPassword, setEmailPassword] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [forgotOpen, setForgotOpen] = useState(false)
   const [submitting, setSubmitting] = useState<'email' | 'google' | 'legacy' | null>(
     null,
   )
@@ -173,6 +175,14 @@ export default function LoginPage() {
                   {submitting !== 'email' && <Mail className="size-4" />}
                   Intră cu Email
                 </Button>
+                <button
+                  type="button"
+                  className="text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => setForgotOpen(true)}
+                >
+                  Ai uitat parola?
+                </button>
               </form>
 
               <div className="my-4 flex items-center gap-3">
@@ -256,6 +266,12 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <ForgotPasswordDialog
+        open={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+        initialEmail={email}
+      />
     </main>
   )
 }
