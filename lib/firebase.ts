@@ -14,6 +14,6 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
 export const db = getFirestore(app)
-/** Firebase Authentication — pregătit pentru migrare; login-ul curent rămâne custom. */
+/** Firebase Authentication — login migrat (email/Google) + legare la primul login. */
 export const auth = getAuth(app)
 export default app
