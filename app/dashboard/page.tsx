@@ -388,29 +388,31 @@ function DashboardContent() {
                     return (
                       <li
                         key={m.id}
-                        className="flex flex-col gap-1 px-3 py-2.5 text-sm"
+                        className="flex flex-col gap-2 px-3 py-4 text-sm sm:py-3"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-3">
                           <TeamName
                             team={m.homeTeam}
                             align="right"
-                            className="flex-1 justify-end font-medium"
+                            flagSize={40}
+                            truncate={false}
+                            className="flex-col-reverse justify-end gap-1 text-center font-medium sm:flex-row sm:gap-2 sm:text-right"
                           />
-                          <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-bold text-muted-foreground">
+                          <span className="shrink-0 rounded bg-secondary px-2 py-1 text-xs font-bold text-muted-foreground">
                             {m.homeScore !== null && m.awayScore !== null
                               ? `${m.homeScore} - ${m.awayScore}`
                               : 'vs'}
                           </span>
                           <TeamName
                             team={m.awayTeam}
-                            className="flex-1 font-medium"
+                            flagSize={40}
+                            truncate={false}
+                            className="flex-col gap-1 text-center font-medium sm:flex-row sm:gap-2 sm:text-left"
                           />
-                          {locked && (
-                            <Lock className="size-3.5 shrink-0 text-muted-foreground" />
-                          )}
                         </div>
-                        <span className="text-center text-xs capitalize text-muted-foreground">
+                        <span className="flex items-center justify-center gap-1 text-center text-xs capitalize text-muted-foreground">
                           {formatKickoff(m.kickoff)}
+                          {locked && <Lock className="size-3.5 shrink-0" />}
                         </span>
                       </li>
                     )

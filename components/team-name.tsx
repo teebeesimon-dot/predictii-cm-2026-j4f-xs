@@ -9,14 +9,16 @@ export function TeamName({
   align = 'left',
   className,
   flagSize = 20,
+  truncate = true,
 }: {
   team: string
   align?: 'left' | 'right'
   className?: string
   flagSize?: 20 | 40 | 80
+  truncate?: boolean
 }) {
   const flag = getFlagUrl(team, flagSize)
-  const dimClass = flagSize >= 40 ? 'h-5 w-7' : 'h-3.5 w-5'
+  const dimClass = flagSize >= 40 ? 'size-8' : 'h-3.5 w-5'
 
   const flagEl = flag ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -29,7 +31,11 @@ export function TeamName({
     />
   ) : null
 
-  const nameEl = <span className="truncate">{team}</span>
+  const nameEl = (
+    <span className={cn(truncate ? 'truncate' : 'break-words leading-snug')}>
+      {team}
+    </span>
+  )
 
   // Pentru echipa gazdă ('right') punem numele întâi și steagul la final, ca
   // steagul să stea lângă scor/„vs". Nu folosim flex-row-reverse fiindcă inversa
