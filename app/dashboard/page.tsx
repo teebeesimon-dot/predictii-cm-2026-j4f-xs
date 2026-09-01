@@ -33,7 +33,7 @@ import {
   type AppUser,
 } from '@/lib/types'
 import { buildScheduler, type Scheduler } from '@/lib/schedule'
-import { computeStandings } from '@/lib/data'
+import { computeStandings, usersForEdition } from '@/lib/data'
 import { cn, formatKickoff } from '@/lib/utils'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, Lock, ClipboardList, Radio, CheckCircle2, PencilLine } from 'lucide-react'
 import { AchievementsSummaryCard } from '@/components/achievements-summary-card'
@@ -53,6 +53,10 @@ function DashboardContent() {
   const { data: matches, isLoading } = useMatches()
   const { data: predictions } = useAllPredictions()
   const { data: users } = useUsers()
+  const editionUsers = useMemo(
+    () => (users ? usersForEdition(users, edition.id) : undefined),
+    [users, edition.id],
+  )
 
   // Scheduler-ul competiției curente: etape, termene, blocare/dezvăluire
   // (World Cup = termene fixe; Champions League = 1h înainte de primul meci).
@@ -70,8 +74,8 @@ function DashboardContent() {
 
   const standings = useMemo(
     () =>
-      users && matches && predictions
-        ? computeStandings(users, matches, predictions, undefined, {
+      editionUsers && matches && predictions
+        ? computeStandings(editionUsers, matches, predictions, undefined, {
             id: user?.id,
             isAdmin: user?.isAdmin,
           })
@@ -89,8 +93,8 @@ function DashboardContent() {
   // Clasamentul doar pe etapa live (se actualizează pe măsură ce intră scorurile).
   const stageStandings = useMemo(
     () =>
-      users && matches && predictions
-        ? computeStandings(users, matches, predictions, liveStage, {
+      editionUsers && matches && predictions
+        ? computeStandings(editionUsers, matches, predictions, liveStage, {
             id: user?.id,
             isAdmin: user?.isAdmin,
           })

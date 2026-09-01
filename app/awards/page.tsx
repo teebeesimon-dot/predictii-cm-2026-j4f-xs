@@ -4,7 +4,7 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
-import { computeStandings } from '@/lib/data'
+import { computeStandings, usersForEdition } from '@/lib/data'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition } from '@/lib/stages'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,7 +30,8 @@ function AwardsContent() {
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const editionUsers = users ? usersForEdition(users, editionId) : undefined
+  const ready = editionUsers && matches && predictions
   // La premii, jucătorii ascunși din clasamente nu apar deloc — nici măcar
   // pentru admin. Singura excepție e propriul cont (potrivire pe id), deci NU
   // transmitem isAdmin aici.
@@ -40,7 +41,7 @@ function AwardsContent() {
   // de puncte mai mulți jucători împart locul 1, deci toți sunt câștigători.
   function stageWinners(stage?: StageId) {
     if (!ready) return []
-    const rows = computeStandings(users, matches, predictions, stage, viewer)
+    const rows = computeStandings(editionUsers, matches, predictions, stage, viewer)
     // un câștigător există doar dacă s-a marcat cel puțin 1 punct în acel scop
     return rows.filter((r) => r.rank === 1 && r.points > 0)
   }

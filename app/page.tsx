@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { BrandLogo } from '@/components/brand-logo'
 
 export default function LoginPage() {
   const { user, loading, login } = useAuth()
@@ -53,11 +54,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <img
-            src="/j4f-emblem.png"
-            alt="Emblema Just4Fun League"
-            className="mb-2 h-40 w-auto object-contain drop-shadow-lg sm:h-48"
-          />
+          <BrandLogo size="hero" alt="SKUPA" />
           <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-foreground">
             Predictii Just4Fun
           </h1>

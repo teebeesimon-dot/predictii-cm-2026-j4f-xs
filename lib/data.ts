@@ -69,6 +69,13 @@ export async function getUsers(): Promise<AppUser[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AppUser, 'id'>) }))
 }
 
+// Participanții unei ediții. Orice listă sau clasament specific competiției
+// trebuie să pornească de aici, ca utilizatorii fără bifă să nu apară în acel
+// context. Datele lor rămân intacte pentru cazul în care accesul este reactivat.
+export function usersForEdition(users: AppUser[], editionId: string): AppUser[] {
+  return users.filter((user) => hasEditionAccess(user, editionId))
+}
+
 // Id-urile edițiilor care au cel puțin un meci încărcat. Edițiile fără meciuri
 // sunt ascunse jucătorilor (selectorul le afișează doar adminilor).
 export async function getAvailableEditionIds(): Promise<string[]> {

@@ -6,7 +6,11 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
-import { computeStandings, computePositionHistory } from '@/lib/data'
+import {
+  computeStandings,
+  computePositionHistory,
+  usersForEdition,
+} from '@/lib/data'
 import type { AppUser, Match, Prediction } from '@/lib/types'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition, type StageDef } from '@/lib/stages'
@@ -42,7 +46,8 @@ function StandingsContent() {
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const editionUsers = users ? usersForEdition(users, editionId) : undefined
+  const ready = editionUsers && matches && predictions
   const viewer = { id: user?.id, isAdmin: user?.isAdmin }
 
   return (
@@ -78,7 +83,7 @@ function StandingsContent() {
               <TabsContent value="general" className="mt-4">
                 <StandingsTable
                   rows={computeStandings(
-                    users,
+                    editionUsers,
                     matches,
                     predictions,
                     undefined,
@@ -95,7 +100,7 @@ function StandingsContent() {
                   </p>
                   <StandingsTable
                     rows={computeStandings(
-                      users,
+                      editionUsers,
                       matches,
                       predictions,
                       s.id as StageId,
@@ -108,7 +113,7 @@ function StandingsContent() {
 
               <TabsContent value="evolution" className="mt-4">
                 <EvolutionTab
-                  users={users}
+                  users={editionUsers}
                   matches={matches}
                   predictions={predictions}
                   viewer={viewer}

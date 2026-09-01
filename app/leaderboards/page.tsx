@@ -14,6 +14,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { usersForEdition } from '@/lib/data'
+import { useEdition } from '@/components/edition-provider'
 import { BarChart2, Target, Calendar, LayoutList } from 'lucide-react'
 
 export default function LeaderboardsPage() {
@@ -26,12 +28,14 @@ export default function LeaderboardsPage() {
 
 function LeaderboardsContent() {
   const { user } = useAuth()
+  const { editionId } = useEdition()
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const editionUsers = users ? usersForEdition(users, editionId) : undefined
+  const ready = editionUsers && matches && predictions
   const viewer = { id: user?.id, isAdmin: user?.isAdmin }
 
   return (
@@ -77,7 +81,7 @@ function LeaderboardsContent() {
 
               <TabsContent value="exact" className="mt-4">
                 <LeaderboardTable
-                  rows={computeExactScoresLeaderboard(users, matches, predictions, viewer)}
+                  rows={computeExactScoresLeaderboard(editionUsers, matches, predictions, viewer)}
                   highlightId={user?.id}
                   valueLabel="Scoruri exacte"
                   secondaryLabel="Meciuri jucate"
@@ -89,7 +93,7 @@ function LeaderboardsContent() {
                   Procent pronosticuri corecte (1X2). Minim 5 meciuri jucate.
                 </p>
                 <LeaderboardTable
-                  rows={computeAccuracyLeaderboard(users, matches, predictions, viewer)}
+                  rows={computeAccuracyLeaderboard(editionUsers, matches, predictions, viewer)}
                   highlightId={user?.id}
                   valueLabel="Acuratețe"
                   valueSuffix="%"
@@ -99,7 +103,7 @@ function LeaderboardsContent() {
 
               <TabsContent value="monthly" className="mt-4">
                 <MonthlyTab
-                  users={users}
+                  users={editionUsers}
                   matches={matches}
                   predictions={predictions}
                   viewer={viewer}
@@ -112,7 +116,7 @@ function LeaderboardsContent() {
                   Punctaj total în competiția curentă (ediția selectată).
                 </p>
                 <LeaderboardTable
-                  rows={computeCompetitionLeaderboard(users, matches, predictions, viewer)}
+                  rows={computeCompetitionLeaderboard(editionUsers, matches, predictions, viewer)}
                   highlightId={user?.id}
                   valueLabel="Puncte"
                   secondaryLabel="Exacte"

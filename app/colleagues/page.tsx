@@ -16,6 +16,7 @@ import {
   scorePrediction,
 } from '@/lib/types'
 import { formatKickoff } from '@/lib/utils'
+import { usersForEdition } from '@/lib/data'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,7 +40,8 @@ function ColleaguesContent() {
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const editionUsers = users ? usersForEdition(users, editionId) : undefined
+  const ready = editionUsers && matches && predictions
   // Scheduler-ul competiției curente: decide etapele și când se dezvăluie
   // pronosticurile (World Cup = termene fixe; Champions League = 1h înainte
   // de primul meci al etapei).
@@ -63,7 +65,7 @@ function ColleaguesContent() {
         </div>
       ) : (
         <StageTabs
-          users={users}
+          users={editionUsers}
           matches={matches}
           predictions={predictions}
           currentUserId={user?.id}

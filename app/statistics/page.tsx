@@ -4,7 +4,11 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useAllPredictions, useUsers } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
-import { computeStandings, type StandingRow } from '@/lib/data'
+import {
+  computeStandings,
+  usersForEdition,
+  type StandingRow,
+} from '@/lib/data'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition } from '@/lib/stages'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,14 +32,15 @@ function StatisticsContent() {
   const { data: predictions, isLoading: l3 } = useAllPredictions()
 
   const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const editionUsers = users ? usersForEdition(users, editionId) : undefined
+  const ready = editionUsers && matches && predictions
   // Etapele competiției curente (World Cup = 5, Champions League = 11).
   const stages = stagesForEdition(editionId)
 
   // Statisticile mele pentru un scop dat (general sau o etapă anume).
   function myRowFor(stage?: StageId): StandingRow | undefined {
     if (!ready) return undefined
-    return computeStandings(users, matches, predictions, stage, {
+    return computeStandings(editionUsers, matches, predictions, stage, {
       id: user?.id,
       isAdmin: user?.isAdmin,
     }).find((r) => r.userId === user?.id)

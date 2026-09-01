@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth-provider'
 import { EditionProvider } from '@/components/edition-provider'
 import { PushNotificationsProvider } from '@/components/push-notifications-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { ThemeFavicon } from '@/components/theme-favicon'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -25,9 +26,9 @@ export const metadata: Metadata = {
     'Jocul de predicții Just4Fun pentru marile competiții de fotbal: World Cup, Euro și Champions League. Pune pronosticuri, urmărește clasamentele și câștigă trofeul.',
   generator: 'v0.app',
   icons: {
-    icon: '/j4f-icon.png',
-    shortcut: '/j4f-icon.png',
-    apple: '/j4f-icon.png',
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
 }
 
@@ -56,6 +57,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <ThemeFavicon />
           <EditionProvider>
             <AuthProvider>
               <PushNotificationsProvider />

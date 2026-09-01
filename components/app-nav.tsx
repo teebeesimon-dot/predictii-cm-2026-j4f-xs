@@ -35,6 +35,7 @@ import { useAuth } from '@/components/auth-provider'
 import { EditionSelector } from '@/components/edition-selector'
 import { useCurrentAppUser, useUserNotifications } from '@/lib/hooks'
 import { unreadCount } from '@/lib/notifications-read'
+import { BrandLogo } from '@/components/brand-logo'
 
 type NavItem = {
   href: string
@@ -151,11 +152,7 @@ export function AppNav() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-3">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/dashboard" className="flex shrink-0 items-center">
-            <img
-              src="/j4f-emblem.png"
-              alt="Predictii Just4Fun League"
-              className="h-9 w-auto shrink-0 object-contain lg:h-11"
-            />
+            <BrandLogo alt="SKUPA" />
           </Link>
           <EditionSelector />
         </div>
