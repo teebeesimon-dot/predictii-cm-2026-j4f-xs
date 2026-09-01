@@ -26,6 +26,9 @@ interface SessionUser {
   name: string
   isAdmin: boolean
   mustChangePassword: boolean
+  // Accesul per ediție trebuie păstrat și în sesiune; selectorul competiției
+  // folosește acest câmp pentru a afișa Champions League / edițiile noi.
+  access?: Record<string, boolean>
   // Cont de supraveghere: nu poate trimite pronosticuri.
   viewOnly: boolean
   // Ascuns din clasamente pentru ceilalți (dar se vede pe sine).
@@ -57,18 +60,46 @@ function needsPasswordChange(data: AppUser): boolean {
   return false
 }
 
+function toSessionUser(id: string, data: AppUser): SessionUser {
+  return {
+    id,
+    username: data.username,
+    name: data.name || data.username,
+    isAdmin: isUserAdmin(data),
+    mustChangePassword: needsPasswordChange(data),
+    access: data.access,
+    viewOnly: data.viewOnly === true,
+    hideFromStandings: data.hideFromStandings === true,
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setUser(JSON.parse(raw))
-    } catch {
-      // ignore
-    }
-    setLoading(false)
+    void (async () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if (!raw) return
+
+        const cached = JSON.parse(raw) as SessionUser
+        setUser(cached)
+
+        // Adminul poate modifica accesul cât timp utilizatorul este deja logat.
+        // Re-citim documentul la fiecare pornire, altfel sesiunea locală veche nu
+        // află niciodată că access[editionId] a fost bifat în Firestore.
+        const snap = await getDoc(doc(db, 'users', cached.id))
+        if (!snap.exists()) return
+        const fresh = toSessionUser(cached.id, snap.data() as AppUser)
+        setUser(fresh)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh))
+      } catch {
+        // Păstrăm sesiunea din cache dacă Firestore nu este momentan disponibil.
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
 
   const persist = useCallback((u: SessionUser | null) => {
@@ -95,15 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.password !== password) {
         return { ok: false, error: 'Parolă incorectă.' }
       }
-      persist({
-        id: docSnap.id,
-        username: data.username,
-        name: data.name || data.username,
-        isAdmin: isUserAdmin(data),
-        mustChangePassword: needsPasswordChange(data),
-        viewOnly: data.viewOnly === true,
-        hideFromStandings: data.hideFromStandings === true,
-      })
+      persist(toSessionUser(docSnap.id, data))
       return { ok: true }
     },
     [persist],
@@ -121,15 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDoc(ref)
         if (!snap.exists()) return
         const data = snap.data() as AppUser
-        persist({
-          id: current.id,
-          username: data.username,
-          name: data.name || data.username,
-          isAdmin: isUserAdmin(data),
-          mustChangePassword: needsPasswordChange(data),
-          viewOnly: data.viewOnly === true,
-          hideFromStandings: data.hideFromStandings === true,
-        })
+        persist(toSessionUser(current.id, data))
       })()
       return current
     })
