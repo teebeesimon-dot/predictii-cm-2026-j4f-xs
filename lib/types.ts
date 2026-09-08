@@ -275,6 +275,18 @@ export function isDedicatedAdmin(
   )
 }
 
+// Participanții eligibili pentru o ediție: au acces explicit/implicit la ediție,
+// nu sunt conturi de supraveghere și nu sunt contul admin dedicat.
+export function eligibleUsersForEdition(
+  users: AppUser[],
+  editionId: string,
+): AppUser[] {
+  return users.filter(
+    (u) =>
+      hasEditionAccess(u, editionId) && !isViewOnly(u) && !isDedicatedAdmin(u),
+  )
+}
+
 export interface Match {
   id: string
   // Ediția (competiție + an) căreia îi aparține meciul. Documentele mai vechi

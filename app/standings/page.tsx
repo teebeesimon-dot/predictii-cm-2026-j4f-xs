@@ -6,7 +6,11 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions, useGroups } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
-import { computeStandings, computePositionHistory } from '@/lib/data'
+import {
+  computeStandings,
+  computePositionHistory,
+  type StandingsViewer,
+} from '@/lib/data'
 import type { AppUser, Match, Prediction } from '@/lib/types'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition, type StageDef } from '@/lib/stages'
@@ -51,9 +55,23 @@ function StandingsContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
-  const viewer = { id: user?.id, isAdmin: user?.isAdmin }
-
   const userGroups = useMemo(() => buildUserGroupsMap(groups), [groups])
+  const groupMemberIds = useMemo(
+    () =>
+      memberIdsForSelectedGroups(
+        groups,
+        groups.map((group) => group.id),
+      ) ?? new Set<string>(),
+    [groups],
+  )
+  const canViewGeneral =
+    user?.isAdmin === true || (user?.id ? groupMemberIds.has(user.id) : false)
+  const viewer: StandingsViewer = {
+    id: user?.id,
+    isAdmin: user?.isAdmin,
+    editionId,
+    allowedUserIds: user?.isAdmin ? undefined : groupMemberIds,
+  }
 
   function rowsFor(stage?: StageId) {
     if (!ready) return []
@@ -105,11 +123,18 @@ function StandingsContent() {
               </TabsList>
 
               <TabsContent value="general" className="mt-4">
-                <StandingsTable
-                  rows={rowsFor(undefined)}
-                  highlightUserId={user?.id}
-                  userGroups={userGroups}
-                />
+                {canViewGeneral ? (
+                  <StandingsTable
+                    rows={rowsFor(undefined)}
+                    highlightUserId={user?.id}
+                    userGroups={userGroups}
+                  />
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                    Clasamentul general este disponibil doar participanților
+                    înscriși într-o grupă a acestei ediții.
+                  </p>
+                )}
               </TabsContent>
 
               {stages.map((s) => (
@@ -158,7 +183,7 @@ function EvolutionTab({
   users: AppUser[]
   matches: Match[]
   predictions: Prediction[]
-  viewer: { id?: string; isAdmin?: boolean }
+  viewer: StandingsViewer
   highlightUserId?: string
   stages: StageDef[]
   selectedGroupIds: string[]

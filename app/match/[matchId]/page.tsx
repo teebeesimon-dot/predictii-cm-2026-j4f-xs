@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, Lock, Trophy, Users } from 'lucide-react'
@@ -14,9 +14,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/components/auth-provider'
 import { useEdition } from '@/components/edition-provider'
-import { useAllPredictions, useMatches, useUsers } from '@/lib/hooks'
+import {
+  useAllPredictions,
+  useGroups,
+  useMatches,
+  useUsers,
+} from '@/lib/hooks'
 import { computeStandings } from '@/lib/data'
 import { buildScheduler } from '@/lib/schedule'
+import { memberIdsForSelectedGroups } from '@/lib/groups'
 
 export default function MatchCenterPage() {
   return (
@@ -36,6 +42,15 @@ function MatchCenterContent() {
   const { data: users, isLoading: usersLoading } = useUsers()
   const { data: predictions, isLoading: predictionsLoading } =
     useAllPredictions()
+  const { data: groups = [] } = useGroups()
+  const groupMemberIds = useMemo(
+    () =>
+      memberIdsForSelectedGroups(
+        groups,
+        groups.map((group) => group.id),
+      ) ?? new Set<string>(),
+    [groups],
+  )
 
   useEffect(() => {
     const updateNow = () => setNow(Date.now())
@@ -93,6 +108,8 @@ function MatchCenterContent() {
   const viewer = {
     id: user?.id,
     isAdmin: user?.isAdmin,
+    editionId: edition.id,
+    allowedUserIds: user?.isAdmin ? undefined : groupMemberIds,
   }
   const stageStandings = computeStandings(
     users,

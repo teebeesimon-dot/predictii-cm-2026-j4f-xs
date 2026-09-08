@@ -38,6 +38,7 @@ function StatisticsContent() {
     return computeStandings(users, matches, predictions, stage, {
       id: user?.id,
       isAdmin: user?.isAdmin,
+      editionId,
     }).find((r) => r.userId === user?.id)
   }
 

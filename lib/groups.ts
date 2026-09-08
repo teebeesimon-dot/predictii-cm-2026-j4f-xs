@@ -42,7 +42,7 @@ export function memberIdsForSelectedGroups(
   return memberIds
 }
 
-/** Filtrează rândurile de clasament fără a recalcula punctajul/rangul. */
+/** Filtrează rândurile și recalculează pozițiile în clasamentul rezultat. */
 export function filterStandingRowsByGroups(
   rows: StandingRow[],
   groups: Group[],
@@ -50,7 +50,19 @@ export function filterStandingRowsByGroups(
 ): StandingRow[] {
   const memberIds = memberIdsForSelectedGroups(groups, selectedGroupIds)
   if (!memberIds) return rows
-  return rows.filter((row) => memberIds.has(row.userId))
+
+  let lastPoints: number | null = null
+  let lastRank = 0
+  return rows
+    .filter((row) => memberIds.has(row.userId))
+    .map((row, index) => {
+      const rank = lastPoints !== null && row.points === lastPoints
+        ? lastRank
+        : index + 1
+      lastPoints = row.points
+      lastRank = rank
+      return { ...row, rank }
+    })
 }
 
 export function readRecentEmojis(): string[] {

@@ -12,6 +12,7 @@ import {
   useUsers,
   useCurrentAppUser,
   useUserNotifications,
+  useGroups,
 } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { MatchCard } from '@/components/match/MatchCard'
@@ -33,6 +34,7 @@ import {
 } from '@/lib/match-display'
 import { buildScheduler } from '@/lib/schedule'
 import { computeStandings } from '@/lib/data'
+import { memberIdsForSelectedGroups } from '@/lib/groups'
 import { ListChecks, Trophy, BarChart3, CalendarClock, Flag, ClipboardList, Radio } from 'lucide-react'
 import { AchievementsSummaryCard } from '@/components/achievements-summary-card'
 
@@ -72,6 +74,16 @@ function DashboardContent() {
   const { data: matches, isLoading } = useMatches()
   const { data: predictions } = useAllPredictions()
   const { data: users } = useUsers()
+  const { data: groups = [] } = useGroups()
+  const groupMemberIds = useMemo(
+    () =>
+      memberIdsForSelectedGroups(
+        groups,
+        groups.map((group) => group.id),
+      ) ?? new Set<string>(),
+    [groups],
+  )
+  const allowedUserIds = user?.isAdmin ? undefined : groupMemberIds
 
   // Scheduler-ul competiției curente: etape, termene, blocare/dezvăluire
   // (World Cup = termene fixe; Champions League = 1h înainte de primul meci).
@@ -93,9 +105,11 @@ function DashboardContent() {
         ? computeStandings(users, matches, predictions, undefined, {
             id: user?.id,
             isAdmin: user?.isAdmin,
+            editionId: edition.id,
+            allowedUserIds,
           })
         : [],
-    [users, matches, predictions, user?.id, user?.isAdmin],
+    [users, matches, predictions, user?.id, user?.isAdmin, edition.id, allowedUserIds],
   )
   // Etapa care se joacă efectiv acum (poate diferi de etapa „activă" pentru
   // pronosticuri, care sare la următoarea etapă imediat ce termenul expiră).
@@ -112,9 +126,20 @@ function DashboardContent() {
         ? computeStandings(users, matches, predictions, liveStage, {
             id: user?.id,
             isAdmin: user?.isAdmin,
+            editionId: edition.id,
+            allowedUserIds,
           })
         : [],
-    [users, matches, predictions, liveStage, user?.id, user?.isAdmin],
+    [
+      users,
+      matches,
+      predictions,
+      liveStage,
+      user?.id,
+      user?.isAdmin,
+      edition.id,
+      allowedUserIds,
+    ],
   )
   const myRow = standings.find((r) => r.userId === user?.id)
   const myRank = myRow?.rank ?? -1

@@ -350,14 +350,15 @@ function MatchRow({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <TeamName
             team={match.homeTeam}
             competition={scheduler.competitionId}
             align="right"
-            className="flex-1 justify-end font-semibold"
+            className="flex-1 justify-end font-semibold leading-tight"
+            wrap
           />
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Input
               inputMode="numeric"
               aria-label={`Scor ${match.homeTeam}`}
@@ -379,7 +380,8 @@ function MatchRow({
           <TeamName
             team={match.awayTeam}
             competition={scheduler.competitionId}
-            className="flex-1 font-semibold"
+            className="flex-1 font-semibold leading-tight"
+            wrap
           />
         </div>
 

@@ -80,12 +80,13 @@ export function MatchCard({
     >
       <CardContent className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <TeamName
               team={match.homeTeam}
               competition={competition}
               align="right"
-              className="font-heading font-bold"
+              className="min-w-0 flex-1 font-heading font-bold"
+              wrap
             />
             {hasScore ? (
               <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
@@ -97,7 +98,8 @@ export function MatchCard({
             <TeamName
               team={match.awayTeam}
               competition={competition}
-              className="font-heading font-bold"
+              className="min-w-0 flex-1 font-heading font-bold"
+              wrap
             />
           </div>
           {status === 'live' ? (
@@ -151,6 +153,7 @@ export function MatchCard({
               competition={competition}
               align="right"
               flagSize={detailed ? 80 : 20}
+              wrap
               className={cn(
                 'min-w-0 flex-1 justify-end font-heading font-bold',
                 detailed && 'text-lg sm:text-xl',
@@ -168,6 +171,7 @@ export function MatchCard({
               team={match.awayTeam}
               competition={competition}
               flagSize={detailed ? 80 : 20}
+              wrap
               className={cn(
                 'min-w-0 flex-1 font-heading font-bold',
                 detailed && 'text-lg sm:text-xl',

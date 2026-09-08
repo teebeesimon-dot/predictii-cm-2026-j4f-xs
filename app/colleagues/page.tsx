@@ -14,6 +14,7 @@ import {
   type Match,
   type Prediction,
   type AppUser,
+  eligibleUsersForEdition,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -39,6 +40,10 @@ function ColleaguesContent() {
 
   const loading = l1 || l2 || l3
   const ready = users && matches && predictions
+  const eligibleUsers = useMemo(
+    () => eligibleUsersForEdition(users ?? [], editionId),
+    [users, editionId],
+  )
   // Scheduler-ul competiției curente: decide etapele și când se dezvăluie
   // pronosticurile (World Cup = termene fixe; Champions League = 1h înainte
   // de primul meci al etapei).
@@ -62,7 +67,7 @@ function ColleaguesContent() {
         </div>
       ) : (
         <StageTabs
-          users={users}
+          users={eligibleUsers}
           matches={matches}
           predictions={predictions}
           currentUserId={user?.id}

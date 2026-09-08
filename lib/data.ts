@@ -594,18 +594,24 @@ export interface StandingRow {
   rank: number
 }
 
+export interface StandingsViewer {
+  id?: string
+  isAdmin?: boolean
+  editionId?: string
+  allowedUserIds?: ReadonlySet<string>
+}
+
 // Compute a standings table. If stage is provided, only matches in that stage.
 //
-// `viewer` controlează vizibilitatea jucătorilor ascunși (hideFromStandings):
-// un astfel de jucător apare DOAR pentru el însuși și pentru admini. Pentru
-// ceilalți este complet eliminat, iar pozițiile se recalculează curat.
-// Conturile de supraveghere (viewOnly) și adminul dedicat nu apar niciodată.
+// `viewer` controlează vizibilitatea jucătorilor ascunși (hideFromStandings),
+// accesul la ediția curentă și, unde este necesar, setul de membri ai grupelor.
+// Pozițiile se recalculează după toate aceste filtre.
 export function computeStandings(
   users: AppUser[],
   matches: Match[],
   predictions: Prediction[],
   stage?: StageId,
-  viewer?: { id?: string; isAdmin?: boolean },
+  viewer?: StandingsViewer,
 ): StandingRow[] {
   const relevant = matches.filter(
     (m) =>
@@ -628,6 +634,10 @@ export function computeStandings(
 
   const rows: Omit<StandingRow, 'rank'>[] = users
     .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
+    .filter((u) => !viewer?.editionId || hasEditionAccess(u, viewer.editionId))
+    .filter(
+      (u) => !viewer?.allowedUserIds || viewer.allowedUserIds.has(u.id),
+    )
     .filter((u) => !u.hideFromStandings || canSeeHidden(u))
     .map((u) => {
       let points = 0
@@ -701,7 +711,7 @@ export function computePositionHistory(
   matches: Match[],
   predictions: Prediction[],
   stage?: StageId,
-  viewer?: { id?: string; isAdmin?: boolean },
+  viewer?: StandingsViewer,
 ): PositionHistory {
   const scoped = stage ? matches.filter((m) => m.stage === stage) : matches
   const finished = scoped
