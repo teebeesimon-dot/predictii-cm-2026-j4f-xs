@@ -151,10 +151,20 @@ function DashboardContent() {
 
   // Următorul meci: cel mai apropiat meci din viitor (kickoff încă nu a trecut).
   // Folosit doar când nu există niciun meci în desfășurare.
-  const nextMatch =
-    [...(matches ?? [])]
-      .filter((m) => +new Date(m.kickoff) > now)
-      .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))[0] ?? null
+  const upcomingMatches = [...(matches ?? [])]
+    .filter((m) => +new Date(m.kickoff) > now)
+    .sort((a, b) => +new Date(a.kickoff) - +new Date(b.kickoff))
+  const nextMatch = upcomingMatches[0] ?? null
+  // Păstrăm toate meciurile care au exact aceeași zi și aceeași oră ca primul.
+  // Astfel, un program simultan nu ascunde meciurile surori pe Acasă.
+  const nextKickoffKey = nextMatch
+    ? Math.floor(new Date(nextMatch.kickoff).getTime() / 60000)
+    : null
+  const nextMatches = nextKickoffKey === null
+    ? []
+    : upcomingMatches.filter(
+        (match) => Math.floor(new Date(match.kickoff).getTime() / 60000) === nextKickoffKey,
+      )
 
   // Acțiuni contextuale: afișăm doar ce e relevant pentru utilizatorul curent.
   const smartActions: SmartAction[] = []
@@ -258,14 +268,19 @@ function DashboardContent() {
             {/* Stânga: meciul/meciurile live cu pronosticurile tuturor */}
             <div className="flex flex-col gap-3">
               {liveMatches.map((m) => (
-                <LiveMatchCard
+                <Link
                   key={m.id}
-                  match={m}
-                  users={users}
-                  predictions={predictions}
-                  currentUserId={user?.id}
-                  scheduler={scheduler}
-                />
+                  href={`/matches/${m.id}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                >
+                  <LiveMatchCard
+                    match={m}
+                    users={users}
+                    predictions={predictions}
+                    currentUserId={user?.id}
+                    scheduler={scheduler}
+                  />
+                </Link>
               ))}
             </div>
             {/* Dreapta: mai întâi clasamentul live pe etapa curentă, apoi cel general */}
@@ -303,7 +318,7 @@ function DashboardContent() {
         </section>
       )}
       {/* Niciun meci live → următorul meci + clasament, în același layout split */}
-      {!isLoading && liveMatches.length === 0 && nextMatch && (
+      {!isLoading && liveMatches.length === 0 && nextMatches.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <CalendarClock className="size-5 text-primary" />
@@ -313,14 +328,24 @@ function DashboardContent() {
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Stânga: următorul meci cu pronosticurile tuturor */}
-            <LiveMatchCard
-              match={nextMatch}
-              users={users ?? []}
-              predictions={predictions ?? []}
-              currentUserId={user?.id}
-              variant="next"
-              scheduler={scheduler}
-            />
+            <div className="flex flex-col gap-3">
+              {nextMatches.map((match) => (
+                <Link
+                  key={match.id}
+                  href={`/matches/${match.id}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <LiveMatchCard
+                    match={match}
+                    users={users ?? []}
+                    predictions={predictions ?? []}
+                    currentUserId={user?.id}
+                    variant="next"
+                    scheduler={scheduler}
+                  />
+                </Link>
+              ))}
+            </div>
             {/* Dreapta: mai întâi clasamentul pe etapa curentă, apoi cel general */}
             <div className="flex flex-col gap-4">
               <Card className="border-primary/30">
