@@ -161,6 +161,7 @@ function MatchCenterContent() {
               users={users}
               predictions={predictions}
               currentUserId={user?.id}
+              editionId={edition.id}
             />
           )}
         </CardContent>

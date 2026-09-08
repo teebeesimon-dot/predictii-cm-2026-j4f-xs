@@ -15,6 +15,7 @@ import {
 } from '@/lib/hooks'
 import { DeadlineBanner } from '@/components/deadline-banner'
 import { MatchCard } from '@/components/match/MatchCard'
+import { MatchPredictionsList } from '@/components/match/MatchPredictionsList'
 import { MatchList } from '@/components/match/MatchList'
 import { StandingsTable } from '@/components/standings-table'
 import { HomeResume } from '@/components/home-resume'
@@ -277,7 +278,17 @@ function DashboardContent() {
               match={singleActiveMatch}
               competition={competition.id}
               now={now}
-            />
+            >
+              {scheduler.isLocked(singleActiveMatch) && users && predictions && (
+                <MatchPredictionsList
+                  match={singleActiveMatch}
+                  users={users}
+                  predictions={predictions}
+                  currentUserId={user?.id}
+                  editionId={edition.id}
+                />
+              )}
+            </MatchCard>
             <div className="flex flex-col gap-4">
               <Card className="border-primary/30">
                 <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">

@@ -1,6 +1,7 @@
 import { CheckCircle2, PencilLine } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
+  hasEditionAccess,
   isViewOnly,
   scorePrediction,
   type AppUser,
@@ -14,36 +15,43 @@ export function MatchPredictionsList({
   users,
   predictions,
   currentUserId,
+  editionId,
   columns = 2,
 }: {
   match: Match
   users: AppUser[]
   predictions: Prediction[]
   currentUserId?: string
+  editionId?: string
   columns?: 1 | 2
 }) {
   const matchPredictions = predictions.filter(
     (prediction) => prediction.matchId === match.id,
   )
+  const activeUsers = users.filter(
+    (user) =>
+      !isViewOnly(user) &&
+      user.username !== 'admin' &&
+      (user.name ?? '').toLowerCase() !== 'administrator' &&
+      (!editionId || hasEditionAccess(user, editionId)),
+  )
+  const activeUserIds = new Set(activeUsers.map((user) => user.id))
+  const activePredictions = matchPredictions.filter((prediction) =>
+    activeUserIds.has(prediction.userId),
+  )
   const hasResult = match.homeScore !== null && match.awayScore !== null
-  const rows = [...users]
-    .filter(
-      (user) =>
-        !isViewOnly(user) &&
-        user.username !== 'admin' &&
-        (user.name ?? '').toLowerCase() !== 'administrator',
-    )
+  const rows = [...activeUsers]
     .map((user) => ({
       user,
       prediction:
-        matchPredictions.find((item) => item.userId === user.id) ?? null,
+        activePredictions.find((item) => item.userId === user.id) ?? null,
     }))
     .sort((a, b) => {
       if (!!a.prediction !== !!b.prediction) return a.prediction ? -1 : 1
       return a.user.name.localeCompare(b.user.name, 'ro')
     })
 
-  if (matchPredictions.length === 0) {
+  if (activePredictions.length === 0) {
     return (
       <p className="mt-3 text-sm text-muted-foreground">
         Niciun scor înregistrat pentru acest meci.

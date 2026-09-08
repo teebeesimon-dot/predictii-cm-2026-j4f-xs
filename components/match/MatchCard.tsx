@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { CompetitionId } from '@/lib/editions'
 import {
   formatDisplayedKickoffTime,
+  getLiveMinute,
   getMatchDisplayStatus,
   type MatchDisplayStatus,
 } from '@/lib/match-display'
@@ -15,9 +16,11 @@ import { cn, formatKickoff } from '@/lib/utils'
 function MatchStatus({
   match,
   status,
+  now,
 }: {
   match: Match
   status: MatchDisplayStatus
+  now: number
 }) {
   if (status === 'upcoming' || status === 'unknown') {
     return (
@@ -31,7 +34,7 @@ function MatchStatus({
     return (
       <span className="flex items-center gap-1.5 text-xs font-bold uppercase text-destructive">
         <Radio className="size-3.5" />
-        Live
+        Live · {getLiveMinute(match, now)}'
       </span>
     )
   }
@@ -61,7 +64,8 @@ export function MatchCard({
   children?: React.ReactNode
   now?: number
 }) {
-  const status = getMatchDisplayStatus(match, now)
+  const displayNow = now ?? Date.now()
+  const status = getMatchDisplayStatus(match, displayNow)
   const hasScore = match.homeScore !== null && match.awayScore !== null
   const detailed = variant === 'detail'
   const row = variant === 'row'
@@ -99,7 +103,7 @@ export function MatchCard({
           {status === 'live' ? (
             <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
               <Radio className="size-3" />
-              Live
+              Live · {getLiveMinute(match, displayNow)}'
             </Badge>
           ) : status === 'finished' ? (
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -176,7 +180,7 @@ export function MatchCard({
               detailed && 'flex flex-col items-center gap-1 text-center',
             )}
           >
-            <MatchStatus match={match} status={status} />
+            <MatchStatus match={match} status={status} now={displayNow} />
             {locked && (
               <Lock className="size-3.5 shrink-0 text-muted-foreground" />
             )}

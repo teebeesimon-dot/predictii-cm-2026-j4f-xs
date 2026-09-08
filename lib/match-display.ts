@@ -61,6 +61,11 @@ export function getActiveMatchBatch(matches: Match[], now = Date.now()): Match[]
   )
 }
 
+export function getLiveMinute(match: Match, now = Date.now()): number {
+  const kickoff = getDisplayedKickoffTimestamp(match.kickoff)
+  return Math.max(1, Math.floor((now - kickoff) / 60_000) + 1)
+}
+
 export function formatDisplayedKickoffTime(kickoff: string): string {
   return displayedKickoffTimeFormatter.format(new Date(kickoff))
 }
