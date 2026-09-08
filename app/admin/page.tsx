@@ -28,15 +28,15 @@ import {
   importWorldCupKnockout,
   importChampionsLeague,
 } from '@/app/actions/sync'
-import { EDITIONS, COMPETITIONS, formatSeasonYear } from '@/lib/editions'
+import { EDITIONS, COMPETITIONS, formatSeasonYear, getEdition } from '@/lib/editions'
+import { stagesForEdition } from '@/lib/stages'
+import { buildScheduler } from '@/lib/schedule'
 import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
-  STAGES,
   isLocked,
   isDedicatedAdmin,
   isViewOnly,
-  getActiveStage,
   KNOCKOUT_ROUNDS,
   type Match,
   type StageId,
@@ -356,8 +356,9 @@ function CompletionOverview({
   const allMatches = matches ?? []
   const allPreds = predictions ?? []
 
-  // Etapele care au cel puțin un meci încărcat (ignorăm etapele goale).
-  const stagesWithMatches = STAGES.filter((s) =>
+  // Etapele competiției curente (World Cup = 5, Champions League = 11 etc.),
+  // păstrându-le doar pe cele care au cel puțin un meci încărcat.
+  const stagesWithMatches = stagesForEdition(editionId).filter((s) =>
     allMatches.some((m) => m.stage === s.id),
   )
 
@@ -385,7 +386,7 @@ function CompletionOverview({
     m.set(stage, (m.get(stage) ?? 0) + 1)
   }
 
-  const activeStage = getActiveStage()
+  const activeStage = buildScheduler(editionId, allMatches).getActiveStage()
 
   if (participants.length === 0) {
     return (
@@ -1189,6 +1190,13 @@ function AddMatchForm({
   const [kickoff, setKickoff] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Etapele competiției curente (World Cup/Euro = 5, Champions League = 11).
+  const stages = stagesForEdition(editionId)
+  // Runda eliminatorie (r16/sferturi/…) e specifică turneelor finale, unde
+  // etapa 5 e faza eliminatorie. La Champions League etapa 5 e rundă de ligă.
+  const isFinalTournament = getEdition(editionId)?.competitionId !== 'cl'
+  const showKnockoutRound = isFinalTournament && stage === 5
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!home.trim() || !away.trim() || !kickoff) {
@@ -1202,7 +1210,7 @@ function AddMatchForm({
         homeTeam: home.trim(),
         awayTeam: away.trim(),
         stage,
-        ...(stage === 5 ? { round } : {}),
+        ...(showKnockoutRound ? { round } : {}),
         kickoff: new Date(kickoff).toISOString(),
         homeScore: null,
         awayScore: null,
@@ -1256,7 +1264,7 @@ function AddMatchForm({
                 onChange={(e) => setStage(Number(e.target.value) as StageId)}
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {STAGES.map((s) => (
+                {stages.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} — {s.label}
                   </option>
@@ -1274,7 +1282,7 @@ function AddMatchForm({
             </div>
           </div>
 
-          {stage === 5 && (
+          {showKnockoutRound && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="round">Runda eliminatorie (decide termenul limită)</Label>
               <select
@@ -1382,7 +1390,9 @@ function ResultRow({ match, onSaved }: { match: Match; onSaved: () => void }) {
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary">
-            {STAGES.find((s) => s.id === match.stage)?.short}
+            {stagesForEdition(match.editionId ?? '').find(
+              (s) => s.id === match.stage,
+            )?.short}
           </Badge>
           <span className="text-xs text-muted-foreground">
             {formatKickoff(match.kickoff)}
