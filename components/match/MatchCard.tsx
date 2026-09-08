@@ -1,10 +1,9 @@
-import { CalendarClock, Clock3, Lock } from 'lucide-react'
+import { CalendarClock, Lock } from 'lucide-react'
 import { MatchPredictionsLink } from '@/components/match/MatchPredictionsLink'
 import { TeamName } from '@/components/team-name'
 import { Card, CardContent } from '@/components/ui/card'
 import type { CompetitionId } from '@/lib/editions'
 import {
-  formatDisplayedKickoffTime,
   getLiveLabel,
   getMatchDisplayStatus,
   type MatchDisplayStatus,
@@ -15,21 +14,10 @@ import { cn, formatKickoff } from '@/lib/utils'
 function MatchStatus({
   match,
   status,
-  showKickoff = true,
 }: {
   match: Match
   status: MatchDisplayStatus
-  showKickoff?: boolean
 }) {
-  if (status === 'upcoming' || status === 'unknown') {
-    if (!showKickoff) return null
-    return (
-      <span className="flex items-center gap-1.5 text-xs font-medium tabular-nums text-muted-foreground">
-        <Clock3 className="size-3.5" />
-        {formatDisplayedKickoffTime(match.kickoff)}
-      </span>
-    )
-  }
   if (status === 'live') {
     return (
       <span className="text-[10px] font-bold uppercase tracking-wide text-destructive">
@@ -37,10 +25,50 @@ function MatchStatus({
       </span>
     )
   }
+  if (status === 'finished') {
+    return (
+      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        FT
+      </span>
+    )
+  }
+  return null
+}
+
+function MatchScore({
+  match,
+  status,
+  locked,
+  detailed = false,
+}: {
+  match: Match
+  status: MatchDisplayStatus
+  locked: boolean
+  detailed?: boolean
+}) {
+  const hasScore = match.homeScore !== null && match.awayScore !== null
+  const hasStatus = status === 'live' || status === 'finished'
+
   return (
-    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-      FT
-    </span>
+    <div className="flex min-w-0 shrink-0 flex-col items-center gap-1">
+      <span
+        className={cn(
+          'rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums',
+          detailed && 'px-3 py-1 text-lg',
+        )}
+      >
+        {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
+      </span>
+      <div className="flex min-h-4 items-center justify-center gap-1.5">
+        {hasStatus && <MatchStatus match={match} status={status} />}
+        {locked && (
+          <Lock
+            aria-label="Pronostic închis"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -65,9 +93,10 @@ export function MatchCard({
   now?: number
   showKickoff?: boolean
 }) {
+  // Cardurile din listele fără ceas propriu au nevoie de statusul actual.
+  // eslint-disable-next-line react-hooks/purity
   const displayNow = now ?? Date.now()
   const status = getMatchDisplayStatus(match, displayNow)
-  const hasScore = match.homeScore !== null && match.awayScore !== null
   const detailed = variant === 'detail'
   const row = variant === 'row'
   const displayKickoff = showKickoff ?? true
@@ -90,22 +119,7 @@ export function MatchCard({
               className="min-w-0 flex-1 font-heading font-bold"
               wrap
             />
-            <div className="flex shrink-0 flex-col items-center gap-0.5">
-              {hasScore ? (
-                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
-                  {match.homeScore} - {match.awayScore}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">vs</span>
-              )}
-              {status === 'live' && (
-                <MatchStatus
-                  match={match}
-                  status={status}
-                  showKickoff={displayKickoff}
-                />
-              )}
-            </div>
+            <MatchScore match={match} status={status} locked={locked} />
             <TeamName
               team={match.awayTeam}
               competition={competition}
@@ -113,11 +127,7 @@ export function MatchCard({
               wrap
             />
           </div>
-          {status === 'live' ? null : status === 'finished' ? (
-            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              FT
-            </span>
-          ) : (
+          {status !== 'live' && status !== 'finished' && displayKickoff && (
             <span className="flex items-center gap-1 text-xs capitalize text-muted-foreground">
               <CalendarClock className="size-3.5" />
               {formatKickoff(match.kickoff)}
@@ -146,19 +156,11 @@ export function MatchCard({
       >
         <div
           className={cn(
-            'items-center gap-3',
-            detailed
-              ? 'flex flex-col gap-4'
-              : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]',
+            'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3',
+            detailed && 'w-full gap-4 sm:gap-6',
           )}
         >
-          <div
-            className={cn(
-              detailed
-                ? 'flex w-full items-center justify-center gap-4 sm:gap-6'
-                : 'contents',
-            )}
-          >
+          <div className="contents">
             <TeamName
               team={match.homeTeam}
               competition={competition}
@@ -170,23 +172,12 @@ export function MatchCard({
                 detailed && 'text-lg sm:text-xl',
               )}
             />
-            <div className="flex min-w-0 shrink-0 flex-col items-center gap-0.5">
-              <span
-                className={cn(
-                  'rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums',
-                  detailed && 'px-3 py-1 text-lg',
-                )}
-              >
-                {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
-              </span>
-              {status === 'live' && (
-                <MatchStatus
-                  match={match}
-                  status={status}
-                  showKickoff={displayKickoff}
-                />
-              )}
-            </div>
+            <MatchScore
+              match={match}
+              status={status}
+              locked={locked}
+              detailed={detailed}
+            />
             <TeamName
               team={match.awayTeam}
               competition={competition}
@@ -195,33 +186,15 @@ export function MatchCard({
               className={cn(
                 'min-w-0 flex-1 font-heading font-bold',
                 detailed && 'text-lg sm:text-xl',
-                row && 'pr-8',
               )}
             />
           </div>
-          <div
-            className={cn(
-              'flex shrink-0 items-center gap-2',
-              !detailed && 'absolute right-4 top-1/2 -translate-y-1/2',
-              detailed && 'flex flex-col items-center gap-1 text-center',
-            )}
-          >
-            {status !== 'live' && (
-              <MatchStatus
-                match={match}
-                status={status}
-                showKickoff={displayKickoff}
-              />
-            )}
-            {locked && (
-              <Lock className="size-3.5 shrink-0 text-muted-foreground" />
-            )}
-            {detailed && (
-              <span className="text-xs capitalize text-muted-foreground">
-                {displayKickoff && formatKickoff(match.kickoff)}
-              </span>
-            )}
-          </div>
+          {detailed && displayKickoff && (
+            <span className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1 text-xs capitalize text-muted-foreground">
+              <CalendarClock className="size-3.5" />
+              {formatKickoff(match.kickoff)}
+            </span>
+          )}
         </div>
         {children}
       </CardContent>

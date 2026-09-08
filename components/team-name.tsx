@@ -30,46 +30,42 @@ export function TeamName({
   const isClubLogo =
     competition !== undefined &&
     TEAM_IMAGES_BY_COMPETITION[competition] === 'clubs'
-  const dimClass = isClubLogo
+  const logoFrameClass = isClubLogo
     ? flagSize >= 40
       ? 'size-10'
-      : 'size-7'
+      : 'size-8'
     : flagSize >= 40
       ? 'h-5 w-7'
       : 'h-3.5 w-5'
-  const targetClubSize = flagSize >= 40 ? 40 : 28
 
-  const flagEl = flag ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={flag || '/placeholder.svg'}
-      alt=""
-      aria-hidden="true"
-      width={isClubLogo ? targetClubSize * 2 : flagSize}
-      height={isClubLogo ? targetClubSize * 2 : flagSize}
+  const flagEl = (
+    <span
       className={cn(
-        'shrink-0 rounded-sm shadow-sm',
-        isClubLogo ? 'object-contain' : 'object-cover',
-        dimClass,
+        'flex shrink-0 items-center justify-center',
+        logoFrameClass,
       )}
-      loading="lazy"
-      decoding="async"
-      onLoad={(event) => {
-        if (!isClubLogo) return
-        const image = event.currentTarget
-        const pixelRatio = window.devicePixelRatio || 1
-        const maxCssWidth = image.naturalWidth / pixelRatio
-        const maxCssHeight = image.naturalHeight / pixelRatio
-        if (maxCssWidth < targetClubSize || maxCssHeight < targetClubSize) {
-          image.style.width = `${Math.min(targetClubSize, maxCssWidth)}px`
-          image.style.height = `${Math.min(targetClubSize, maxCssHeight)}px`
-        }
-      }}
-      onError={(event) => {
-        event.currentTarget.style.display = 'none'
-      }}
-    />
-  ) : null
+    >
+      {flag ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={flag}
+          alt=""
+          aria-hidden="true"
+          width={isClubLogo ? 40 : flagSize}
+          height={isClubLogo ? 40 : flagSize}
+          className={cn(
+            'max-h-full max-w-full rounded-sm',
+            isClubLogo ? 'object-contain' : 'object-cover',
+          )}
+          loading="lazy"
+          decoding="async"
+          onError={(event) => {
+            event.currentTarget.style.visibility = 'hidden'
+          }}
+        />
+      ) : null}
+    </span>
+  )
 
   const nameEl = (
     <span
