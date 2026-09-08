@@ -31,6 +31,7 @@ club(77, 'Athletic Club', 'Athletic Bilbao')
 club(78, 'Club Atlético de Madrid', 'Atlético de Madrid', 'Atletico Madrid')
 club(81, 'FC Barcelona', 'Barcelona')
 club(86, 'Real Madrid CF', 'Real Madrid')
+club(90, 'Real Betis Balompié', 'Real Betis', 'Real Betis Balompie')
 club(94, 'Villarreal CF', 'Villarreal')
 club(3, 'Bayer 04 Leverkusen', 'Bayer Leverkusen')
 club(4, 'Borussia Dortmund')
@@ -51,6 +52,9 @@ club(678, 'AFC Ajax', 'Ajax')
 club(498, 'Sporting Clube de Portugal', 'Sporting CP')
 club(503, 'FC Porto', 'Porto')
 club(1903, 'SL Benfica', 'Benfica')
+club(521, 'Lille OSC', 'Lille')
+club(1899, 'PAE AEK', 'AEK Athens', 'AEK')
+club(2016, 'LASK Linz', 'LASK')
 
 function getClubLogo(teamName: string): string | null {
   const id = CLUB_IDS[normalize(teamName)]

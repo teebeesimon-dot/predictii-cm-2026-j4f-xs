@@ -64,6 +64,7 @@ export function ChampionsMatchList({
                 match={match}
                 competition={edition.competitionId}
                 locked={scheduler.isLocked(match)}
+                showKickoff={false}
               />
             ))}
           </ul>

@@ -8,10 +8,12 @@ export function MatchRow({
   match,
   competition,
   locked,
+  showKickoff = true,
 }: {
   match: Match
   competition: CompetitionId
   locked: boolean
+  showKickoff?: boolean
 }) {
   return (
     <li>
@@ -20,6 +22,7 @@ export function MatchRow({
         competition={competition}
         variant="row"
         locked={locked}
+        showKickoff={showKickoff}
       />
     </li>
   )

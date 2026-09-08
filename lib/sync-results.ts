@@ -153,6 +153,8 @@ export async function runResultsSync(
           homeScore: c.toHome,
           awayScore: c.toAway,
           liveStatus: c.toLiveStatus,
+          liveMinute: c.toLiveMinute,
+          livePeriod: c.toLivePeriod,
         })
       }
       await batch.commit()

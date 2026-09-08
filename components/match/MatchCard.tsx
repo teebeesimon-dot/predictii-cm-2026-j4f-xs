@@ -15,13 +15,14 @@ import { cn, formatKickoff } from '@/lib/utils'
 function MatchStatus({
   match,
   status,
-  now,
+  showKickoff = true,
 }: {
   match: Match
   status: MatchDisplayStatus
-  now: number
+  showKickoff?: boolean
 }) {
   if (status === 'upcoming' || status === 'unknown') {
+    if (!showKickoff) return null
     return (
       <span className="flex items-center gap-1.5 text-xs font-medium tabular-nums text-muted-foreground">
         <Clock3 className="size-3.5" />
@@ -32,7 +33,7 @@ function MatchStatus({
   if (status === 'live') {
     return (
       <span className="text-[10px] font-bold uppercase tracking-wide text-destructive">
-        {getLiveLabel(match, now)}
+        {getLiveLabel(match)}
       </span>
     )
   }
@@ -52,6 +53,7 @@ export function MatchCard({
   className,
   children,
   now,
+  showKickoff,
 }: {
   match: Match
   competition: CompetitionId
@@ -61,12 +63,14 @@ export function MatchCard({
   className?: string
   children?: React.ReactNode
   now?: number
+  showKickoff?: boolean
 }) {
   const displayNow = now ?? Date.now()
   const status = getMatchDisplayStatus(match, displayNow)
   const hasScore = match.homeScore !== null && match.awayScore !== null
   const detailed = variant === 'detail'
   const row = variant === 'row'
+  const displayKickoff = showKickoff ?? true
 
   const compactCard = (
     <Card
@@ -95,7 +99,11 @@ export function MatchCard({
                 <span className="text-muted-foreground">vs</span>
               )}
               {status === 'live' && (
-                <MatchStatus match={match} status={status} now={displayNow} />
+                <MatchStatus
+                  match={match}
+                  status={status}
+                  showKickoff={displayKickoff}
+                />
               )}
             </div>
             <TeamName
@@ -133,17 +141,22 @@ export function MatchCard({
         className,
       )}
     >
-      <CardContent className={cn('p-4', detailed && 'p-5 sm:p-6')}>
+      <CardContent
+        className={cn('relative p-4', detailed && 'p-5 sm:p-6')}
+      >
         <div
           className={cn(
-            'flex items-center gap-3',
-            detailed ? 'flex-col gap-4' : 'justify-between',
+            'items-center gap-3',
+            detailed
+              ? 'flex flex-col gap-4'
+              : 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]',
           )}
         >
           <div
             className={cn(
-              'flex min-w-0 flex-1 items-center justify-center gap-3',
-              detailed && 'w-full gap-4 sm:gap-6',
+              detailed
+                ? 'flex w-full items-center justify-center gap-4 sm:gap-6'
+                : 'contents',
             )}
           >
             <TeamName
@@ -157,7 +170,7 @@ export function MatchCard({
                 detailed && 'text-lg sm:text-xl',
               )}
             />
-            <div className="flex shrink-0 flex-col items-center gap-0.5">
+            <div className="flex min-w-0 shrink-0 flex-col items-center gap-0.5">
               <span
                 className={cn(
                   'rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums',
@@ -167,7 +180,11 @@ export function MatchCard({
                 {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
               </span>
               {status === 'live' && (
-                <MatchStatus match={match} status={status} now={displayNow} />
+                <MatchStatus
+                  match={match}
+                  status={status}
+                  showKickoff={displayKickoff}
+                />
               )}
             </div>
             <TeamName
@@ -178,24 +195,30 @@ export function MatchCard({
               className={cn(
                 'min-w-0 flex-1 font-heading font-bold',
                 detailed && 'text-lg sm:text-xl',
+                row && 'pr-8',
               )}
             />
           </div>
           <div
             className={cn(
               'flex shrink-0 items-center gap-2',
+              !detailed && 'absolute right-4 top-1/2 -translate-y-1/2',
               detailed && 'flex flex-col items-center gap-1 text-center',
             )}
           >
             {status !== 'live' && (
-              <MatchStatus match={match} status={status} now={displayNow} />
+              <MatchStatus
+                match={match}
+                status={status}
+                showKickoff={displayKickoff}
+              />
             )}
             {locked && (
               <Lock className="size-3.5 shrink-0 text-muted-foreground" />
             )}
             {detailed && (
               <span className="text-xs capitalize text-muted-foreground">
-                {formatKickoff(match.kickoff)}
+                {displayKickoff && formatKickoff(match.kickoff)}
               </span>
             )}
           </div>

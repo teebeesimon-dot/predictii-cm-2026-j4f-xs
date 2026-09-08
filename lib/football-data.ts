@@ -8,7 +8,11 @@
 // (lib/wc2026-schedule.ts) le are în ROMÂNĂ. De aceea normalizăm și mapăm
 // numele englezești (cu variante posibile) la numele românești canonice.
 
-import type { Match, MatchLiveStatus } from '@/lib/types'
+import type {
+  Match,
+  MatchLivePeriod,
+  MatchLiveStatus,
+} from '@/lib/types'
 
 export const WORLD_CUP_COMPETITION = 2000
 const API_BASE = 'https://api.football-data.org/v4'
@@ -42,6 +46,10 @@ interface ApiMatch {
   id: number
   status: ApiMatchStatus
   utcDate?: string
+  // Sunt opționale pentru compatibilitate cu furnizori/răspunsuri care oferă
+  // minutul live explicit; football-data.org nu le trimite în răspunsul curent.
+  minute?: number | null
+  period?: string | null
   homeTeam: ApiTeam
   awayTeam: ApiTeam
   score: {
@@ -172,6 +180,8 @@ export interface NormalizedApiMatch {
   roAway: string | null
   homeScore: number | null
   awayScore: number | null
+  liveMinute: number | null
+  livePeriod: MatchLivePeriod | null
   rawHome: string
   rawAway: string
   kickoff: string // ISO; folosit pentru a distinge manșele tur-retur
@@ -181,6 +191,30 @@ export interface NormalizedApiMatch {
 // chiar dacă API-ul inversează gazdă/oaspete față de orarul nostru).
 export function teamPairKey(a: string, b: string): string {
   return [normalize(a), normalize(b)].sort().join('::')
+}
+
+function normalizeLivePeriod(value: string | null | undefined): MatchLivePeriod | null {
+  switch (value?.toUpperCase()) {
+    case 'R1':
+    case 'FIRST_HALF':
+    case '1H':
+      return 'R1'
+    case 'R2':
+    case 'SECOND_HALF':
+    case '2H':
+      return 'R2'
+    case 'P1':
+    case 'EXTRA_TIME_FIRST_HALF':
+      return 'P1'
+    case 'P2':
+    case 'EXTRA_TIME_SECOND_HALF':
+      return 'P2'
+    case 'PK':
+    case 'PENALTY_SHOOTOUT':
+      return 'PK'
+    default:
+      return null
+  }
 }
 
 // Preia toate meciurile unei competiții de la football-data.org și le
@@ -213,6 +247,8 @@ export async function fetchWorldCupMatches(
       roAway: mapApiTeamToRo(m.awayTeam),
       homeScore: home,
       awayScore: away,
+      liveMinute: typeof m.minute === 'number' ? m.minute : null,
+      livePeriod: normalizeLivePeriod(m.period),
       rawHome: m.homeTeam.name ?? m.homeTeam.shortName ?? '?',
       rawAway: m.awayTeam.name ?? m.awayTeam.shortName ?? '?',
       kickoff: m.utcDate ? new Date(m.utcDate).toISOString() : '',
@@ -375,6 +411,10 @@ export interface ScoreUpdate {
   toAway: number | null
   fromLiveStatus: MatchLiveStatus | null | undefined
   toLiveStatus: MatchLiveStatus | null
+  fromLiveMinute: number | null | undefined
+  toLiveMinute: number | null
+  fromLivePeriod: MatchLivePeriod | null | undefined
+  toLivePeriod: MatchLivePeriod | null
   status: ApiMatchStatus
 }
 
@@ -447,11 +487,16 @@ export function diffScores(
     const toLiveStatus: MatchLiveStatus | null = isLiveStatus(api.status)
       ? api.status
       : null
+    const toLiveMinute = isLiveStatus(api.status) ? api.liveMinute : null
+    const toLivePeriod = isLiveStatus(api.status) ? api.livePeriod : null
     const scoreChanged =
       (toHome !== null && toHome !== m.homeScore) ||
       (toAway !== null && toAway !== m.awayScore)
-    const liveStatusChanged = m.liveStatus !== toLiveStatus
-    if (!scoreChanged && !liveStatusChanged) continue
+    const liveDataChanged =
+      m.liveStatus !== toLiveStatus ||
+      m.liveMinute !== toLiveMinute ||
+      m.livePeriod !== toLivePeriod
+    if (!scoreChanged && !liveDataChanged) continue
 
     updates.push({
       matchId: m.id,
@@ -463,6 +508,10 @@ export function diffScores(
       toAway: toAway ?? m.awayScore,
       fromLiveStatus: m.liveStatus,
       toLiveStatus,
+      fromLiveMinute: m.liveMinute,
+      toLiveMinute,
+      fromLivePeriod: m.livePeriod,
+      toLivePeriod,
       status: api.status,
     })
   }
