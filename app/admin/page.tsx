@@ -121,7 +121,7 @@ function AdminContent() {
     setExporting(true)
     try {
       const standings = computeStandings(
-        users,
+        users.filter((u) => hasEditionAccess(u, editionId)),
         matches,
         predictions,
         undefined,
@@ -270,22 +270,24 @@ function AdminContent() {
         </TabsContent>
 
         <TabsContent value="completion" className="mt-4">
-          <CompletionOverview
-            users={users}
-            matches={matches}
-            predictions={predictions}
-            loading={isLoading || usersLoading}
-          />
+              <CompletionOverview
+                users={users}
+                matches={matches}
+                predictions={predictions}
+                loading={isLoading || usersLoading}
+                editionId={editionId}
+              />
         </TabsContent>
 
         <TabsContent value="predictions" className="mt-4">
-          <PredictionEditor
-            users={users}
-            matches={matches}
-            predictions={predictions}
-            loading={isLoading || usersLoading}
-            onSaved={() => mutate()}
-          />
+              <PredictionEditor
+                users={users}
+                matches={matches}
+                predictions={predictions}
+                loading={isLoading || usersLoading}
+                onSaved={() => mutate()}
+                editionId={editionId}
+              />
         </TabsContent>
 
         <TabsContent value="sync" className="mt-4">
@@ -327,11 +329,13 @@ function CompletionOverview({
   matches,
   predictions,
   loading,
+  editionId,
 }: {
   users: AppUser[] | undefined
   matches: Match[] | undefined
   predictions: Prediction[] | undefined
   loading: boolean
+  editionId: string
 }) {
   if (loading) {
     return (
@@ -344,7 +348,10 @@ function CompletionOverview({
   }
 
   const participants = (users ?? []).filter(
-    (u) => !isDedicatedAdmin(u) && !isViewOnly(u),
+    (u) =>
+      !isDedicatedAdmin(u) &&
+      !isViewOnly(u) &&
+      hasEditionAccess(u, editionId),
   )
   const allMatches = matches ?? []
   const allPreds = predictions ?? []
@@ -503,12 +510,14 @@ function PredictionEditor({
   predictions,
   loading,
   onSaved,
+  editionId,
 }: {
   users: AppUser[] | undefined
   matches: Match[] | undefined
   predictions: Prediction[] | undefined
   loading: boolean
   onSaved: () => void
+  editionId: string
 }) {
   const { user: admin } = useAuth()
   const [selectedMatchId, setSelectedMatchId] = useState<string>('')
@@ -534,9 +543,14 @@ function PredictionEditor({
   const participants = useMemo(
     () =>
       (users ?? [])
-        .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
+        .filter(
+          (u) =>
+            !isDedicatedAdmin(u) &&
+            !isViewOnly(u) &&
+            hasEditionAccess(u, editionId),
+        )
         .sort((a, b) => a.name.localeCompare(b.name, 'ro')),
-    [users],
+    [users, editionId],
   )
 
   const selectedMatch =
