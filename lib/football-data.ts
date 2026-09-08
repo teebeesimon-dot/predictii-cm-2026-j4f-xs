@@ -8,7 +8,7 @@
 // (lib/wc2026-schedule.ts) le are în ROMÂNĂ. De aceea normalizăm și mapăm
 // numele englezești (cu variante posibile) la numele românești canonice.
 
-import type { Match } from '@/lib/types'
+import type { Match, MatchLiveStatus } from '@/lib/types'
 
 export const WORLD_CUP_COMPETITION = 2000
 const API_BASE = 'https://api.football-data.org/v4'
@@ -157,7 +157,7 @@ export function isFinalStatus(status: ApiMatchStatus): boolean {
 }
 
 // Considerăm scorul „în desfășurare" (live) pentru aceste statusuri.
-export function isLiveStatus(status: ApiMatchStatus): boolean {
+export function isLiveStatus(status: ApiMatchStatus): status is MatchLiveStatus {
   return (
     status === 'IN_PLAY' ||
     status === 'PAUSED' ||
@@ -371,8 +371,10 @@ export interface ScoreUpdate {
   awayTeam: string
   fromHome: number | null
   fromAway: number | null
-  toHome: number
-  toAway: number
+  toHome: number | null
+  toAway: number | null
+  fromLiveStatus: MatchLiveStatus | null | undefined
+  toLiveStatus: MatchLiveStatus | null
   status: ApiMatchStatus
 }
 
@@ -429,7 +431,9 @@ export function diffScores(
 
     const usable = isFinalStatus(api.status) || (includeLive && isLiveStatus(api.status))
     if (!usable) continue
-    if (api.homeScore === null || api.awayScore === null) continue
+    if (isFinalStatus(api.status) && (api.homeScore === null || api.awayScore === null)) {
+      continue
+    }
 
     // Aliniază scorurile la orientarea gazdă/oaspete din orarul nostru.
     let toHome = api.homeScore
@@ -440,7 +444,14 @@ export function diffScores(
       toAway = api.homeScore
     }
 
-    if (m.homeScore === toHome && m.awayScore === toAway) continue
+    const toLiveStatus: MatchLiveStatus | null = isLiveStatus(api.status)
+      ? api.status
+      : null
+    const scoreChanged =
+      (toHome !== null && toHome !== m.homeScore) ||
+      (toAway !== null && toAway !== m.awayScore)
+    const liveStatusChanged = m.liveStatus !== toLiveStatus
+    if (!scoreChanged && !liveStatusChanged) continue
 
     updates.push({
       matchId: m.id,
@@ -448,8 +459,10 @@ export function diffScores(
       awayTeam: m.awayTeam,
       fromHome: m.homeScore,
       fromAway: m.awayScore,
-      toHome,
-      toAway,
+      toHome: toHome ?? m.homeScore,
+      toAway: toAway ?? m.awayScore,
+      fromLiveStatus: m.liveStatus,
+      toLiveStatus,
       status: api.status,
     })
   }

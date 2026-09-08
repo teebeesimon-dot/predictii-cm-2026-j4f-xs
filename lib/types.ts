@@ -287,6 +287,12 @@ export function eligibleUsersForEdition(
   )
 }
 
+export type MatchLiveStatus =
+  | 'IN_PLAY'
+  | 'PAUSED'
+  | 'EXTRA_TIME'
+  | 'PENALTY_SHOOTOUT'
+
 export interface Match {
   id: string
   // Ediția (competiție + an) căreia îi aparține meciul. Documentele mai vechi
@@ -306,6 +312,9 @@ export interface Match {
   // automată NU suprascrie meciurile marcate astfel (furnizorul poate avea
   // scorul greșit). Resetat la false când scorul e șters din admin.
   scoreOverride?: boolean
+  // Starea live furnizată de football-data.org. Este folosită pentru a afișa
+  // corect loviturile de departajare; perioadele de joc sunt calculate din minut.
+  liveStatus?: 'IN_PLAY' | 'PAUSED' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT' | null
 }
 
 export interface Prediction {

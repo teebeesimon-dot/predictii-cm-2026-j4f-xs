@@ -34,6 +34,14 @@ export function getMatchDisplayStatus(
 ): MatchDisplayStatus {
   const kickoff = getDisplayedKickoffTimestamp(match.kickoff)
   if (now < kickoff) return 'upcoming'
+  if (
+    match.liveStatus === null &&
+    match.homeScore !== null &&
+    match.awayScore !== null
+  ) {
+    return 'finished'
+  }
+  if (match.liveStatus) return 'live'
   if (now <= kickoff + MATCH_LIVE_WINDOW_MS) return 'live'
   if (match.homeScore !== null && match.awayScore !== null) return 'finished'
   return 'unknown'
@@ -61,9 +69,32 @@ export function getActiveMatchBatch(matches: Match[], now = Date.now()): Match[]
   )
 }
 
-export function getLiveMinute(match: Match, now = Date.now()): number {
+export function getLiveMinute(
+  match: Pick<Match, 'kickoff'>,
+  now = Date.now(),
+): number {
   const kickoff = getDisplayedKickoffTimestamp(match.kickoff)
   return Math.max(1, Math.floor((now - kickoff) / 60_000) + 1)
+}
+
+export type LivePeriod = 'R1' | 'R2' | 'P1' | 'P2' | 'PK'
+
+export function getLivePeriod(
+  match: Pick<Match, 'kickoff' | 'liveStatus'>,
+  now = Date.now(),
+): LivePeriod {
+  if (match.liveStatus === 'PENALTY_SHOOTOUT') return 'PK'
+
+  const minute = getLiveMinute(match, now)
+  if (match.liveStatus === 'EXTRA_TIME' || minute > 90) {
+    return minute <= 105 ? 'P1' : 'P2'
+  }
+  return minute <= 45 ? 'R1' : 'R2'
+}
+
+export function getLiveLabel(match: Match, now = Date.now()): string {
+  const period = getLivePeriod(match, now)
+  return period === 'PK' ? period : `${period} · ${getLiveMinute(match, now)}'`
 }
 
 export function formatDisplayedKickoffTime(kickoff: string): string {

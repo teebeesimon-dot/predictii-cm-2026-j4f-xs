@@ -1,12 +1,11 @@
-import { CalendarClock, Clock3, Lock, Radio } from 'lucide-react'
+import { CalendarClock, Clock3, Lock } from 'lucide-react'
 import { MatchPredictionsLink } from '@/components/match/MatchPredictionsLink'
 import { TeamName } from '@/components/team-name'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { CompetitionId } from '@/lib/editions'
 import {
   formatDisplayedKickoffTime,
-  getLiveMinute,
+  getLiveLabel,
   getMatchDisplayStatus,
   type MatchDisplayStatus,
 } from '@/lib/match-display'
@@ -32,9 +31,8 @@ function MatchStatus({
   }
   if (status === 'live') {
     return (
-      <span className="flex items-center gap-1.5 text-xs font-bold uppercase text-destructive">
-        <Radio className="size-3.5" />
-        Live · {getLiveMinute(match, now)}'
+      <span className="text-[10px] font-bold uppercase tracking-wide text-destructive">
+        {getLiveLabel(match, now)}
       </span>
     )
   }
@@ -88,13 +86,18 @@ export function MatchCard({
               className="min-w-0 flex-1 font-heading font-bold"
               wrap
             />
-            {hasScore ? (
-              <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
-                {match.homeScore} - {match.awayScore}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">vs</span>
-            )}
+            <div className="flex shrink-0 flex-col items-center gap-0.5">
+              {hasScore ? (
+                <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums">
+                  {match.homeScore} - {match.awayScore}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">vs</span>
+              )}
+              {status === 'live' && (
+                <MatchStatus match={match} status={status} now={displayNow} />
+              )}
+            </div>
             <TeamName
               team={match.awayTeam}
               competition={competition}
@@ -102,12 +105,7 @@ export function MatchCard({
               wrap
             />
           </div>
-          {status === 'live' ? (
-            <Badge className="gap-1 bg-destructive px-2 py-0.5 text-[10px] font-bold uppercase text-destructive-foreground">
-              <Radio className="size-3" />
-              Live · {getLiveMinute(match, displayNow)}'
-            </Badge>
-          ) : status === 'finished' ? (
+          {status === 'live' ? null : status === 'finished' ? (
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               FT
             </span>
@@ -159,14 +157,19 @@ export function MatchCard({
                 detailed && 'text-lg sm:text-xl',
               )}
             />
-            <span
-              className={cn(
-                'shrink-0 rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums',
-                detailed && 'px-3 py-1 text-lg',
+            <div className="flex shrink-0 flex-col items-center gap-0.5">
+              <span
+                className={cn(
+                  'rounded-md bg-secondary px-2 py-0.5 font-mono text-sm font-bold tabular-nums',
+                  detailed && 'px-3 py-1 text-lg',
+                )}
+              >
+                {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
+              </span>
+              {status === 'live' && (
+                <MatchStatus match={match} status={status} now={displayNow} />
               )}
-            >
-              {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'vs'}
-            </span>
+            </div>
             <TeamName
               team={match.awayTeam}
               competition={competition}
@@ -184,7 +187,9 @@ export function MatchCard({
               detailed && 'flex flex-col items-center gap-1 text-center',
             )}
           >
-            <MatchStatus match={match} status={status} now={displayNow} />
+            {status !== 'live' && (
+              <MatchStatus match={match} status={status} now={displayNow} />
+            )}
             {locked && (
               <Lock className="size-3.5 shrink-0 text-muted-foreground" />
             )}

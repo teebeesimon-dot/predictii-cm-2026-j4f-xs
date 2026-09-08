@@ -152,6 +152,7 @@ export async function runResultsSync(
         batch.update(doc(db, 'matches', c.matchId), {
           homeScore: c.toHome,
           awayScore: c.toAway,
+          liveStatus: c.toLiveStatus,
         })
       }
       await batch.commit()
