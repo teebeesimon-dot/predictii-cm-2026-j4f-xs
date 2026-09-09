@@ -35,6 +35,15 @@ function MatchStatus({
   return null
 }
 
+function KickoffLabel({ match }: { match: Match }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 text-center text-sm font-medium capitalize tabular-nums text-muted-foreground">
+      <CalendarClock className="size-4 shrink-0" />
+      <span>{formatKickoff(match.kickoff)}</span>
+    </div>
+  )
+}
+
 function MatchScore({
   match,
   status,
@@ -110,29 +119,24 @@ export function MatchCard({
       )}
     >
       <CardContent className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <TeamName
-              team={match.homeTeam}
-              competition={competition}
-              align="right"
-              className="min-w-0 flex-1 font-heading font-bold"
-              wrap
-            />
-            <MatchScore match={match} status={status} locked={locked} />
-            <TeamName
-              team={match.awayTeam}
-              competition={competition}
-              className="min-w-0 flex-1 font-heading font-bold"
-              wrap
-            />
-          </div>
-          {status !== 'live' && status !== 'finished' && displayKickoff && (
-            <span className="flex items-center gap-1 text-xs capitalize text-muted-foreground">
-              <CalendarClock className="size-3.5" />
-              {formatKickoff(match.kickoff)}
-            </span>
-          )}
+        {status === 'upcoming' && displayKickoff && (
+          <KickoffLabel match={match} />
+        )}
+        <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+          <TeamName
+            team={match.homeTeam}
+            competition={competition}
+            align="right"
+            className="min-w-0 justify-end font-heading font-bold"
+            wrap
+          />
+          <MatchScore match={match} status={status} locked={locked} />
+          <TeamName
+            team={match.awayTeam}
+            competition={competition}
+            className="min-w-0 font-heading font-bold"
+            wrap
+          />
         </div>
         {children}
       </CardContent>
@@ -152,11 +156,14 @@ export function MatchCard({
       )}
     >
       <CardContent
-        className={cn('relative p-4', detailed && 'p-5 sm:p-6')}
+        className={cn('p-4', detailed && 'p-5 sm:p-6')}
       >
+        {status === 'upcoming' && displayKickoff && (
+          <KickoffLabel match={match} />
+        )}
         <div
           className={cn(
-            'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3',
+            'mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3',
             detailed && 'w-full gap-4 sm:gap-6',
           )}
         >
@@ -189,12 +196,6 @@ export function MatchCard({
               )}
             />
           </div>
-          {detailed && displayKickoff && (
-            <span className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1 text-xs capitalize text-muted-foreground">
-              <CalendarClock className="size-3.5" />
-              {formatKickoff(match.kickoff)}
-            </span>
-          )}
         </div>
         {children}
       </CardContent>
