@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { useEdition } from '@/components/edition-provider'
-import { useStagePayments, useUsers } from '@/lib/hooks'
+import { useAllPredictions, useMatches, useStagePayments, useUsers } from '@/lib/hooks'
 import {
   hasEditionAccess,
   isDedicatedAdmin,
@@ -15,7 +15,9 @@ import { stagesForEdition } from '@/lib/stages'
 import {
   setStagePaymentAmount,
   setStagePaymentStatus,
+  setStagePrizeAmount,
 } from '@/lib/data'
+import { calculatePrizeSummary } from '@/lib/prizes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,11 +45,16 @@ export default function AdminPaymentsPage() {
 function AdminPaymentsContent() {
   const { edition, editionId } = useEdition()
   const { data: users, isLoading: usersLoading } = useUsers()
+  const { data: matches, isLoading: matchesLoading } = useMatches()
+  const { data: predictions, isLoading: predictionsLoading } = useAllPredictions()
   const { data: payments, isLoading: paymentsLoading, mutate } = useStagePayments()
-  const stages = stagesForEdition(editionId)
+  const stages = useMemo(() => stagesForEdition(editionId), [editionId])
+  const stageIds = useMemo(() => stages.map((stage) => stage.id), [stages])
   const [savingStage, setSavingStage] = useState<number | null>(null)
+  const [savingPrize, setSavingPrize] = useState<number | null>(null)
   const [savingUser, setSavingUser] = useState<string | null>(null)
   const [amounts, setAmounts] = useState<Record<number, string>>({})
+  const [prizes, setPrizes] = useState<Record<number, string>>({})
 
   const participants = useMemo(
     () =>
@@ -65,8 +72,20 @@ function AdminPaymentsContent() {
     [payments],
   )
 
+  const prizeSummary = useMemo(
+    () =>
+      users && matches && predictions && payments
+        ? calculatePrizeSummary(users, matches, predictions, payments, stageIds)
+        : null,
+    [users, matches, predictions, payments, stageIds],
+  )
+
   function amountFor(stageId: number, payment?: StagePayment) {
     return amounts[stageId] ?? (payment?.amount ? String(payment.amount) : '')
+  }
+
+  function prizeFor(stageId: number, payment?: StagePayment) {
+    return prizes[stageId] ?? (payment?.prizeAmount ? String(payment.prizeAmount) : '')
   }
 
   async function saveAmount(stageId: number) {
@@ -89,6 +108,26 @@ function AdminPaymentsContent() {
     }
   }
 
+  async function savePrize(stageId: number) {
+    const value = Number.parseFloat(prizeFor(stageId, paymentByStage.get(stageId)))
+    if (!Number.isFinite(value) || value < 0) {
+      toast.error('Introdu un premiu valid, egal sau mai mare decât zero.')
+      return
+    }
+
+    setSavingPrize(stageId)
+    try {
+      await setStagePrizeAmount(editionId, stageId, value)
+      await mutate()
+      toast.success(`Premiul pentru Etapa ${stageId} a fost salvat.`)
+    } catch (error) {
+      console.error(error)
+      toast.error('Nu am putut salva premiul pentru etapă.')
+    } finally {
+      setSavingPrize(null)
+    }
+  }
+
   async function togglePaid(stageId: number, user: AppUser, paid: boolean) {
     const key = `${stageId}:${user.id}`
     setSavingUser(key)
@@ -103,7 +142,7 @@ function AdminPaymentsContent() {
     }
   }
 
-  const loading = usersLoading || paymentsLoading
+  const loading = usersLoading || matchesLoading || predictionsLoading || paymentsLoading
 
   return (
     <div className="flex flex-col gap-6">
@@ -128,11 +167,21 @@ function AdminPaymentsContent() {
             {participants.length} participanți eligibili · {stages.length} etape
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          <SummaryItem label="Taxe configurate" value={`${(payments ?? []).filter((p) => p.amount > 0).length}/${stages.length}`} />
-          <SummaryItem label="Plăți înregistrate" value={String(new Set((payments ?? []).flatMap((p) => p.paidUserIds)).size)} />
-          <SummaryItem label="Total configurat" value={money.format((payments ?? []).reduce((sum, p) => sum + (p.amount || 0), 0))} />
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryItem label="Taxe încasate" value={money.format(prizeSummary?.collected ?? 0)} />
+          <SummaryItem label="Premii etape" value={money.format(prizeSummary?.stagePrizes ?? 0)} />
+          <SummaryItem label="Premiu clasament final" value={money.format(prizeSummary?.finalPrize ?? 0)} />
+          <SummaryItem label="Etape configurate" value={`${(payments ?? []).filter((p) => p.amount > 0).length}/${stages.length}`} />
         </CardContent>
+        {prizeSummary && prizeSummary.stagePrizes > prizeSummary.collected ? (
+          <p className="px-6 pb-5 text-sm text-destructive">
+            Premiile etapelor depășesc taxele încasate cu {money.format(prizeSummary.stagePrizes - prizeSummary.collected)}. Premiul final este afișat ca zero până când fondul este acoperit.
+          </p>
+        ) : (
+          <p className="px-6 pb-5 text-sm text-muted-foreground">
+            Premiul final este diferența dintre taxele încasate și premiile fixe alocate etapelor.
+          </p>
+        )}
       </Card>
 
       <div className="flex flex-col gap-4">
@@ -153,12 +202,12 @@ function AdminPaymentsContent() {
                     </CardTitle>
                     <CardDescription className="mt-1">{stage.label}</CardDescription>
                   </div>
-                  <div className="flex items-end gap-2">
+                  <div className="flex flex-wrap items-end justify-end gap-2">
                     <div className="flex flex-col gap-1">
                       <Label htmlFor={`amount-${stage.id}`} className="text-xs">Taxă (RON)</Label>
                       <Input
                         id={`amount-${stage.id}`}
-                        className="w-32"
+                        className="w-28"
                         type="number"
                         min="0"
                         step="0.01"
@@ -170,20 +219,51 @@ function AdminPaymentsContent() {
                         }
                       />
                     </div>
-                    <Button
-                      type="button"
-                      onClick={() => saveAmount(stage.id)}
-                      disabled={savingStage === stage.id}
-                    >
+                    <Button type="button" onClick={() => saveAmount(stage.id)} disabled={savingStage === stage.id}>
                       {savingStage === stage.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                      Salvează
+                      Salvează taxa
+                    </Button>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor={`prize-${stage.id}`} className="text-xs">Premiu etapă (RON)</Label>
+                      <Input
+                        id={`prize-${stage.id}`}
+                        className="w-28"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={prizeFor(stage.id, payment)}
+                        onChange={(event) =>
+                          setPrizes((current) => ({ ...current, [stage.id]: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <Button type="button" variant="secondary" onClick={() => savePrize(stage.id)} disabled={savingPrize === stage.id}>
+                      {savingPrize === stage.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      Salvează premiul
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="size-4" />
-                    {paidCount} din {participants.length} plătiți
+                  <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Users className="size-4" />
+                      {paidCount} din {participants.length} plătiți
+                    </span>
+                    <span>
+                      Premiu calculat:{' '}
+                      <strong className="text-foreground">{money.format(prizeSummary?.stages.find((item) => item.stageId === stage.id)?.configuredPrize ?? 0)}</strong>
+                    </span>
+                    {(() => {
+                      const result = prizeSummary?.stages.find((item) => item.stageId === stage.id)
+                      return result && result.winners.length > 0 ? (
+                        <span>
+                          Câștigător: <strong className="text-foreground">{result.winners.map((winner) => winner.name).join(', ')}</strong>
+                          {' · '}{money.format(result.prizePerWinner)} / persoană
+                        </span>
+                      ) : null
+                    })()}
                   </div>
                   {participants.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">

@@ -80,6 +80,8 @@ export interface StagePayment {
   editionId: string
   stageId: StageId
   amount: number
+  // Fondul fix alocat premiului pentru această etapă.
+  prizeAmount?: number
   paidUserIds: string[]
   updatedAt?: number
 }

@@ -2,7 +2,8 @@
 
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
-import { useMatches, useUsers, useAllPredictions } from '@/lib/hooks'
+import { useMatches, useUsers, useAllPredictions, useStagePayments } from '@/lib/hooks'
+import { calculatePrizeSummary } from '@/lib/prizes'
 import { useEdition } from '@/components/edition-provider'
 import { computeStandings } from '@/lib/data'
 import { type StageId } from '@/lib/types'
@@ -11,6 +12,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Trophy, Medal } from 'lucide-react'
 import Image from 'next/image'
+
+const money = new Intl.NumberFormat('ro-RO', {
+  style: 'currency',
+  currency: 'RON',
+  maximumFractionDigits: 2,
+})
 
 export default function AwardsPage() {
   return (
@@ -28,9 +35,13 @@ function AwardsContent() {
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const { data: predictions, isLoading: l3 } = useAllPredictions()
+  const { data: payments, isLoading: l4 } = useStagePayments()
 
-  const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const loading = l1 || l2 || l3 || l4
+  const ready = users && matches && predictions && payments
+  const prizeSummary = ready
+    ? calculatePrizeSummary(users, matches, predictions, payments, stages.map((stage) => stage.id))
+    : null
   // La premii, jucătorii ascunși din clasamente nu apar deloc — nici măcar
   // pentru admin. Singura excepție e propriul cont (potrivire pe id), deci NU
   // transmitem isAdmin aici.
@@ -94,6 +105,11 @@ function AwardsContent() {
                     {overall[0].points} puncte · {overall[0].exact} scoruri exacte
                     {overall.length > 1 && ` · ${overall.length} la egalitate`}
                   </p>
+                  {prizeSummary && (
+                    <p className="text-sm font-semibold text-primary">
+                      Premiu clasament final: {money.format(prizeSummary.finalPrize)}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-muted-foreground">Încă nedecis</p>
@@ -104,7 +120,8 @@ function AwardsContent() {
           {/* Stage winners */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {stages.map((s) => {
-              const winners = stageWinners(s.id as StageId)
+              const prize = prizeSummary?.stages.find((item) => item.stageId === s.id)
+              const winners = prize ? prize.winners : stageWinners(s.id as StageId)
               return (
                 <Card key={s.id}>
                   <CardContent className="flex flex-col gap-3 p-5">
@@ -118,6 +135,12 @@ function AwardsContent() {
                       </div>
                     </div>
                     <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                      {prize && prize.configuredPrize > 0 && (
+                        <p className="mb-2 text-sm font-semibold text-primary">
+                          Premiu: {money.format(prize.configuredPrize)}
+                          {prize.winners.length > 1 && ` · ${money.format(prize.prizePerWinner)} / persoană`}
+                        </p>
+                      )}
                       {winners.length > 0 ? (
                         <div className="flex flex-col gap-1.5">
                           {winners.map((w) => (

@@ -99,6 +99,19 @@ export async function setStagePaymentAmount(
   )
 }
 
+export async function setStagePrizeAmount(
+  editionId: string,
+  stageId: StageId,
+  prizeAmount: number,
+): Promise<void> {
+  const id = `${editionId}_${stageId}`
+  await setDoc(
+    doc(db, 'stagePayments', id),
+    { editionId, stageId, prizeAmount, updatedAt: Date.now() },
+    { merge: true },
+  )
+}
+
 export async function setStagePaymentStatus(
   editionId: string,
   stageId: StageId,
