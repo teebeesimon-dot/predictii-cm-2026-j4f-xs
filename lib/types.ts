@@ -73,6 +73,18 @@ export interface Group {
   updatedAt: number
 }
 
+// Evidența manuală a taxei pentru o etapă. Configurația și lista participanților
+// plătiți sunt păstrate în același document Firestore pentru actualizări simple.
+export interface StagePayment {
+  id: string
+  editionId: string
+  stageId: StageId
+  amount: number
+  paidUserIds: string[]
+  updatedAt?: number
+}
+
+
 export interface AppUser {
   id: string
   username: string

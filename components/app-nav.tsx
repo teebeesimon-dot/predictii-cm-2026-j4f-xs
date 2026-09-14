@@ -17,6 +17,7 @@ import {
   UserCog,
   Users,
   Bell,
+  CircleDollarSign,
   MoreHorizontal,
   ChevronDown,
   Award,
@@ -122,7 +123,8 @@ export function AppNav() {
             match: (p: string) =>
               p.startsWith('/admin') &&
               p !== '/admin/notifications' &&
-              p !== '/admin/groups',
+              p !== '/admin/groups' &&
+              p !== '/admin/payments',
           },
           {
             href: '/admin/groups',
@@ -130,12 +132,18 @@ export function AppNav() {
             icon: Users,
             match: (p: string) => p === '/admin/groups',
           },
-          {
-            href: '/admin/notifications',
-            label: 'Notificări',
-            icon: Bell,
-            match: (p: string) => p === '/admin/notifications',
-          },
+              {
+                href: '/admin/notifications',
+                label: 'Notificări',
+                icon: Bell,
+                match: (p: string) => p === '/admin/notifications',
+              },
+              {
+                href: '/admin/payments',
+                label: 'Plăți pe etape',
+                icon: CircleDollarSign,
+                match: (p: string) => p === '/admin/payments',
+              },
         ]
       : []),
   ]

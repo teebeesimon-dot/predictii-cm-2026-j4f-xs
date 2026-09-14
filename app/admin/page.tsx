@@ -205,6 +205,12 @@ function AdminContent() {
             <Cpu className="size-4" />
             Notification Engine
           </Link>
+          <Link
+            href="/admin/payments"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            Plăți pe etape
+          </Link>
           <Button
             variant="outline"
             onClick={handleExport}

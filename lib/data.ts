@@ -23,6 +23,7 @@ import type {
   StageId,
   NotificationCategory,
   Group,
+  StagePayment,
 } from '@/lib/types'
 import {
   scorePrediction,
@@ -72,6 +73,50 @@ export async function getMatches(editionId?: string): Promise<Match[]> {
 export async function getUsers(): Promise<AppUser[]> {
   const snap = await getDocs(collection(db, 'users'))
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AppUser, 'id'>) }))
+}
+
+export async function getStagePayments(editionId: string): Promise<StagePayment[]> {
+  const snap = await getDocs(
+    query(collection(db, 'stagePayments'), where('editionId', '==', editionId)),
+  )
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<StagePayment, 'id'>),
+    paidUserIds: (d.data().paidUserIds as string[] | undefined) ?? [],
+  }))
+}
+
+export async function setStagePaymentAmount(
+  editionId: string,
+  stageId: StageId,
+  amount: number,
+): Promise<void> {
+  const id = `${editionId}_${stageId}`
+  await setDoc(
+    doc(db, 'stagePayments', id),
+    { editionId, stageId, amount, updatedAt: Date.now() },
+    { merge: true },
+  )
+}
+
+export async function setStagePaymentStatus(
+  editionId: string,
+  stageId: StageId,
+  userId: string,
+  paid: boolean,
+): Promise<void> {
+  const id = `${editionId}_${stageId}`
+  await setDoc(
+    doc(db, 'stagePayments', id),
+    {
+      editionId,
+      stageId,
+      amount: 0,
+      paidUserIds: paid ? arrayUnion(userId) : arrayRemove(userId),
+      updatedAt: Date.now(),
+    },
+    { merge: true },
+  )
 }
 
 // Id-urile edițiilor care au cel puțin un meci încărcat. Edițiile fără meciuri
