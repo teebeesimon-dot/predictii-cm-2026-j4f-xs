@@ -3,7 +3,9 @@ import type { AppUser, Match, Prediction, StageId, StagePayment } from '@/lib/ty
 
 export interface StagePrizeResult {
   stageId: StageId
+  collected: number
   configuredPrize: number
+  finalContribution: number
   winners: StandingRow[]
   prizePerWinner: number
 }
@@ -36,7 +38,12 @@ export function calculatePrizeSummary(
     0,
   )
   const stages = stageIds.map((stageId) => {
-    const configuredPrize = Math.max(0, paymentByStage.get(stageId)?.prizeAmount ?? 0)
+    const payment = paymentByStage.get(stageId)
+    const collectedForStage = (payment?.amount ?? 0) * (payment?.paidUserIds.length ?? 0)
+    const stagePrizePerPayment = Math.max(0, payment?.stagePrizePerPayment ?? 0)
+    const finalPrizePerPayment = Math.max(0, payment?.finalPrizePerPayment ?? 0)
+    const configuredPrize = stagePrizePerPayment * (payment?.paidUserIds.length ?? 0)
+    const finalContribution = finalPrizePerPayment * (payment?.paidUserIds.length ?? 0)
     const rows = computeStandings(users, matches, predictions, stageId)
       .filter((row) => row.played > 0)
       .sort(compareForPrize)
@@ -45,16 +52,19 @@ export function calculatePrizeSummary(
       : []
     return {
       stageId,
+      collected: collectedForStage,
       configuredPrize,
+      finalContribution,
       winners,
       prizePerWinner: winners.length > 0 ? configuredPrize / winners.length : 0,
     }
   })
   const stagePrizes = stages.reduce((sum, stage) => sum + stage.configuredPrize, 0)
+  const finalPrize = stages.reduce((sum, stage) => sum + stage.finalContribution, 0)
   return {
     collected,
     stagePrizes,
-    finalPrize: Math.max(0, collected - stagePrizes),
+    finalPrize,
     stages,
   }
 }

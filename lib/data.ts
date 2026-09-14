@@ -99,15 +99,16 @@ export async function setStagePaymentAmount(
   )
 }
 
-export async function setStagePrizeAmount(
+export async function setStagePrizeAllocation(
   editionId: string,
   stageId: StageId,
-  prizeAmount: number,
+  stagePrizePerPayment: number,
+  finalPrizePerPayment: number,
 ): Promise<void> {
   const id = `${editionId}_${stageId}`
   await setDoc(
     doc(db, 'stagePayments', id),
-    { editionId, stageId, prizeAmount, updatedAt: Date.now() },
+    { editionId, stageId, stagePrizePerPayment, finalPrizePerPayment, updatedAt: Date.now() },
     { merge: true },
   )
 }
@@ -124,7 +125,6 @@ export async function setStagePaymentStatus(
     {
       editionId,
       stageId,
-      amount: 0,
       paidUserIds: paid ? arrayUnion(userId) : arrayRemove(userId),
       updatedAt: Date.now(),
     },

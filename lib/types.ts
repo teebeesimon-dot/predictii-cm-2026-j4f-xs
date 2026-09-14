@@ -80,8 +80,9 @@ export interface StagePayment {
   editionId: string
   stageId: StageId
   amount: number
-  // Fondul fix alocat premiului pentru această etapă.
-  prizeAmount?: number
+  // Din taxa fiecărui participant plătitor, aceste sume intră în fondurile de premiere.
+  stagePrizePerPayment?: number
+  finalPrizePerPayment?: number
   paidUserIds: string[]
   updatedAt?: number
 }

@@ -15,7 +15,7 @@ import { stagesForEdition } from '@/lib/stages'
 import {
   setStagePaymentAmount,
   setStagePaymentStatus,
-  setStagePrizeAmount,
+  setStagePrizeAllocation,
 } from '@/lib/data'
 import { calculatePrizeSummary } from '@/lib/prizes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,10 +51,11 @@ function AdminPaymentsContent() {
   const stages = useMemo(() => stagesForEdition(editionId), [editionId])
   const stageIds = useMemo(() => stages.map((stage) => stage.id), [stages])
   const [savingStage, setSavingStage] = useState<number | null>(null)
-  const [savingPrize, setSavingPrize] = useState<number | null>(null)
+  const [savingAllocation, setSavingAllocation] = useState<number | null>(null)
   const [savingUser, setSavingUser] = useState<string | null>(null)
   const [amounts, setAmounts] = useState<Record<number, string>>({})
-  const [prizes, setPrizes] = useState<Record<number, string>>({})
+  const [stagePrizeShares, setStagePrizeShares] = useState<Record<number, string>>({})
+  const [finalPrizeShares, setFinalPrizeShares] = useState<Record<number, string>>({})
 
   const participants = useMemo(
     () =>
@@ -84,8 +85,12 @@ function AdminPaymentsContent() {
     return amounts[stageId] ?? (payment?.amount ? String(payment.amount) : '')
   }
 
-  function prizeFor(stageId: number, payment?: StagePayment) {
-    return prizes[stageId] ?? (payment?.prizeAmount ? String(payment.prizeAmount) : '')
+  function stagePrizeFor(stageId: number, payment?: StagePayment) {
+    return stagePrizeShares[stageId] ?? (payment?.stagePrizePerPayment ? String(payment.stagePrizePerPayment) : '')
+  }
+
+  function finalPrizeFor(stageId: number, payment?: StagePayment) {
+    return finalPrizeShares[stageId] ?? (payment?.finalPrizePerPayment ? String(payment.finalPrizePerPayment) : '')
   }
 
   async function saveAmount(stageId: number) {
@@ -108,23 +113,30 @@ function AdminPaymentsContent() {
     }
   }
 
-  async function savePrize(stageId: number) {
-    const value = Number.parseFloat(prizeFor(stageId, paymentByStage.get(stageId)))
-    if (!Number.isFinite(value) || value < 0) {
-      toast.error('Introdu un premiu valid, egal sau mai mare decât zero.')
+  async function saveAllocation(stageId: number) {
+    const payment = paymentByStage.get(stageId)
+    const fee = Number.parseFloat(amountFor(stageId, payment))
+    const stagePrize = Number.parseFloat(stagePrizeFor(stageId, payment) || '0')
+    const finalPrize = Number.parseFloat(finalPrizeFor(stageId, payment) || '0')
+    if (![fee, stagePrize, finalPrize].every((value) => Number.isFinite(value) && value >= 0)) {
+      toast.error('Introdu valori valide, egale sau mai mari decât zero.')
+      return
+    }
+    if (stagePrize + finalPrize > fee) {
+      toast.error('Premiul etapei și clasamentul final nu pot depăși taxa pe etapă.')
       return
     }
 
-    setSavingPrize(stageId)
+    setSavingAllocation(stageId)
     try {
-      await setStagePrizeAmount(editionId, stageId, value)
+      await setStagePrizeAllocation(editionId, stageId, stagePrize, finalPrize)
       await mutate()
-      toast.success(`Premiul pentru Etapa ${stageId} a fost salvat.`)
+      toast.success(`Împărțirea taxei pentru Etapa ${stageId} a fost salvată.`)
     } catch (error) {
       console.error(error)
-      toast.error('Nu am putut salva premiul pentru etapă.')
+      toast.error('Nu am putut salva împărțirea taxei.')
     } finally {
-      setSavingPrize(null)
+      setSavingAllocation(null)
     }
   }
 
@@ -149,7 +161,7 @@ function AdminPaymentsContent() {
       <header>
         <h1 className="font-heading text-3xl font-bold">Plăți pe etape</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Configurează taxa și marchează manual participanții care au plătit pentru fiecare etapă.
+          Configurează taxa, împarte suma per plătitor între premiul etapei și clasamentul final și marchează manual participanții care au plătit.
           Datele sunt vizibile și editabile doar în administrare.
         </p>
         <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
@@ -170,7 +182,7 @@ function AdminPaymentsContent() {
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryItem label="Taxe încasate" value={money.format(prizeSummary?.collected ?? 0)} />
           <SummaryItem label="Premii etape" value={money.format(prizeSummary?.stagePrizes ?? 0)} />
-          <SummaryItem label="Premiu clasament final" value={money.format(prizeSummary?.finalPrize ?? 0)} />
+          <SummaryItem label="Fond clasament final" value={money.format(prizeSummary?.finalPrize ?? 0)} />
           <SummaryItem label="Etape configurate" value={`${(payments ?? []).filter((p) => p.amount > 0).length}/${stages.length}`} />
         </CardContent>
         {prizeSummary && prizeSummary.stagePrizes > prizeSummary.collected ? (
@@ -179,7 +191,7 @@ function AdminPaymentsContent() {
           </p>
         ) : (
           <p className="px-6 pb-5 text-sm text-muted-foreground">
-            Premiul final este diferența dintre taxele încasate și premiile fixe alocate etapelor.
+            Pentru fiecare plătitor, taxa este împărțită între premiul etapei și fondul clasamentului final. Orice diferență nealocată rămâne în afara fondului de premiere.
           </p>
         )}
       </Card>
@@ -224,24 +236,40 @@ function AdminPaymentsContent() {
                       Salvează taxa
                     </Button>
                     <div className="flex flex-col gap-1">
-                      <Label htmlFor={`prize-${stage.id}`} className="text-xs">Premiu etapă (RON)</Label>
+                      <Label htmlFor={`stage-prize-${stage.id}`} className="text-xs">Premiu etapă / plătitor (RON)</Label>
                       <Input
-                        id={`prize-${stage.id}`}
-                        className="w-28"
+                        id={`stage-prize-${stage.id}`}
+                        className="w-32"
                         type="number"
                         min="0"
                         step="0.01"
                         inputMode="decimal"
                         placeholder="0"
-                        value={prizeFor(stage.id, payment)}
+                        value={stagePrizeFor(stage.id, payment)}
                         onChange={(event) =>
-                          setPrizes((current) => ({ ...current, [stage.id]: event.target.value }))
+                          setStagePrizeShares((current) => ({ ...current, [stage.id]: event.target.value }))
                         }
                       />
                     </div>
-                    <Button type="button" variant="secondary" onClick={() => savePrize(stage.id)} disabled={savingPrize === stage.id}>
-                      {savingPrize === stage.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                      Salvează premiul
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor={`final-prize-${stage.id}`} className="text-xs">Clasament final / plătitor (RON)</Label>
+                      <Input
+                        id={`final-prize-${stage.id}`}
+                        className="w-32"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={finalPrizeFor(stage.id, payment)}
+                        onChange={(event) =>
+                          setFinalPrizeShares((current) => ({ ...current, [stage.id]: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <Button type="button" variant="secondary" onClick={() => saveAllocation(stage.id)} disabled={savingAllocation === stage.id}>
+                      {savingAllocation === stage.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      Salvează împărțirea
                     </Button>
                   </div>
                 </CardHeader>
@@ -252,8 +280,12 @@ function AdminPaymentsContent() {
                       {paidCount} din {participants.length} plătiți
                     </span>
                     <span>
-                      Premiu calculat:{' '}
+                      Fond etapă:{' '}
                       <strong className="text-foreground">{money.format(prizeSummary?.stages.find((item) => item.stageId === stage.id)?.configuredPrize ?? 0)}</strong>
+                    </span>
+                    <span>
+                      Fond final:{' '}
+                      <strong className="text-foreground">{money.format(prizeSummary?.stages.find((item) => item.stageId === stage.id)?.finalContribution ?? 0)}</strong>
                     </span>
                     {(() => {
                       const result = prizeSummary?.stages.find((item) => item.stageId === stage.id)
