@@ -38,7 +38,11 @@ import {
   formatSeasonYear,
   type CompetitionId,
 } from '@/lib/editions'
-import { DEFAULT_EDITION_ID, hasEditionAccess } from '@/lib/types'
+import {
+  DEFAULT_EDITION_ID,
+  eligibleUsersForEdition,
+  hasEditionAccess,
+} from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
   STAGES,
@@ -303,6 +307,7 @@ function AdminContent() {
 
         <TabsContent value="completion" className="mt-4">
           <CompletionOverview
+            editionId={editionId}
             users={users}
             matches={matches}
             predictions={predictions}
@@ -312,6 +317,7 @@ function AdminContent() {
 
         <TabsContent value="predictions" className="mt-4">
           <PredictionEditor
+            editionId={editionId}
             users={users}
             matches={matches}
             predictions={predictions}
@@ -360,11 +366,13 @@ function AdminContent() {
 // fiecare etapă cu meciuri. Arată un tabel cu numărul de pronosticuri pe etapă
 // și o stare generală, ca să se vadă cine a rămas în urmă.
 function CompletionOverview({
+  editionId,
   users,
   matches,
   predictions,
   loading,
 }: {
+  editionId: string
   users: AppUser[] | undefined
   matches: Match[] | undefined
   predictions: Prediction[] | undefined
@@ -380,9 +388,7 @@ function CompletionOverview({
     )
   }
 
-  const participants = (users ?? []).filter(
-    (u) => !isDedicatedAdmin(u) && !isViewOnly(u),
-  )
+  const participants = eligibleUsersForEdition(users ?? [], editionId)
   const allMatches = matches ?? []
   const allPreds = predictions ?? []
 
@@ -535,12 +541,14 @@ function CompletionOverview({
 // afișat transparent tuturor. Refolosește datele deja încărcate (matches,
 // users, predictions), deci nu face citiri suplimentare din Firestore.
 function PredictionEditor({
+  editionId,
   users,
   matches,
   predictions,
   loading,
   onSaved,
 }: {
+  editionId: string
   users: AppUser[] | undefined
   matches: Match[] | undefined
   predictions: Prediction[] | undefined
@@ -570,10 +578,10 @@ function PredictionEditor({
 
   const participants = useMemo(
     () =>
-      (users ?? [])
-        .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
-        .sort((a, b) => a.name.localeCompare(b.name, 'ro')),
-    [users],
+      eligibleUsersForEdition(users ?? [], editionId).sort((a, b) =>
+        a.name.localeCompare(b.name, 'ro'),
+      ),
+    [users, editionId],
   )
 
   const selectedMatch =
