@@ -19,13 +19,16 @@ import {
 import { hasEditionAccess } from '@/lib/types'
 import { useEdition } from '@/components/edition-provider'
 import { useAuth } from '@/components/auth-provider'
-import { useAvailableEditionIds } from '@/lib/hooks'
+import { useAvailableEditionIds, useCurrentAppUser } from '@/lib/hooks'
 import { cn } from '@/lib/utils'
 
 export function EditionSelector() {
   const { user } = useAuth()
   const { editionId, edition, competition, setEditionId } = useEdition()
   const { data: availableIds } = useAvailableEditionIds(60_000)
+  // Sesiunea (`user`) nu conține câmpul `access`; accesul per ediție se citește
+  // din documentul complet al utilizatorului din Firestore.
+  const appUser = useCurrentAppUser(user?.id)
 
   const isAdmin = user?.isAdmin === true
 
@@ -37,9 +40,9 @@ export function EditionSelector() {
     return EDITIONS.filter((e) => {
       if (isAdmin) return true
       if (!available.has(e.id)) return false
-      return user ? hasEditionAccess(user, e.id) : false
+      return appUser ? hasEditionAccess(appUser, e.id) : false
     })
-  }, [availableIds, isAdmin, user])
+  }, [availableIds, isAdmin, appUser])
 
   // Competițiile care au cel puțin o ediție vizibilă, în ordinea de afișare.
   const competitions = useMemo(
