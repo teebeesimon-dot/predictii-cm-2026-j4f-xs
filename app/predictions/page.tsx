@@ -50,9 +50,11 @@ function PredictionsContent() {
 
   const [entries, setEntries] = useState<Record<string, Entry>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [activeStage, setActiveStage] = useState(
-    String(scheduler.stages[0]?.id ?? 1),
-  )
+  // Tab-ul ales manual de utilizator; cât timp e null se afișează etapa în
+  // curs (prima cu termenul neexpirat), deci după ce o etapă se blochează se
+  // trece automat la următoarea.
+  const [pickedStage, setActiveStage] = useState<string | null>(null)
+  const activeStage = pickedStage ?? String(scheduler.getActiveStage())
   const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(
     null,
   )
