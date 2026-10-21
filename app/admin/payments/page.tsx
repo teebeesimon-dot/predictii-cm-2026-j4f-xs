@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { AppShell } from '@/components/app-shell'
 import { useEdition } from '@/components/edition-provider'
-import { useAllPredictions, useMatches, useStagePayments, useUsers } from '@/lib/hooks'
+import { useAllPredictions, useGroups, useMatches, useStagePayments, useUsers } from '@/lib/hooks'
 import {
   hasEditionAccess,
   isDedicatedAdmin,
@@ -45,11 +45,13 @@ export default function AdminPaymentsPage() {
 function AdminPaymentsContent() {
   const { edition, editionId } = useEdition()
   const { data: users, isLoading: usersLoading } = useUsers()
+  const { data: groups, isLoading: groupsLoading } = useGroups()
   const { data: matches, isLoading: matchesLoading } = useMatches()
   const { data: predictions, isLoading: predictionsLoading } = useAllPredictions()
   const { data: payments, isLoading: paymentsLoading, mutate } = useStagePayments()
   const stages = useMemo(() => stagesForEdition(editionId), [editionId])
   const stageIds = useMemo(() => stages.map((stage) => stage.id), [stages])
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(null)
   const [savingStage, setSavingStage] = useState<number | null>(null)
   const [savingAllocation, setSavingAllocation] = useState<number | null>(null)
   const [savingUser, setSavingUser] = useState<string | null>(null)
@@ -57,15 +59,19 @@ function AdminPaymentsContent() {
   const [stagePrizeShares, setStagePrizeShares] = useState<Record<number, string>>({})
   const [finalPrizeShares, setFinalPrizeShares] = useState<Record<number, string>>({})
 
+  const bilkaVipGroup = useMemo(
+    () => (groups ?? []).find((group) => group.name.trim().toLocaleLowerCase('ro') === 'bilka vip'),
+    [groups],
+  )
+
   const participants = useMemo(
     () =>
       (users ?? [])
         .filter((user) => !isDedicatedAdmin(user) && !isViewOnly(user))
         .filter((user) => hasEditionAccess(user, editionId))
-        .sort((a, b) =>
-          (a.name || a.username).localeCompare(b.name || b.username, 'ro'),
-        ),
-    [users, editionId],
+        .filter((user) => bilkaVipGroup?.members.includes(user.id) ?? false)
+        .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username, 'ro')),
+    [users, editionId, bilkaVipGroup],
   )
 
   const paymentByStage = useMemo(
@@ -154,7 +160,8 @@ function AdminPaymentsContent() {
     }
   }
 
-  const loading = usersLoading || matchesLoading || predictionsLoading || paymentsLoading
+  const selectedStage = stages.find((stage) => stage.id === selectedStageId) ?? stages[0]
+  const loading = usersLoading || groupsLoading || matchesLoading || predictionsLoading || paymentsLoading
 
   return (
     <div className="flex flex-col gap-6">
@@ -197,10 +204,16 @@ function AdminPaymentsContent() {
       </Card>
 
       <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2 sm:max-w-sm">
+          <Label htmlFor="payment-stage-select">Etapă</Label>
+          <select id="payment-stage-select" value={selectedStage?.id ?? ''} onChange={(event) => setSelectedStageId(Number(event.target.value))} className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm" disabled={!stages.length}>
+            {stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name} ({stage.short}) — {stage.label}</option>)}
+          </select>
+        </div>
         {loading ? (
           <Skeleton className="h-72 w-full" />
         ) : (
-          stages.map((stage) => {
+          stages.filter((stage) => stage.id === selectedStage?.id).map((stage) => {
             const payment = paymentByStage.get(stage.id)
             const paidIds = new Set(payment?.paidUserIds ?? [])
             const paidCount = participants.filter((user) => paidIds.has(user.id)).length
@@ -297,7 +310,9 @@ function AdminPaymentsContent() {
                       ) : null
                     })()}
                   </div>
-                  {participants.length === 0 ? (
+                  {!bilkaVipGroup ? (
+                    <p className="rounded-lg border border-dashed border-border p-4 text-sm text-destructive">Nu am găsit grupa „BILKA VIP” pentru această ediție. Verifică denumirea grupei în Administrare → Grupe.</p>
+                  ) : participants.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
                       Nu există participanți eligibili pentru această ediție.
                     </p>
