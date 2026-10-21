@@ -394,9 +394,7 @@ function CompletionOverview({
   const allPreds = predictions ?? []
 
   // Etapele care au cel puțin un meci încărcat (ignorăm etapele goale).
-  const stagesWithMatches = stagesForEdition(editionId).filter((s) =>
-    allMatches.some((m) => m.stage === s.id),
-  )
+  const stagesWithMatches = stagesForEdition(editionId)
 
   // Câte meciuri are fiecare etapă.
   const matchesPerStage = new Map<StageId, number>()
