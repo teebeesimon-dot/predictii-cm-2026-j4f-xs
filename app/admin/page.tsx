@@ -45,7 +45,6 @@ import {
 } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
-  STAGES,
   isLocked,
   isDedicatedAdmin,
   isViewOnly,
@@ -60,6 +59,7 @@ import {
   authMigrationStatusLabel,
 } from '@/lib/types'
 import { isUserMigratedForPasswordReset } from '@/lib/auth-password-reset'
+import { stagesForEdition } from '@/lib/stages'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -393,7 +393,7 @@ function CompletionOverview({
   const allPreds = predictions ?? []
 
   // Etapele care au cel puțin un meci încărcat (ignorăm etapele goale).
-  const stagesWithMatches = STAGES.filter((s) =>
+  const stagesWithMatches = stagesForEdition(editionId).filter((s) =>
     allMatches.some((m) => m.stage === s.id),
   )
 
