@@ -45,6 +45,7 @@ import {
 } from '@/lib/types'
 import { WC2026_GROUP_MATCHES } from '@/lib/wc2026-schedule'
 import {
+  STAGES,
   isLocked,
   isDedicatedAdmin,
   isViewOnly,
