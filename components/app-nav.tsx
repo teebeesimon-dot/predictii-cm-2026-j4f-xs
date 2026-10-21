@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   ListChecks,
   Trophy,
-  BarChart3,
   Medal,
   Shield,
   LogOut,
@@ -20,7 +19,6 @@ import {
   CircleDollarSign,
   MoreHorizontal,
   ChevronDown,
-  Award,
   BarChart2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -65,12 +63,6 @@ const NAV: NavItem[] = [
     match: (p) => p === '/standings',
   },
   {
-    href: '/statistics',
-    label: 'Statistici',
-    icon: BarChart3,
-    match: (p) => p === '/statistics',
-  },
-  {
     href: '/colleagues',
     label: 'Scorurile tuturor',
     icon: Users,
@@ -96,12 +88,6 @@ export function AppNav() {
   const unread = unreadCount(notifications, appUser?.preferences)
 
   const secondaryItems: NavItem[] = [
-    {
-      href: '/trophy',
-      label: 'Vitrina trofeelor',
-      icon: Award,
-      match: (p: string) => p === '/trophy',
-    },
     {
       href: '/leaderboards',
       label: 'Clasamente extinse',
