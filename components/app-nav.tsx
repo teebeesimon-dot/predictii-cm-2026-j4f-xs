@@ -108,44 +108,23 @@ export function AppNav() {
       icon: BarChart2,
       match: (p: string) => p === '/leaderboards',
     },
-    {
-      href: '/account',
-      label: 'Contul meu',
-      icon: UserCog,
-      match: (p: string) => p === '/account',
-    },
-    ...(user?.isAdmin
+    ...(!user?.isAdmin
       ? [
+          {
+            href: '/account',
+            label: 'Contul meu',
+            icon: UserCog,
+            match: (p: string) => p === '/account',
+          },
+        ]
+      : [
           {
             href: '/admin',
             label: 'Administrare',
             icon: Shield,
-            match: (p: string) =>
-              p.startsWith('/admin') &&
-              p !== '/admin/notifications' &&
-              p !== '/admin/groups' &&
-              p !== '/admin/payments',
+            match: (p: string) => p.startsWith('/admin'),
           },
-          {
-            href: '/admin/groups',
-            label: 'Grupe',
-            icon: Users,
-            match: (p: string) => p === '/admin/groups',
-          },
-              {
-                href: '/admin/notifications',
-                label: 'Notificări',
-                icon: Bell,
-                match: (p: string) => p === '/admin/notifications',
-              },
-              {
-                href: '/admin/payments',
-                label: 'Plăți pe etape',
-                icon: CircleDollarSign,
-                match: (p: string) => p === '/admin/payments',
-              },
-        ]
-      : []),
+        ]),
   ]
   const items = [...NAV, ...secondaryItems]
   const secondaryActive = secondaryItems.some((item) =>
