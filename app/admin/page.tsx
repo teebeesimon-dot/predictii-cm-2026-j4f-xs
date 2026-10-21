@@ -89,6 +89,8 @@ import {
   Copy,
   UserPlus,
   Users,
+  UserCog,
+  Bell,
   Download,
   FileSpreadsheet,
   CheckCircle2,
@@ -190,11 +192,25 @@ function AdminContent() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/account"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <UserCog className="size-4" />
+            Contul meu
+          </Link>
+          <Link
             href="/admin/groups"
             className={buttonVariants({ variant: 'outline' })}
           >
             <Users className="size-4" />
             Grupe
+          </Link>
+          <Link
+            href="/admin/notifications"
+            className={buttonVariants({ variant: 'outline' })}
+          >
+            <Bell className="size-4" />
+            Notificări
           </Link>
           <Link
             href="/admin/overview"
