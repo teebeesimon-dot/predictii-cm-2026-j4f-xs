@@ -1,6 +1,6 @@
 import 'server-only'
 import type { NextRequest } from 'next/server'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/firebase-admin-notifications'
 
 /**
  * Autorizarea cererilor către endpoint-urile de administrare.
