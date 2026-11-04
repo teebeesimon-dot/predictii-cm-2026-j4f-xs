@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "749344660683",
+    "project_id": "predictii-cm-2026-j4f",
+    "storage_bucket": "predictii-cm-2026-j4f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:749344660683:android:d1e9aa72e9ba8170c6cf4e",
+        "android_client_info": {
+          "package_name": "ro.just4fun.predictii"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "749344660683-r5pnc8aacjpqin1hbnhjs6un8kjkltjr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBf4PgdMJB1zeeGzslT-J9xO1k2pqAqWk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "749344660683-r5pnc8aacjpqin1hbnhjs6un8kjkltjr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
