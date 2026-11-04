@@ -1,5 +1,5 @@
 import 'server-only'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/firebase-admin-notifications'
 import type { EngineRunResult } from '@/lib/notifications/types'
 
 /**
