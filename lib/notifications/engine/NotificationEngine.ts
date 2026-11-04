@@ -21,35 +21,17 @@ import {
   emptyEngineData,
 } from '@/lib/notifications/context/EngineDataSource'
 
-// Funcție care furnizează datele partajate (injectabilă pentru testare).
 type DataLoader = (now: number) => Promise<EngineData>
 
 /**
- * NotificationEngine — decide CE notificări trebuie trimise.
- *
- * Pași:
- *   0. încarcă O SINGURĂ DATĂ datele partajate (users/matches/predictions +
- *      scheduler per ediție) și le pune în context (minimizează citirile)
- *   1. încarcă toate regulile active (din registry)
- *   2. execută fiecare regulă izolat (o eroare într-o regulă nu le oprește pe
- *      celelalte) și reține câte a generat fiecare
- *   3. colectează notificările generate și le atribuie o cheie deterministă
- *   4. elimină duplicatele DIN ACEEAȘI rulare
- *   5. validează notificările
- *   6. elimină notificările deja trimise (din `notification_history`)
- *   7. în funcție de mod:
- *        - 'dry-run': DOAR întoarce lista (nu trimite, nu salvează)
- *        - 'live':    trimite prin serviciul Push și salvează în istoric
- *
- * În modul 'dry-run' engine-ul NU are niciun efect secundar (dar citește datele).
+ * NotificationEngine decides which notifications should be sent, validates
+ * them, deduplicates them and dispatches them through Firebase Cloud Messaging.
  */
 export class NotificationEngine {
-  // Cheie de deduplicare în cadrul aceleiași rulări = cheia deterministă.
   private dedupeKey(t: NotificationTask): string {
     return keyOf(t)
   }
 
-  // O sarcină e validă dacă are conținut și destinatari coerenți.
   private isValid(t: NotificationTask): boolean {
     if (!t.id || !t.type) return false
     if (!t.title.trim() || !t.body.trim()) return false
@@ -65,15 +47,9 @@ export class NotificationEngine {
   ): Promise<EngineRunResult> {
     const logger = new NotificationLogger()
     logger.start()
-
-    // Asigură-te că regulile s-au înregistrat în registry.
     ensureRulesRegistered()
 
     const errors: { ruleId: string; message: string }[] = []
-
-    // 0: încarcă datele partajate o singură dată. Dacă eșuează (ex.
-    // FIREBASE_SERVICE_ACCOUNT lipsă), continuăm cu date goale — regulile nu
-    // produc nimic, dar engine-ul nu crapă.
     let data: EngineData
     try {
       data = await loadData(now)
@@ -89,7 +65,6 @@ export class NotificationEngine {
     const generated: NotificationTask[] = []
     const ruleResults: RuleRunSummary[] = []
 
-    // 1-3: execută fiecare regulă izolat, colectează și atribuie cheia.
     for (const rule of rules) {
       let count = 0
       let failed = false
@@ -115,7 +90,6 @@ export class NotificationEngine {
       })
     }
 
-    // Colectăm notificările ignorate + motivul (pentru panoul admin).
     const skipped: SkippedNotification[] = []
     const asSkip = (
       t: NotificationTask,
@@ -127,7 +101,6 @@ export class NotificationEngine {
       reason,
     })
 
-    // 4: deduplicare în cadrul rulării (păstrează prima apariție).
     const seen = new Set<string>()
     const deduped: NotificationTask[] = []
     for (const task of generated) {
@@ -141,7 +114,6 @@ export class NotificationEngine {
     }
     const duplicatesRemoved = generated.length - deduped.length
 
-    // 5: validare.
     const valid: NotificationTask[] = []
     for (const t of deduped) {
       if (this.isValid(t)) valid.push(t)
@@ -149,7 +121,6 @@ export class NotificationEngine {
     }
     const invalidRemoved = deduped.length - valid.length
 
-    // 6: elimină notificările deja trimise (din istoric).
     let toSend: NotificationTask[] = valid
     try {
       toSend = await notificationHistory.filterNew(valid)
@@ -158,15 +129,12 @@ export class NotificationEngine {
         if (!kept.has(keyOf(t))) skipped.push(asSkip(t, 'deja trimisă'))
       }
     } catch (e) {
-      // Dacă istoricul nu e disponibil (ex. FIREBASE_SERVICE_ACCOUNT lipsă),
-      // nu blocăm rularea: raportăm eroarea și continuăm fără filtrare.
       const message = (e as Error).message
       errors.push({ ruleId: '__history__', message })
       console.log(`[v0] notif-engine: istoric indisponibil: ${message}`)
     }
     const alreadySentSkipped = valid.length - toSend.length
 
-    // 7: trimitere + salvare doar în modul 'live'.
     let dispatched = 0
     let pushSent = 0
     let pushFailed = 0
@@ -178,7 +146,17 @@ export class NotificationEngine {
           pushSent += res.sent
           pushFailed += res.failed
           dispatched += 1
-          delivered.push(task)
+
+          // Nu marcăm notificarea drept trimisă dacă nu a ajuns la niciun
+          // dispozitiv. În acest fel, un utilizator care își înregistrează
+          // telefonul ulterior poate primi notificarea la următoarea rulare.
+          if (res.sent > 0) {
+            delivered.push(task)
+          } else {
+            console.log(
+              `[v0] notif-engine: "${task.notificationKey}" nu a fost arhivată: niciun dispozitiv FCM nu a confirmat livrarea.`,
+            )
+          }
         } catch (e) {
           const message = (e as Error).message
           errors.push({ ruleId: `dispatch:${task.notificationKey}`, message })
@@ -188,7 +166,6 @@ export class NotificationEngine {
         }
       }
       try {
-        // Un singur commit Firestore pentru toate notificările livrate.
         await notificationHistory.recordMany(delivered)
       } catch (e) {
         const message = (e as Error).message
@@ -197,7 +174,6 @@ export class NotificationEngine {
       }
     }
 
-    // Metrici + log.
     logger.set('rules', rules.length)
     logger.set('notifications', generated.length)
     logger.set('duplicates', duplicatesRemoved)
@@ -228,5 +204,4 @@ export class NotificationEngine {
   }
 }
 
-// Instanță partajată (engine-ul e stateless între rulări).
 export const notificationEngine = new NotificationEngine()
