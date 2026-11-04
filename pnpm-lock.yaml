@@ -3,6 +3,8 @@ lockfileVersion: '9.0'
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
+  overrides:
+    'jwks-rsa>jose': 4.15.9
 
 importers:
 
