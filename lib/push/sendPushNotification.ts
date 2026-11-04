@@ -1,6 +1,6 @@
 import 'server-only'
 import { FieldValue } from 'firebase-admin/firestore'
-import { adminMessaging, adminDb } from '@/lib/firebase-admin'
+import { adminMessaging, adminDb } from '@/lib/firebase-admin-notifications'
 
 /**
  * Logica centralizată pentru trimiterea notificărilor push prin Firebase Cloud
