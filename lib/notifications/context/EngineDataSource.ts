@@ -1,5 +1,5 @@
 import 'server-only'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/firebase-admin-notifications'
 import { DEFAULT_EDITION_ID, type Match, type AppUser, type Prediction } from '@/lib/types'
 import { getEdition } from '@/lib/editions'
 import { stagesForEdition } from '@/lib/stages'
