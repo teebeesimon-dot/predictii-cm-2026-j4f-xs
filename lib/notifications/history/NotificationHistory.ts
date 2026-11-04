@@ -1,7 +1,7 @@
 import 'server-only'
 import type { NotificationTask } from '@/lib/notifications/types'
 import { computeNotificationKey } from '@/lib/notifications/types'
-import { adminDb } from '@/lib/firebase-admin'
+import { adminDb } from '@/lib/firebase-admin-notifications'
 
 /**
  * Istoricul notificărilor — sursa de adevăr pentru „ce s-a trimis deja".
