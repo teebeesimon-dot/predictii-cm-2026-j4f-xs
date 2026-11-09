@@ -15,6 +15,7 @@ secrets/**
 
 # Common ignores
 node_modules
+package-lock.json
 .next/
 .DS_Store
 tsconfig.tsbuildinfo

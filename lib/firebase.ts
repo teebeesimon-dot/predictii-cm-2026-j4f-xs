@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { Capacitor } from '@capacitor/core'
+import {
+  getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
+} from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -15,5 +20,28 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
 export const db = getFirestore(app)
 /** Firebase Authentication — login migrat (email/Google) + legare la primul login. */
-export const auth = getAuth(app)
+function getFirebaseAuth() {
+  if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+    try {
+      return initializeAuth(app, {
+        persistence: indexedDBLocalPersistence,
+      })
+    } catch (error) {
+      // Păstrează aceeași instanță la re-evaluarea modulului în development.
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'auth/already-initialized'
+      ) {
+        return getAuth(app)
+      }
+      throw error
+    }
+  }
+
+  return getAuth(app)
+}
+
+export const auth = getFirebaseAuth()
 export default app

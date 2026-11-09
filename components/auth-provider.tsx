@@ -19,12 +19,15 @@ import {
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  signInWithCredential,
   sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth'
+import { Capacitor } from '@capacitor/core'
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication'
 import { auth, db } from '@/lib/firebase'
 import type { AppUser } from '@/lib/types'
 import { isUserAdmin } from '@/lib/types'
@@ -83,6 +86,28 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const STORAGE_KEY = 'cm2026_session'
 const googleProvider = new GoogleAuthProvider()
+
+async function signInWithGoogle() {
+  if (!Capacitor.isNativePlatform()) {
+    return signInWithPopup(auth, googleProvider)
+  }
+
+  const result = await FirebaseAuthentication.signInWithGoogle()
+  const idToken = result.credential?.idToken
+  if (!idToken) {
+    throw new Error('Autentificarea Google nu a returnat un ID token.')
+  }
+
+  const credential = GoogleAuthProvider.credential(idToken)
+  return signInWithCredential(auth, credential)
+}
+
+async function signOutFromAuth() {
+  await signOut(auth)
+  if (Capacitor.isNativePlatform()) {
+    await FirebaseAuthentication.signOut().catch(() => undefined)
+  }
+}
 
 // Decide dacă utilizatorul trebuie forțat să-și schimbe parola: fie flag-ul
 // explicit este setat, fie (pentru conturi mai vechi fără flag) parola este
@@ -207,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         )
         const appUser = await findUserByAuthUid(cred.user.uid)
         if (!appUser) {
-          await signOut(auth)
+          await signOutFromAuth()
           return {
             ok: false,
             error:
@@ -225,10 +250,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     try {
-      const cred = await signInWithPopup(auth, googleProvider)
+      const cred = await signInWithGoogle()
       const appUser = await findUserByAuthUid(cred.user.uid)
       if (!appUser) {
-        await signOut(auth)
+        await signOutFromAuth()
         return {
           ok: false,
           error:
@@ -246,11 +271,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!migrationPending) return
     setMigrationBusy(true)
     try {
-      const cred = await signInWithPopup(auth, googleProvider)
+      const cred = await signInWithGoogle()
       const firebaseUser = cred.user
       const email = firebaseUser.email
       if (!email) {
-        await signOut(auth)
+        await signOutFromAuth()
         throw new Error('Contul Google nu are o adresă de email.')
       }
 
@@ -261,7 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         provider: 'google.com',
       })
       if (!linked.ok) {
-        await signOut(auth)
+        await signOutFromAuth()
         throw new Error(linked.error)
       }
 
@@ -333,7 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           provider: 'password',
         })
         if (!linked.ok) {
-          await signOut(auth)
+          await signOutFromAuth()
           return linked
         }
 
@@ -351,7 +376,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: true }
       } catch (err) {
         try {
-          await signOut(auth)
+          await signOutFromAuth()
         } catch {
           // ignore
         }
@@ -365,13 +390,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const cancelMigration = useCallback(() => {
     setMigrationPending(null)
-    void signOut(auth).catch(() => undefined)
+    void signOutFromAuth().catch(() => undefined)
   }, [])
 
   const logout = useCallback(() => {
     setMigrationPending(null)
     persist(null)
-    void signOut(auth).catch(() => undefined)
+    void signOutFromAuth().catch(() => undefined)
   }, [persist])
 
   const refreshSession = useCallback(async () => {

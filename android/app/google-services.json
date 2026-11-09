@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "749344660683-mjrbddc7524hjb6nfou3jbn91flqa2th.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "ro.just4fun.predictii",
+            "certificate_hash": "6840c14632f7bbef3d8649a68a5f76222d27cd62"
+          }
+        },
+        {
+          "client_id": "749344660683-to98ep1jhihr9uimg4m941cdml1brbae.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "ro.just4fun.predictii",
+            "certificate_hash": "405bc4f4c6279916c1b711a70ffd626f4085f28f"
+          }
+        },
+        {
           "client_id": "749344660683-r5pnc8aacjpqin1hbnhjs6un8kjkltjr.apps.googleusercontent.com",
           "client_type": 3
         }
