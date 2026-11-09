@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import Link from 'next/link'
 import { useState, useMemo, useEffect } from 'react'
 import { AppShell } from '@/components/app-shell'
@@ -1852,10 +1853,10 @@ function UserRow({
     setGeneratingReset(true)
     setResetLink(null)
     try {
-      const res = await fetch('/api/admin/send-password-reset', {
+      const res = await adminFetch('/api/admin/send-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, actorId: currentUser.id }),
+        body: JSON.stringify({ userId: user.id }),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean

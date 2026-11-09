@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -62,10 +63,10 @@ function NotificationsContent() {
   const selectedUser = recipients.find((u) => u.id === targetUserId)
 
   async function postJson(url: string, payload: Record<string, unknown>) {
-    const res = await fetch(url, {
+    const res = await adminFetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, actorId: user?.id }),
+      body: JSON.stringify(payload),
     })
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {

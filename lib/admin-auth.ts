@@ -5,14 +5,15 @@ import { adminDb } from '@/lib/firebase-admin-notifications'
 /**
  * Autorizarea cererilor către endpoint-urile de administrare.
  *
- * Aplicația nu are sesiune server-side (autentificarea e client-side, în
- * localStorage), deci verificăm rolul de admin re-citind documentul
- * utilizatorului din Firestore — sursa de adevăr — pe baza unui `actorId`
- * primit de la client. Nu ne bazăm niciodată pe un flag `isAdmin` trimis de
- * client.
+ * Identitatea se dovedește cu un ID token Firebase (header
+ * `Authorization: Bearer <idToken>`), verificat criptografic cu Admin SDK.
+ * Din token obținem `uid`-ul Auth, găsim documentul `users` cu `authUid == uid`
+ * și verificăm rolul de admin în Firestore (sursa de adevăr).
  *
- * Suportăm și un bypass server-to-server prin CRON_SECRET (pentru automatizări
- * viitoare: început de etapă, deadline pronosticuri etc.).
+ * Un `actorId` trimis de client NU mai este folosit: era doar un id de document
+ * Firestore, deci oricine îl afla putea impersona un admin.
+ *
+ * Rămâne bypass-ul server-to-server prin CRON_SECRET (automatizări).
  */
 export interface AdminAuthResult {
   ok: boolean
@@ -21,33 +22,62 @@ export interface AdminAuthResult {
   reason?: string
 }
 
+const SIGN_IN_AGAIN =
+  'Sesiune invalidă sau expirată. Deconectează-te și autentifică-te din nou (Google sau Email).'
+
+function bearerToken(req: NextRequest): string | null {
+  const header = req.headers.get('authorization')
+  if (!header) return null
+  const match = /^Bearer\s+(.+)$/i.exec(header)
+  return match ? match[1].trim() : null
+}
+
+// Al doilea parametru este păstrat doar pentru compatibilitate cu apelanții
+// existenți; este ignorat intenționat.
 export async function authorizeAdminRequest(
   req: NextRequest,
-  actorIdFromBody?: string,
+  _ignoredActorId?: string,
 ): Promise<AdminAuthResult> {
+  const token = bearerToken(req)
+
   // 1) Bypass server-to-server cu CRON_SECRET (header x-push-secret sau Bearer).
   const secret = process.env.CRON_SECRET
   if (secret) {
     const header = req.headers.get('x-push-secret')
-    const auth = req.headers.get('authorization')
-    if (header === secret || auth === `Bearer ${secret}`) {
+    if (header === secret || token === secret) {
       return { ok: true, actorName: 'system (cron)' }
     }
   }
 
-  // 2) Actor uman: verificăm rolul din Firestore.
-  const actorId =
-    actorIdFromBody || req.headers.get('x-actor-id') || undefined
-  if (!actorId) {
-    return { ok: false, reason: 'Lipsește identitatea (actorId).' }
+  // 2) Admin uman: ID token Firebase verificat.
+  if (!token) {
+    return { ok: false, reason: SIGN_IN_AGAIN }
   }
 
-  const snap = await adminDb().collection('users').doc(actorId).get()
-  if (!snap.exists) {
-    return { ok: false, reason: 'Utilizator inexistent.' }
+  let authUid: string
+  try {
+    // Import dinamic: modulul cu firebase-admin/auth se încarcă doar aici.
+    const { adminAuth } = await import('@/lib/firebase-admin')
+    const decoded = await adminAuth().verifyIdToken(token)
+    authUid = decoded.uid
+  } catch {
+    return { ok: false, reason: SIGN_IN_AGAIN }
   }
 
-  const data = snap.data() ?? {}
+  const snap = await adminDb()
+    .collection('users')
+    .where('authUid', '==', authUid)
+    .limit(1)
+    .get()
+  if (snap.empty) {
+    return {
+      ok: false,
+      reason: 'Contul Auth nu este legat de un profil SKUPA.',
+    }
+  }
+
+  const doc = snap.docs[0]
+  const data = doc.data() ?? {}
   const isAdmin = data.isAdmin === true || data.role === 'admin'
   if (!isAdmin) {
     return { ok: false, reason: 'Acces interzis: doar administratorii.' }
@@ -55,7 +85,7 @@ export async function authorizeAdminRequest(
 
   return {
     ok: true,
-    actorId,
-    actorName: (data.name as string) || (data.username as string) || actorId,
+    actorId: doc.id,
+    actorName: (data.name as string) || (data.username as string) || doc.id,
   }
 }

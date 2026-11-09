@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AppShell } from '@/components/app-shell'
@@ -58,10 +59,10 @@ function OverviewContent() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/overview', {
+      const res = await adminFetch('/api/admin/overview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorId: user.id }),
+        body: JSON.stringify({}),
       })
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
       if (!res.ok) throw new Error((json.error as string) || 'Eroare la încărcare.')

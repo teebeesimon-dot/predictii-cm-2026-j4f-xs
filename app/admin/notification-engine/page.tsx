@@ -1,5 +1,6 @@
 'use client'
 
+import { adminFetch } from '@/lib/admin-fetch'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -49,9 +50,7 @@ function NotificationEngineContent() {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/admin/notification-engine/run', {
-          headers: { 'x-actor-id': user.id },
-        })
+        const res = await adminFetch('/api/admin/notification-engine/run')
         const data = (await res.json().catch(() => ({}))) as {
           runLog?: EngineRunLogEntry[]
         }
@@ -80,10 +79,10 @@ function NotificationEngineContent() {
     }
     setRunning(mode)
     try {
-      const res = await fetch('/api/admin/notification-engine/run', {
+      const res = await adminFetch('/api/admin/notification-engine/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorId: user?.id, mode }),
+        body: JSON.stringify({ mode }),
       })
       const data = (await res.json().catch(() => ({}))) as EngineRunResult & {
         error?: string
