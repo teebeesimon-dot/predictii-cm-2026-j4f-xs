@@ -16,6 +16,7 @@ export default function LoginPage() {
   const {
     user,
     loading,
+    authNotice,
     needsAuthMigration,
     login,
     loginWithEmail,
@@ -135,6 +136,14 @@ export default function LoginPage() {
               <h2 className="mb-5 text-center font-heading text-lg font-bold uppercase tracking-wide">
                 Autentificare
               </h2>
+              {authNotice ? (
+                <p
+                  role="alert"
+                  className="mb-5 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm leading-relaxed text-destructive"
+                >
+                  {authNotice}
+                </p>
+              ) : null}
 
               <form onSubmit={handleEmailLogin} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">

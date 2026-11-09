@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
+import { auth } from '@/lib/firebase'
 import { AppNav } from '@/components/app-nav'
 import { AutoSync } from '@/components/auto-sync'
 import { Trophy } from 'lucide-react'
@@ -17,6 +18,7 @@ export function AppShell({
   const { user, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const firebaseAdmin = requireAdmin && Boolean(auth.currentUser) && user?.isAdmin === true
 
   useEffect(() => {
     if (loading) return
@@ -25,15 +27,15 @@ export function AppShell({
     } else if (user.mustChangePassword && pathname !== '/account') {
       // Prima logare / parolă resetată: forțează schimbarea parolei.
       router.replace('/account')
-    } else if (requireAdmin && !user.isAdmin) {
+    } else if (requireAdmin && !firebaseAdmin) {
       router.replace('/dashboard')
     }
-  }, [user, loading, requireAdmin, router, pathname])
+  }, [user, loading, requireAdmin, firebaseAdmin, router, pathname])
 
   const blocked =
     loading ||
     !user ||
-    (requireAdmin && !user.isAdmin) ||
+    (requireAdmin && !firebaseAdmin) ||
     (user.mustChangePassword && pathname !== '/account')
 
   if (blocked) {

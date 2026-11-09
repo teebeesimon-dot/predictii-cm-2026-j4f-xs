@@ -19,6 +19,7 @@ import {
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
   signInWithCredential,
   sendEmailVerification,
   signInWithEmailAndPassword,
@@ -34,11 +35,17 @@ import { isUserAdmin } from '@/lib/types'
 import { seedUsersIfEmpty, DEFAULT_PASSWORD } from '@/lib/data'
 import {
   assertEmailAvailableForUser,
-  findUserByAuthUid,
   linkFirestoreUserToAuth,
   mapFirebaseAuthError,
   touchAuthLogin,
 } from '@/lib/auth-migration'
+import {
+  ADMIN_FIREBASE_REQUIRED,
+  ADMIN_UNLINKED,
+  ADMIN_USE_FIREBASE,
+  resolveSession,
+  type LegacySession,
+} from '@/lib/admin-session'
 import { AuthMigrationDialog } from '@/components/auth-migration-dialog'
 import { FirebaseError } from 'firebase/app'
 
@@ -61,6 +68,8 @@ type AuthResult = AuthOk | AuthFail
 interface AuthContextValue {
   user: SessionUser | null
   loading: boolean
+  /** Mesaj când o sesiune de administrator nu poate fi acordată. */
+  authNotice: string | null
   /** true când userul a trecut login-ul vechi și trebuie să lege Firebase Auth */
   needsAuthMigration: boolean
   login: (username: string, password: string) => Promise<AuthResult>
@@ -85,6 +94,7 @@ interface MigrationPending {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const STORAGE_KEY = 'cm2026_session'
+const NOTICE_KEY = 'cm2026_auth_notice'
 const googleProvider = new GoogleAuthProvider()
 
 async function signInWithGoogle() {
@@ -144,6 +154,7 @@ function authErrorMessage(err: unknown): string {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [migrationPending, setMigrationPending] =
     useState<MigrationPending | null>(null)
   const [migrationBusy, setMigrationBusy] = useState(false)
@@ -154,15 +165,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else localStorage.removeItem(STORAGE_KEY)
   }, [])
 
-  useEffect(() => {
+  const readStoredSession = useCallback((): LegacySession | null => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setUser(JSON.parse(raw) as SessionUser)
+      if (!raw) return null
+      const parsed = JSON.parse(raw) as Partial<SessionUser>
+      if (!parsed.id || !parsed.username) return null
+      return {
+        id: parsed.id,
+        username: parsed.username,
+        name: parsed.name || parsed.username,
+        isAdmin: parsed.isAdmin === true,
+        mustChangePassword: parsed.mustChangePassword === true,
+        viewOnly: parsed.viewOnly === true,
+        hideFromStandings: parsed.hideFromStandings === true,
+      }
     } catch {
-      // ignore
+      return null
     }
-    setLoading(false)
   }, [])
+
+  const applyDecision = useCallback(
+    (decision: ReturnType<typeof resolveSession>) => {
+      if (decision.kind === 'firebase') {
+        sessionStorage.removeItem(NOTICE_KEY)
+        setAuthNotice(null)
+        persist(sessionFromAppUser(decision.user.id, decision.user))
+        return
+      }
+      if (decision.kind === 'legacy') {
+        sessionStorage.removeItem(NOTICE_KEY)
+        setAuthNotice(null)
+        persist(decision.user)
+        return
+      }
+      if (decision.kind === 'denied') {
+        sessionStorage.setItem(NOTICE_KEY, decision.notice)
+        setAuthNotice(decision.notice)
+        persist(null)
+        return
+      }
+      setAuthNotice(sessionStorage.getItem(NOTICE_KEY))
+      persist(null)
+    },
+    [persist],
+  )
+
+  const profilesForUid = useCallback(async (authUid: string): Promise<AppUser[]> => {
+    const snap = await getDocs(
+      query(collection(db, 'users'), where('authUid', '==', authUid)),
+    )
+    return snap.docs.map(
+      (item) =>
+        ({ id: item.id, ...(item.data() as Omit<AppUser, 'id'>) }) as AppUser,
+    )
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      void (async () => {
+        try {
+          const decision = firebaseUser
+            ? resolveSession({
+                stored: readStoredSession(),
+                firebaseUid: firebaseUser.uid,
+                profilesForUid: await profilesForUid(firebaseUser.uid),
+              })
+            : resolveSession({
+                stored: readStoredSession(),
+                firebaseUid: null,
+                profilesForUid: [],
+              })
+          if (cancelled) return
+          applyDecision(decision)
+        } catch {
+          if (cancelled) return
+          const stored = readStoredSession()
+          if (stored?.isAdmin) {
+            sessionStorage.setItem(NOTICE_KEY, ADMIN_FIREBASE_REQUIRED)
+            setAuthNotice(ADMIN_FIREBASE_REQUIRED)
+            persist(null)
+          } else if (stored) {
+            setAuthNotice(null)
+            persist({ ...stored, isAdmin: false })
+          } else {
+            setAuthNotice(null)
+            persist(null)
+          }
+        } finally {
+          if (!cancelled) setLoading(false)
+        }
+      })()
+    })
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [applyDecision, persist, profilesForUid, readStoredSession])
 
   const finishMigratedSession = useCallback(
     async (appUser: AppUser, provider: 'password' | 'google.com') => {
@@ -193,6 +293,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.password !== password) {
         return { ok: false, error: 'Parolă incorectă.' }
+      }
+
+      if (isUserAdmin(data)) {
+        return {
+          ok: false,
+          error: data.authUid ? ADMIN_USE_FIREBASE : ADMIN_UNLINKED,
+        }
       }
 
       // Cont deja migrat → trebuie Firebase Auth (email/Google), nu username.
@@ -230,45 +337,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email.trim(),
           password,
         )
-        const appUser = await findUserByAuthUid(cred.user.uid)
-        if (!appUser) {
+        const decision = resolveSession({
+          stored: null,
+          firebaseUid: cred.user.uid,
+          profilesForUid: await profilesForUid(cred.user.uid),
+        })
+        if (decision.kind !== 'firebase') {
           await signOutFromAuth()
           return {
             ok: false,
             error:
-              'Contul Auth nu este legat de un profil SKUPA. Folosește utilizator + parolă pentru migrare.',
+              decision.kind === 'denied'
+                ? decision.notice
+                : 'Contul Auth nu este legat de un profil SKUPA. Folosește utilizator + parolă pentru migrare.',
           }
         }
-        await finishMigratedSession(appUser, 'password')
+        await finishMigratedSession(decision.user, 'password')
         return { ok: true }
       } catch (err) {
         return { ok: false, error: authErrorMessage(err) }
       }
     },
-    [finishMigratedSession],
+    [finishMigratedSession, profilesForUid],
   )
 
   const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
     try {
       const cred = await signInWithGoogle()
-      const appUser = await findUserByAuthUid(cred.user.uid)
-      if (!appUser) {
+      const decision = resolveSession({
+        stored: null,
+        firebaseUid: cred.user.uid,
+        profilesForUid: await profilesForUid(cred.user.uid),
+      })
+      if (decision.kind !== 'firebase') {
         await signOutFromAuth()
         return {
           ok: false,
           error:
-            'Nu există un cont SKUPA migrat pentru acest Google. Intră mai întâi cu utilizator + parolă și completează actualizarea contului.',
+            decision.kind === 'denied'
+              ? decision.notice
+              : 'Nu există un cont SKUPA migrat pentru acest Google. Intră mai întâi cu utilizator + parolă și completează actualizarea contului.',
         }
       }
-      await finishMigratedSession(appUser, 'google.com')
+      await finishMigratedSession(decision.user, 'google.com')
       return { ok: true }
     } catch (err) {
       return { ok: false, error: authErrorMessage(err) }
     }
-  }, [finishMigratedSession])
+  }, [finishMigratedSession, profilesForUid])
 
   const completeMigrationWithGoogle = useCallback(async () => {
     if (!migrationPending) return
+    if (migrationPending.isAdmin) {
+      setAuthNotice(ADMIN_UNLINKED)
+      setMigrationPending(null)
+      return
+    }
     setMigrationBusy(true)
     try {
       const cred = await signInWithGoogle()
@@ -310,6 +434,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string): Promise<AuthResult> => {
       if (!migrationPending) {
         return { ok: false, error: 'Sesiunea de migrare a expirat. Autentifică-te din nou.' }
+      }
+      if (migrationPending.isAdmin) {
+        setAuthNotice(ADMIN_UNLINKED)
+        setMigrationPending(null)
+        return { ok: false, error: ADMIN_UNLINKED }
       }
 
       const emailCheck = await assertEmailAvailableForUser(
@@ -407,7 +536,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDoc(ref)
         if (!snap.exists()) return
         const data = snap.data() as AppUser
-        persist(sessionFromAppUser(current.id, data))
+        const firebaseUid = auth.currentUser?.uid
+        const verifiedAdmin =
+          Boolean(firebaseUid) &&
+          data.authUid === firebaseUid &&
+          isUserAdmin(data)
+        const session = sessionFromAppUser(current.id, data)
+        if (isUserAdmin(data) && !verifiedAdmin) {
+          setAuthNotice(ADMIN_UNLINKED)
+          persist({ ...session, isAdmin: false })
+          return
+        }
+        persist({ ...session, isAdmin: verifiedAdmin })
       })()
       return current
     })
@@ -417,6 +557,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       loading,
+      authNotice,
       needsAuthMigration: migrationPending !== null,
       login,
       loginWithEmail,
@@ -427,6 +568,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [
       user,
       loading,
+      authNotice,
       migrationPending,
       login,
       loginWithEmail,
