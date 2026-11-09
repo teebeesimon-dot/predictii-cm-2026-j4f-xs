@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authorizeAdminRequest } from '@/lib/admin-auth'
+import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { sendTestToCurrentUser } from '@/lib/push/sendPushNotification'
 
 // Trimite o notificare de test către utilizatorul autentificat (adminul care
@@ -18,12 +18,7 @@ export async function POST(req: NextRequest) {
     // Ex.: FIREBASE_SERVICE_ACCOUNT nesetat → nu putem verifica rolul.
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-  if (!auth.ok) {
-    return NextResponse.json(
-      { error: auth.reason ?? 'Neautorizat' },
-      { status: 401 },
-    )
-  }
+  if (!auth.ok) return adminDeniedResponse(auth)
   if (!auth.actorId) {
     return NextResponse.json(
       { error: 'Lipsește utilizatorul curent pentru testul de notificare.' },

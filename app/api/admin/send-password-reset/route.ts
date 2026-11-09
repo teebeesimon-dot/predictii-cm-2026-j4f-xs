@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authorizeAdminRequest } from '@/lib/admin-auth'
+import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { isValidEmail, normalizeEmail } from '@/lib/email'
 
@@ -24,12 +24,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-  if (!authResult.ok) {
-    return NextResponse.json(
-      { error: authResult.reason ?? 'Neautorizat' },
-      { status: 401 },
-    )
-  }
+  if (!authResult.ok) return adminDeniedResponse(authResult)
 
   const userId = body.userId?.trim()
   if (!userId) {

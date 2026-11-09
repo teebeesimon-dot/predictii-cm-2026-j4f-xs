@@ -1,6 +1,6 @@
 'use client'
 
-import { adminFetch } from '@/lib/admin-fetch'
+import { AdminFetchError, adminFetch } from '@/lib/admin-fetch'
 import Link from 'next/link'
 import { useState, useMemo, useEffect } from 'react'
 import { AppShell } from '@/components/app-shell'
@@ -1869,8 +1869,12 @@ function UserRow({
       }
       setResetLink(data.resetLink)
       toast.success('Link generat. Copiază-l și trimite-l utilizatorului.')
-    } catch {
-      toast.error('Eroare de conexiune la generarea linkului.')
+    } catch (e) {
+      toast.error(
+        e instanceof AdminFetchError
+          ? e.message
+          : 'Eroare de conexiune la generarea linkului.',
+      )
     } finally {
       setGeneratingReset(false)
     }

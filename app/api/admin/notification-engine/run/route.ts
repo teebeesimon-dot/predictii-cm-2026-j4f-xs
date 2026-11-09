@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authorizeAdminRequest } from '@/lib/admin-auth'
+import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { notificationEngine } from '@/lib/notifications/engine/NotificationEngine'
 import { recordRun, getRunLog } from '@/lib/notifications/history/EngineRunLog'
 
 /**
  * Endpoint de debug pentru Notification Engine.
  *
- * DOAR administratorii au acces (verificat din Firestore) sau cron (CRON_SECRET).
+ * DOAR administratorii au acces, cu ID token Firebase verificat.
  * NU trimite notificări — execută engine-ul și întoarce decizia ca JSON.
  *
  * Body (JSON): { "actorId": "...", "mode": "dry-run" | "live" }
@@ -29,12 +29,7 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-  if (!auth.ok) {
-    return NextResponse.json(
-      { error: auth.reason ?? 'Neautorizat' },
-      { status: 401 },
-    )
-  }
+  if (!auth.ok) return adminDeniedResponse(auth)
   const runLog = await getRunLog()
   return NextResponse.json({ runLog })
 }
@@ -54,12 +49,7 @@ export async function POST(req: NextRequest) {
     // Ex.: FIREBASE_SERVICE_ACCOUNT nesetat → nu putem verifica rolul.
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-  if (!auth.ok) {
-    return NextResponse.json(
-      { error: auth.reason ?? 'Neautorizat' },
-      { status: 401 },
-    )
-  }
+  if (!auth.ok) return adminDeniedResponse(auth)
 
   try {
     console.log(

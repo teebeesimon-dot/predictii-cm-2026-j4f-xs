@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { authorizeAdminRequest } from '@/lib/admin-auth'
+import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { sendToAll, sendToUser } from '@/lib/push/sendPushNotification'
 
 // Endpoint de administrare pentru trimiterea notificărilor push.
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     actorId?: string
   }
 
-  // Securitate: doar administratorii (verificat din Firestore) sau cron.
+  // Securitate: doar administratorii, cu ID token Firebase verificat.
   let auth
   try {
     auth = await authorizeAdminRequest(req, body.actorId)
@@ -34,12 +34,7 @@ export async function POST(req: NextRequest) {
     // Ex.: FIREBASE_SERVICE_ACCOUNT nesetat → nu putem verifica rolul.
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
-  if (!auth.ok) {
-    return NextResponse.json(
-      { error: auth.reason ?? 'Neautorizat' },
-      { status: 401 },
-    )
-  }
+  if (!auth.ok) return adminDeniedResponse(auth)
 
   const title = (body.title ?? '').trim()
   const message = (body.body ?? '').trim()
