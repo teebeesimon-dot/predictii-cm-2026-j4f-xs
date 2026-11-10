@@ -4,6 +4,7 @@ import useSWR from 'swr'
 import {
   getMatches,
   getUsers,
+  getUserById,
   getAllPredictions,
   getUserPredictions,
   getAvailableEditionIds,
@@ -104,13 +105,19 @@ export function useUserPredictions(userId: string | undefined) {
   )
 }
 
-// Documentul COMPLET al utilizatorului curent (inclusiv `preferences`), extras
-// din lista deja încărcată de useUsers(). Nu face nicio citire suplimentară —
-// refolosește cache-ul SWR existent al colecției `users`.
-export function useCurrentAppUser(userId: string | undefined): AppUser | undefined {
-  const { data: users } = useUsers()
-  if (!userId) return undefined
-  return users?.find((u) => u.id === userId)
+// Profilul utilizatorului curent se citește individual, nu prin descărcarea
+// întregii colecții `users`. Cache-ul SWR evită citirile repetate între pagini.
+export function useCurrentAppUser(userId: string | undefined) {
+  return useSWR(
+    userId ? ['user', userId] : null,
+    () => getUserById(userId as string),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshWhenHidden: false,
+      dedupingInterval: DATA_DEDUPE_MS,
+    },
+  ).data
 }
 
 // Notificările utilizatorului curent pentru Centrul de notificări. O singură
