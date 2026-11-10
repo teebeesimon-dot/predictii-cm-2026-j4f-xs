@@ -75,6 +75,14 @@ export async function getUsers(): Promise<AppUser[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AppUser, 'id'>) }))
 }
 
+// Citește un singur profil când interfața are nevoie doar de utilizatorul curent.
+// Evită descărcarea întregii colecții `users` pentru datele proprii.
+export async function getUserById(userId: string): Promise<AppUser | undefined> {
+  const snap = await getDoc(doc(db, 'users', userId))
+  if (!snap.exists()) return undefined
+  return { id: snap.id, ...(snap.data() as Omit<AppUser, 'id'>) }
+}
+
 export async function getStagePayments(editionId: string): Promise<StagePayment[]> {
   const snap = await getDocs(
     query(collection(db, 'stagePayments'), where('editionId', '==', editionId)),
