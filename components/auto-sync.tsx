@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useSWRConfig } from 'swr'
 import { useMatches } from '@/lib/hooks'
+import { useEdition } from '@/components/edition-provider'
 import { triggerSync } from '@/app/actions/sync'
 
 // Cât de des încercăm o sincronizare cât timp aplicația e deschisă.
@@ -27,6 +28,7 @@ let sessionCaughtUp = false
 //    useri deschiși simultan NU înmulțesc cererile către football-data.org.
 export function AutoSync() {
   const { data: matches } = useMatches()
+  const { editionId } = useEdition()
   const { mutate } = useSWRConfig()
   const runningRef = useRef(false)
 
@@ -50,8 +52,11 @@ export function AutoSync() {
       try {
         const res = await triggerSync({ includeLive })
         if (res.ran && res.result && res.result.updated > 0) {
-          // Reîmprospătăm toate cheile (meciuri, clasamente, statistici, premii).
-          await mutate(() => true, undefined, { revalidate: true })
+          // Sincronizarea modifică doar documentele din `matches`.
+          // Revalidarea tuturor cheilor SWR recitea inutil și users,
+          // predictions, groups, notificări și alte colecții pentru fiecare
+          // utilizator conectat. Reîmprospătăm strict ediția activă.
+          await mutate(['matches', editionId])
         }
       } catch {
         // Eșec silențios: pollerul va reîncerca la următorul interval.
