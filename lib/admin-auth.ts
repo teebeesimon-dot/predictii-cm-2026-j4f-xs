@@ -80,7 +80,12 @@ export async function authorizeAdminRequest(
       actorId: doc.id,
       actorName: (data.name as string) || (data.username as string) || doc.id,
     }
-  } catch {
+  } catch (error) {
+    const err = error as { code?: unknown; message?: unknown }
+    console.error('[admin-auth] Firestore admin lookup failed', {
+      code: typeof err?.code === 'string' ? err.code : 'unknown',
+      message: typeof err?.message === 'string' ? err.message : 'Unknown Firestore error',
+    })
     return denied(401, CONFIG_REFUSED)
   }
 }
