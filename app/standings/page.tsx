@@ -4,14 +4,14 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
-import { useMatches, useUsers, useAllPredictions, useGroups } from '@/lib/hooks'
+import { useMatches, useUsers, useAllPredictions, useGroups, useLeaderboardSummaries } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
 import {
   computeStandings,
   computePositionHistory,
   type StandingsViewer,
 } from '@/lib/data'
-import type { AppUser, Match, Prediction } from '@/lib/types'
+import { hasEditionAccess, isViewOnly, isDedicatedAdmin, type AppUser, type Match, type Prediction } from '@/lib/types'
 import { type StageId } from '@/lib/types'
 import { stagesForEdition, type StageDef } from '@/lib/stages'
 import {
@@ -48,13 +48,15 @@ function StandingsContent() {
 
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
-  const { data: predictions, isLoading: l3 } = useAllPredictions()
+  const [activeTab, setActiveTab] = useState(initialTab)
+  const { data: predictions, isLoading: l3 } = useAllPredictions(undefined, activeTab === 'evolution')
+  const { data: summaries, isLoading: l4 } = useLeaderboardSummaries()
   const { data: groups = [] } = useGroups()
 
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
 
-  const loading = l1 || l2 || l3
-  const ready = users && matches && predictions
+  const loading = l1 || l2 || l4
+  const ready = users && matches && summaries
   const userGroups = useMemo(() => buildUserGroupsMap(groups), [groups])
   const groupMemberIds = useMemo(
     () =>
@@ -75,14 +77,37 @@ function StandingsContent() {
 
   function rowsFor(stage?: StageId) {
     if (!ready) return []
-    const rows = computeStandings(
-      users,
-      matches,
-      predictions,
-      stage,
-      viewer,
+    const relevantMatches = matches.filter((m) =>
+      m.homeScore !== null && m.awayScore !== null &&
+      (stage === undefined || m.stage === stage),
     )
-    return filterStandingRowsByGroups(rows, groups, selectedGroupIds)
+    const rows = users
+      .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
+      .filter((u) => hasEditionAccess(u, editionId))
+      .filter((u) => !viewer.allowedUserIds || viewer.allowedUserIds.has(u.id))
+      .filter((u) => !u.hideFromStandings || viewer.isAdmin === true || viewer.id === u.id)
+      .map((u) => {
+        const summary = summaries.find((item) => item.userId === u.id)
+        const totals = stage === undefined
+          ? summary
+          : summary?.stages?.[String(stage)]
+        return {
+          userId: u.id, username: u.username, name: u.name || u.username,
+          points: totals?.points ?? 0, exact: totals?.exact ?? 0,
+          correct1x2: totals?.correct1x2 ?? 0, played: totals?.played ?? 0,
+          predicted: totals?.played ?? 0, rank: 0,
+        }
+      })
+      .sort((a, b) => b.points - a.points || b.exact - a.exact || b.correct1x2 - a.correct1x2 || a.name.localeCompare(b.name))
+    let lastPoints: number | null = null
+    let lastRank = 0
+    const ranked = rows.map((row, index) => {
+      const rank = lastPoints !== null && row.points === lastPoints ? lastRank : index + 1
+      if (lastPoints === null || row.points !== lastPoints) { lastPoints = row.points; lastRank = rank }
+      return { ...row, rank }
+    })
+    void relevantMatches
+    return filterStandingRowsByGroups(ranked, groups, selectedGroupIds)
   }
 
   return (
@@ -107,7 +132,7 @@ function StandingsContent() {
           {loading || !ready ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <Tabs key={initialTab} defaultValue={initialTab}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex w-full flex-wrap">
                 <TabsTrigger value="general" className="flex-1">
                   General
@@ -151,16 +176,20 @@ function StandingsContent() {
               ))}
 
               <TabsContent value="evolution" className="mt-4">
-                <EvolutionTab
-                  users={users}
-                  matches={matches}
-                  predictions={predictions}
-                  viewer={viewer}
-                  highlightUserId={user?.id}
-                  stages={stages}
-                  selectedGroupIds={selectedGroupIds}
-                  groups={groups}
-                />
+                {predictions ? (
+                  <EvolutionTab
+                    users={users}
+                    matches={matches}
+                    predictions={predictions}
+                    viewer={viewer}
+                    highlightUserId={user?.id}
+                    stages={stages}
+                    selectedGroupIds={selectedGroupIds}
+                    groups={groups}
+                  />
+                ) : (
+                  <Skeleton className="h-64 w-full" />
+                )}
               </TabsContent>
             </Tabs>
           )}
