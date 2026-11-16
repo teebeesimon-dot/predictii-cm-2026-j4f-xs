@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { adminDb } from '@/lib/firebase-admin'
-import { rebuildEditionLeaderboardSummaries, rebuildMatchLeaderboardSummaries } from '@/lib/server/leaderboard-aggregates'
+import { rebuildAffectedLeaderboardSummaries, rebuildEditionLeaderboardSummaries } from '@/lib/server/leaderboard-aggregates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
     let summariesUpdated = 0
     let summaryRefreshMode: 'match' | 'edition' | 'failed' = 'match'
     try {
-      summariesUpdated = await rebuildMatchLeaderboardSummaries(matchId, editionId)
+      const rebuilt = await rebuildAffectedLeaderboardSummaries([{ matchId, editionId }])
+      summariesUpdated = rebuilt.summariesWritten
     } catch (error) {
       console.error('[admin/update-match-result] match summary rebuild failed', error)
       try {
