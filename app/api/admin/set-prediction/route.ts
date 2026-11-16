@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { adminDb } from '@/lib/firebase-admin'
+import { rebuildUserLeaderboardSummary } from '@/lib/server/leaderboard-aggregates'
 
 // Endpoint de administrare pentru a seta/corecta pronosticul unui utilizator
 // la un meci care ÎNCĂ NU a început. Replică exact logica din
@@ -227,6 +228,10 @@ export async function POST(req: NextRequest) {
     editedByAdminName: auth.actorName ?? 'Administrator',
     editedAt,
   })
+
+  let summaryUpdated = true
+  try { await rebuildUserLeaderboardSummary(userId, editionId) }
+  catch (error) { summaryUpdated = false; console.error('[admin/set-prediction] summary rebuild failed', error) }
 
   const userData = (userDoc.data() ?? {}) as {
     name?: string
