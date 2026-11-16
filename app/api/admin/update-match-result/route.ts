@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { adminDb } from '@/lib/firebase-admin'
-import { rebuildMatchLeaderboardSummaries } from '@/lib/server/leaderboard-aggregates'
+import { rebuildEditionLeaderboardSummaries, rebuildMatchLeaderboardSummaries } from '@/lib/server/leaderboard-aggregates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,9 +39,21 @@ export async function POST(req: NextRequest) {
     })
     const editionId = String(snap.data()?.editionId ?? 'wc-2026')
     let summariesUpdated = 0
-    try { summariesUpdated = await rebuildMatchLeaderboardSummaries(matchId, editionId) }
-    catch (error) { console.error('[admin/update-match-result] summary rebuild failed', error) }
-    return NextResponse.json({ ok: true, matchId, summariesUpdated })
+    let summaryRefreshMode: 'match' | 'edition' | 'failed' = 'match'
+    try {
+      summariesUpdated = await rebuildMatchLeaderboardSummaries(matchId, editionId)
+    } catch (error) {
+      console.error('[admin/update-match-result] match summary rebuild failed', error)
+      try {
+        const rebuilt = await rebuildEditionLeaderboardSummaries(editionId)
+        summariesUpdated = rebuilt.summariesWritten
+        summaryRefreshMode = 'edition'
+      } catch (fallbackError) {
+        summaryRefreshMode = 'failed'
+        console.error('[admin/update-match-result] edition summary rebuild failed', fallbackError)
+      }
+    }
+    return NextResponse.json({ ok: true, matchId, editionId, summariesUpdated, summaryRefreshMode })
   } catch (error) {
     console.error('[admin/update-match-result] failed', error)
     return NextResponse.json({ error: 'Nu am putut actualiza rezultatul.' }, { status: 500 })
