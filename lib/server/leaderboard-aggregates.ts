@@ -81,7 +81,6 @@ export async function rebuildAffectedLeaderboardSummaries(
   changes: Array<{ matchId: string; editionId: string }>,
 ) {
   const db = adminDb()
-  const editionByMatch = new Map(changes.map((change) => [change.matchId, change.editionId]))
   const affectedByEdition = new Map<string, Set<string>>()
   const predictionSnaps = await Promise.all(
     changes.map((change) =>
@@ -113,15 +112,16 @@ export async function rebuildAffectedLeaderboardSummaries(
       if ((match.editionId ?? DEFAULT_EDITION) === editionId) matches.set(matchDoc.id, match)
     }
 
+    const userIdList = [...userIds]
     const userPredictions = await Promise.all(
-      [...userIds].map((userId) =>
+      userIdList.map((userId) =>
         db.collection('predictions').where('userId', '==', userId).get(),
       ),
     )
     let batch = db.batch()
     let operations = 0
     for (let i = 0; i < userPredictions.length; i++) {
-      const userId = [...userIds][i]
+      const userId = userIdList[i]
       const totals = { points: 0, exact: 0, correct1x2: 0, played: 0 }
       const stages: Record<string, { points: number; exact: number; correct1x2: number; played: number }> = {}
       for (const predictionDoc of userPredictions[i].docs) {
