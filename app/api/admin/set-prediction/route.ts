@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     homeScore?: number
     awayScore?: number
     actorId?: string
+    allowAfterKickoff?: boolean
   }
 
   let auth
@@ -196,7 +197,11 @@ export async function POST(req: NextRequest) {
 
   // 3) Guard: meciul nu trebuie să fi început.
   const kickoffMs = new Date(match.kickoff).getTime()
-  if (Number.isFinite(kickoffMs) && kickoffMs <= Date.now()) {
+  if (
+    !body.allowAfterKickoff &&
+    Number.isFinite(kickoffMs) &&
+    kickoffMs <= Date.now()
+  ) {
     return NextResponse.json(
       { error: 'Meciul a început deja — pronosticul este blocat.' },
       { status: 409 },
@@ -210,13 +215,17 @@ export async function POST(req: NextRequest) {
 
   // 5) Scrie pronosticul (același id determinist ca savePrediction).
   const id = `${userId}_${matchId}`
+  const editedAt = Date.now()
   await db.collection('predictions').doc(id).set({
     userId,
     matchId,
     editionId,
     homeScore,
     awayScore,
-    updatedAt: Date.now(),
+    updatedAt: editedAt,
+    editedByAdmin: true,
+    editedByAdminName: auth.actorName ?? 'Administrator',
+    editedAt,
   })
 
   const userData = (userDoc.data() ?? {}) as {
