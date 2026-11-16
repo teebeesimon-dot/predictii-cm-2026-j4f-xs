@@ -50,7 +50,10 @@ export function SyncPanel() {
         } else if (res.result.updated > 0) {
           toast.success(`Actualizat ${res.result.updated} meci(uri).`)
           // Reîmprospătează datele ca toate paginile să reflecte noile scoruri.
-          await mutate('matches')
+          await Promise.all([
+            mutate('matches'),
+            mutate(['leaderboard-summaries', 'wc-2026']),
+          ])
         } else {
           toast.info('Niciun scor nou de actualizat.')
         }
