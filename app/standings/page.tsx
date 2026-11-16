@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions, useGroups, useLeaderboardSummaries } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
 import {
+  computeStandings,
   computePositionHistory,
   type StandingsViewer,
 } from '@/lib/data'
@@ -45,17 +46,18 @@ function StandingsContent() {
       ? stageParam
       : 'general'
 
+  const useAggregates = Boolean(user?.authUid)
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const [activeTab, setActiveTab] = useState(initialTab)
-  const { data: predictions } = useAllPredictions(undefined, activeTab === 'evolution')
-  const { data: summaries, isLoading: l4 } = useLeaderboardSummaries()
+  const { data: predictions, isLoading: l3 } = useAllPredictions(undefined, activeTab === 'evolution' || !useAggregates)
+  const { data: summaries, isLoading: l4 } = useLeaderboardSummaries(useAggregates)
   const { data: groups = [] } = useGroups()
 
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
 
-  const loading = l1 || l2 || l4
-  const ready = users && matches && summaries
+  const loading = l1 || l2 || (useAggregates ? l4 : l3)
+  const ready = users && matches && (useAggregates ? summaries : predictions)
   const userGroups = useMemo(() => buildUserGroupsMap(groups), [groups])
   const groupMemberIds = useMemo(
     () =>
@@ -76,13 +78,21 @@ function StandingsContent() {
 
   function rowsFor(stage?: StageId) {
     if (!ready) return []
+    if (!useAggregates) {
+      if (!predictions) return []
+      return filterStandingRowsByGroups(
+        computeStandings(users, matches, predictions, stage, viewer),
+        groups,
+        selectedGroupIds,
+      )
+    }
     const rows = users
       .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
       .filter((u) => hasEditionAccess(u, editionId))
       .filter((u) => !viewer.allowedUserIds || viewer.allowedUserIds.has(u.id))
       .filter((u) => !u.hideFromStandings || viewer.isAdmin === true || viewer.id === u.id)
       .map((u) => {
-        const summary = summaries.find((item) => item.userId === u.id)
+        const summary = summaries?.find((item) => item.userId === u.id)
         const totals = stage === undefined
           ? summary
           : summary?.stages?.[String(stage)]
