@@ -39,6 +39,8 @@ export async function rebuildUserLeaderboardSummary(userId: string, editionId: s
     const m = d.data() as MatchDoc
     if ((m.editionId ?? DEFAULT_EDITION) === editionId) matches.set(d.id, m)
   }
+  const editionPredictions = predSnap.docs.filter((d) => ((d.data() as ScoreDoc).editionId ?? DEFAULT_EDITION) === editionId)
+  const predictionsCount = editionPredictions.length
   const totals = { points: 0, exact: 0, correct1x2: 0, played: 0 }
   const stages: Record<string, { points: number; exact: number; correct1x2: number; played: number }> = {}
   for (const d of predSnap.docs) {
@@ -59,8 +61,8 @@ export async function rebuildUserLeaderboardSummary(userId: string, editionId: s
     else if (score === 1) stage.correct1x2 += 1
   }
   const ref = db.collection('leaderboard_summaries').doc(`${editionId}_${userId}`)
-  await ref.set({ userId, editionId, ...totals, stages, rebuiltAt: Date.now(), source: 'server-rebuild' })
-  return { userId, editionId, ...totals }
+  await ref.set({ userId, editionId, ...totals, predictionsCount, stages, rebuiltAt: Date.now(), source: 'server-rebuild' })
+  return { userId, editionId, ...totals, predictionsCount }
 }
 
 /** Rebuild all participants affected by a changed match result. */
@@ -122,6 +124,8 @@ export async function rebuildAffectedLeaderboardSummaries(
     let operations = 0
     for (let i = 0; i < userPredictions.length; i++) {
       const userId = userIdList[i]
+      const editionPredictions = userPredictions[i].docs.filter((d) => ((d.data() as ScoreDoc).editionId ?? DEFAULT_EDITION) === editionId)
+      const predictionsCount = editionPredictions.length
       const totals = { points: 0, exact: 0, correct1x2: 0, played: 0 }
       const stages: Record<string, { points: number; exact: number; correct1x2: number; played: number }> = {}
       for (const predictionDoc of userPredictions[i].docs) {
@@ -142,7 +146,7 @@ export async function rebuildAffectedLeaderboardSummaries(
         else if (score === 1) stage.correct1x2++
       }
       batch.set(db.collection('leaderboard_summaries').doc(`${editionId}_${userId}`), {
-        userId, editionId, ...totals, stages, rebuiltAt: Date.now(), source: 'match-result-update',
+        userId, editionId, ...totals, predictionsCount, stages, rebuiltAt: Date.now(), source: 'match-result-update',
       })
       operations++
       summariesWritten++
@@ -188,9 +192,11 @@ export async function rebuildEditionLeaderboardSummaries(editionId: string) {
     const userId = userDoc.id
     const user = userDoc.data()
     if (user.viewOnly === true || user.username === 'admin' || String(user.name ?? '').toLowerCase() === 'administrator') continue
+    const userPredictions = byUser.get(userId) ?? []
+    const predictionsCount = userPredictions.length
     const totals = { points: 0, exact: 0, correct1x2: 0, played: 0 }
     const stages: Record<string, { points: number; exact: number; correct1x2: number; played: number }> = {}
-    for (const p of byUser.get(userId) ?? []) {
+    for (const p of userPredictions) {
       if (!p.matchId) continue
       const match = matches.get(p.matchId)
       if (!match || match.homeScore == null || match.awayScore == null) continue
@@ -207,7 +213,7 @@ export async function rebuildEditionLeaderboardSummaries(editionId: string) {
       else if (score === 1) stage.correct1x2++
     }
     const ref = db.collection('leaderboard_summaries').doc(`${editionId}_${userId}`)
-    batch.set(ref, { userId, editionId, ...totals, stages, rebuiltAt: Date.now(), source: 'full-backfill' })
+    batch.set(ref, { userId, editionId, ...totals, predictionsCount, stages, rebuiltAt: Date.now(), source: 'full-backfill' })
     operations++
     written++
     if (operations === 450) {
