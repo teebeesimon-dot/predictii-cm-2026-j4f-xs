@@ -7,7 +7,6 @@ import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions, useGroups, useLeaderboardSummaries } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
 import {
-  computeStandings,
   computePositionHistory,
   type StandingsViewer,
 } from '@/lib/data'
@@ -49,7 +48,7 @@ function StandingsContent() {
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const [activeTab, setActiveTab] = useState(initialTab)
-  const { data: predictions, isLoading: l3 } = useAllPredictions(undefined, activeTab === 'evolution')
+  const { data: predictions } = useAllPredictions(undefined, activeTab === 'evolution')
   const { data: summaries, isLoading: l4 } = useLeaderboardSummaries()
   const { data: groups = [] } = useGroups()
 
