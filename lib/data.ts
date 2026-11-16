@@ -484,6 +484,9 @@ export async function createUser(
     // Parola inițială este una implicită → utilizatorul trebuie s-o schimbe
     // la prima autentificare.
     mustChangePassword: true,
+    // Conturile noi nu primesc acces automat la nicio editie.
+    // Administratorul acorda accesul explicit din Administrare → Participanti.
+    access: Object.fromEntries(EDITIONS.map((edition) => [edition.id, false])),
   }
 
   const rawEmail = email?.trim() ?? ''
