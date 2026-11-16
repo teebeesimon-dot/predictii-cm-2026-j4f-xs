@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { rebuildUserLeaderboardSummary } from '@/lib/server/leaderboard-aggregates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -78,6 +79,11 @@ export async function POST(req: NextRequest) {
       awayScore,
       updatedAt: Date.now(),
     })
+    let summaryUpdated = true
+    try { await rebuildUserLeaderboardSummary(profile.id, editionId) }
+    catch (error) { summaryUpdated = false; console.error('[predictions/save] summary rebuild failed', error) }
+
+    return NextResponse.json({ ok: true, predictionId, editionId, summaryUpdated })
 
     return NextResponse.json({ ok: true, predictionId, editionId })
   } catch (error) {
