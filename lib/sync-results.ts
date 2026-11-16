@@ -163,22 +163,17 @@ export async function runResultsSync(
       // participantii afectati de fiecare meci. Daca rebuild-ul punctual esueaza,
       // incercam o reconstructie completa a editiei pentru a nu lasa clasamentul
       // in urma fata de scorurile deja salvate.
-      const { rebuildMatchLeaderboardSummaries, rebuildEditionLeaderboardSummaries } =
+      const { rebuildEditionLeaderboardSummaries } =
         await import('@/lib/server/leaderboard-aggregates')
-      const editionByMatch = new Map(
-        firestoreMatches.map((match) => [match.id, match.editionId ?? DEFAULT_EDITION_ID]),
+      const affectedEditions = new Set(
+        changes.map((change) => {
+          const match = firestoreMatches.find((item) => item.id === change.matchId)
+          return match?.editionId ?? DEFAULT_EDITION_ID
+        }),
       )
-      const failedEditions = new Set<string>()
-      for (const change of changes) {
-        const editionId = editionByMatch.get(change.matchId) ?? DEFAULT_EDITION_ID
-        try {
-          await rebuildMatchLeaderboardSummaries(change.matchId, editionId)
-        } catch (error) {
-          console.error('[sync-results] match summary rebuild failed', change.matchId, error)
-          failedEditions.add(editionId)
-        }
-      }
-      for (const editionId of failedEditions) {
+      // Recalculam o singura data fiecare editie, nu o data pentru fiecare meci.
+      // Astfel un sync cu mai multe rezultate nu repeta aceleasi citiri de pronosticuri.
+      for (const editionId of affectedEditions) {
         await rebuildEditionLeaderboardSummaries(editionId)
       }
     }
