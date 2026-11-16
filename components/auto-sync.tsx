@@ -56,7 +56,10 @@ export function AutoSync() {
           // Revalidarea tuturor cheilor SWR recitea inutil și users,
           // predictions, groups, notificări și alte colecții pentru fiecare
           // utilizator conectat. Reîmprospătăm strict ediția activă.
-          await mutate(['matches', editionId])
+          await Promise.all([
+            mutate(['matches', editionId]),
+            mutate(['leaderboard-summaries', editionId]),
+          ])
         }
       } catch {
         // Eșec silențios: pollerul va reîncerca la următorul interval.
