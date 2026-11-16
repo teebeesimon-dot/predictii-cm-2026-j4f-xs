@@ -92,6 +92,7 @@ function StandingsContent() {
       .filter((u) => hasEditionAccess(u, editionId))
       .filter((u) => !viewer.allowedUserIds || viewer.allowedUserIds.has(u.id))
       .filter((u) => !u.hideFromStandings || viewer.isAdmin === true || viewer.id === u.id)
+      .filter((u) => (summaries?.find((item) => item.userId === u.id)?.predictionsCount ?? 0) > 0)
       .map((u) => {
         const summary = summaries?.find((item) => item.userId === u.id)
         const totals = stage === undefined
