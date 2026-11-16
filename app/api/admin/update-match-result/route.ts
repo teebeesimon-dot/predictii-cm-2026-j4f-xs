@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDeniedResponse, authorizeAdminRequest } from '@/lib/admin-auth'
 import { adminDb } from '@/lib/firebase-admin'
+import { rebuildMatchLeaderboardSummaries } from '@/lib/server/leaderboard-aggregates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,11 @@ export async function POST(req: NextRequest) {
       awayScore,
       scoreOverride: homeScore !== null && awayScore !== null,
     })
-    return NextResponse.json({ ok: true, matchId })
+    const editionId = String(snap.data()?.editionId ?? 'wc-2026')
+    let summariesUpdated = 0
+    try { summariesUpdated = await rebuildMatchLeaderboardSummaries(matchId, editionId) }
+    catch (error) { console.error('[admin/update-match-result] summary rebuild failed', error) }
+    return NextResponse.json({ ok: true, matchId, summariesUpdated })
   } catch (error) {
     console.error('[admin/update-match-result] failed', error)
     return NextResponse.json({ error: 'Nu am putut actualiza rezultatul.' }, { status: 500 })
