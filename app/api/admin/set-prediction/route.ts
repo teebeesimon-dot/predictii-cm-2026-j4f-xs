@@ -249,6 +249,7 @@ export async function POST(req: NextRequest) {
     score: `${homeScore}-${awayScore}`,
     predictionId: id,
     editionId,
+    summaryUpdated,
   })
   } catch (e) {
     console.log('[v0] set-prediction ERROR:', (e as Error).message)
