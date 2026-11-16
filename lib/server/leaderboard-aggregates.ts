@@ -72,6 +72,92 @@ export async function rebuildMatchLeaderboardSummaries(matchId: string, editionI
 }
 
 
+/**
+ * Rebuild only participants affected by one or more changed match results.
+ * Predictions are read once per changed match to identify participants, then
+ * once per affected participant to calculate the full edition totals.
+ */
+export async function rebuildAffectedLeaderboardSummaries(
+  changes: Array<{ matchId: string; editionId: string }>,
+) {
+  const db = adminDb()
+  const editionByMatch = new Map(changes.map((change) => [change.matchId, change.editionId]))
+  const affectedByEdition = new Map<string, Set<string>>()
+  const predictionSnaps = await Promise.all(
+    changes.map((change) =>
+      db.collection('predictions').where('matchId', '==', change.matchId).get(),
+    ),
+  )
+
+  for (let i = 0; i < changes.length; i++) {
+    const editionId = changes[i].editionId
+    const ids = affectedByEdition.get(editionId) ?? new Set<string>()
+    for (const predictionDoc of predictionSnaps[i].docs) {
+      const prediction = predictionDoc.data() as ScoreDoc
+      if (!prediction.userId) continue
+      if ((prediction.editionId ?? DEFAULT_EDITION) !== editionId) continue
+      ids.add(prediction.userId)
+    }
+    affectedByEdition.set(editionId, ids)
+  }
+
+  let summariesWritten = 0
+  for (const [editionId, userIds] of affectedByEdition) {
+    if (userIds.size === 0) continue
+    const matchSnap = editionId === DEFAULT_EDITION
+      ? await db.collection('matches').get()
+      : await db.collection('matches').where('editionId', '==', editionId).get()
+    const matches = new Map<string, MatchDoc>()
+    for (const matchDoc of matchSnap.docs) {
+      const match = matchDoc.data() as MatchDoc
+      if ((match.editionId ?? DEFAULT_EDITION) === editionId) matches.set(matchDoc.id, match)
+    }
+
+    const userPredictions = await Promise.all(
+      [...userIds].map((userId) =>
+        db.collection('predictions').where('userId', '==', userId).get(),
+      ),
+    )
+    let batch = db.batch()
+    let operations = 0
+    for (let i = 0; i < userPredictions.length; i++) {
+      const userId = [...userIds][i]
+      const totals = { points: 0, exact: 0, correct1x2: 0, played: 0 }
+      const stages: Record<string, { points: number; exact: number; correct1x2: number; played: number }> = {}
+      for (const predictionDoc of userPredictions[i].docs) {
+        const prediction = predictionDoc.data() as ScoreDoc
+        if ((prediction.editionId ?? DEFAULT_EDITION) !== editionId || !prediction.matchId) continue
+        const match = matches.get(prediction.matchId)
+        if (!match || match.homeScore == null || match.awayScore == null) continue
+        const score = points(prediction, match)
+        totals.points += score
+        totals.played++
+        if (score === 3) totals.exact++
+        else if (score === 1) totals.correct1x2++
+        const stageKey = String(match.stage ?? 0)
+        const stage = stages[stageKey] ??= { points: 0, exact: 0, correct1x2: 0, played: 0 }
+        stage.points += score
+        stage.played++
+        if (score === 3) stage.exact++
+        else if (score === 1) stage.correct1x2++
+      }
+      batch.set(db.collection('leaderboard_summaries').doc(`${editionId}_${userId}`), {
+        userId, editionId, ...totals, stages, rebuiltAt: Date.now(), source: 'match-result-update',
+      })
+      operations++
+      summariesWritten++
+      if (operations === 450) {
+        await batch.commit()
+        batch = db.batch()
+        operations = 0
+      }
+    }
+    if (operations) await batch.commit()
+  }
+
+  return { summariesWritten, participants: [...affectedByEdition.values()].reduce((sum, ids) => sum + ids.size, 0) }
+}
+
 /** One-time full rebuild. Reads source collections once and writes one summary per user. */
 export async function rebuildEditionLeaderboardSummaries(editionId: string) {
   const db = adminDb()
