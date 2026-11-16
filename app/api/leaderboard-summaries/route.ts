@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function bearerToken(req: NextRequest): string | null {
-  const match = /^Bearer\\s+(.+)$/i.exec(req.headers.get('authorization') || '')
+  const match = /^Bearer\s+(.+)$/i.exec(req.headers.get('authorization') || '')
   return match?.[1]?.trim() || null
 }
 
