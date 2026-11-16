@@ -15,7 +15,7 @@ import {
   deleteField,
   limit,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 import type {
   AppUser,
   Match,
@@ -223,7 +223,28 @@ export async function savePrediction(
   homeScore: number,
   awayScore: number,
 ): Promise<void> {
-  // Backend guard: conturile de supraveghere nu pot trimite pronosticuri.
+  // Pentru conturile migrate, scrierea trece prin API si este verificata
+  // server-side pe baza ID token-ului Firebase. Conturile legacy raman pe
+  // fluxul existent pana la migrarea completa la Firebase Authentication.
+  const firebaseUser = auth.currentUser
+  if (firebaseUser) {
+    const token = await firebaseUser.getIdToken()
+    const response = await fetch('/api/predictions/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ matchId, homeScore, awayScore }),
+    })
+    const result = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      throw new Error(result.error || 'Nu am putut salva pronosticul.')
+    }
+    return
+  }
+
+  // Compatibilitate temporara pentru conturile care folosesc login-ul legacy.
   const userSnap = await getDoc(doc(db, 'users', userId))
   const userData = userSnap.exists()
     ? (userSnap.data() as Omit<AppUser, 'id'>)
@@ -231,31 +252,19 @@ export async function savePrediction(
   if (userData && isViewOnly(userData)) {
     throw new Error('Contul de supraveghere nu poate trimite pronosticuri.')
   }
-  // Backend guard: never trust the UI. A prediction cannot be saved or changed
-  // once the match has kicked off (kickoff <= now).
   const snap = await getDoc(doc(db, 'matches', matchId))
-  if (!snap.exists()) {
-    throw new Error('Meciul nu există.')
-  }
+  if (!snap.exists()) throw new Error('Meciul nu există.')
   const match = snap.data() as Omit<Match, 'id'>
   const editionId = editionOf(match)
-
-  // Backend guard: utilizatorul trebuie să aibă acces la ediția meciului.
   if (userData && !hasEditionAccess(userData, editionId)) {
     throw new Error('Nu ai acces la această competiție.')
   }
   if (new Date(match.kickoff).getTime() <= Date.now()) {
     throw new PredictionLockedError()
   }
-
   const id = `${userId}_${matchId}`
   await setDoc(doc(db, 'predictions', id), {
-    userId,
-    matchId,
-    editionId,
-    homeScore,
-    awayScore,
-    updatedAt: Date.now(),
+    userId, matchId, editionId, homeScore, awayScore, updatedAt: Date.now(),
   })
 }
 
@@ -274,28 +283,25 @@ export async function adminSetPrediction(
   adminName: string,
   allowAfterKickoff = false,
 ): Promise<void> {
-  const snap = await getDoc(doc(db, 'matches', matchId))
-  if (!snap.exists()) {
-    throw new Error('Meciul nu există.')
+  const firebaseUser = auth.currentUser
+  if (!firebaseUser) {
+    throw new Error('Autentificarea Firebase este necesara pentru aceasta operatie.')
   }
-  const match = snap.data() as Omit<Match, 'id'>
-  const editionId = editionOf(match)
-  if (!allowAfterKickoff && new Date(match.kickoff).getTime() <= Date.now()) {
-    throw new PredictionLockedError()
-  }
-
-  const id = `${userId}_${matchId}`
-  await setDoc(doc(db, 'predictions', id), {
-    userId,
-    matchId,
-    editionId,
-    homeScore,
-    awayScore,
-    updatedAt: Date.now(),
-    editedByAdmin: true,
-    editedByAdminName: adminName,
-    editedAt: Date.now(),
+  const token = await firebaseUser.getIdToken()
+  const response = await fetch('/api/admin/set-prediction', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      userId, matchId, homeScore, awayScore, allowAfterKickoff,
+    }),
   })
+  const result = (await response.json().catch(() => ({}))) as { error?: string }
+  if (!response.ok) {
+    throw new Error(result.error || 'Nu am putut salva pronosticul administrativ.')
+  }
 }
 
 export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
