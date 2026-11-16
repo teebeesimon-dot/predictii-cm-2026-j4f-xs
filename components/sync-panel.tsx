@@ -30,6 +30,8 @@ export function SyncPanel() {
   const [running, setRunning] = useState(false)
   const [lastResult, setLastResult] = useState<SyncResult | null>(null)
   const [backfillRunning, setBackfillRunning] = useState(false)
+  const [apiTestRunning, setApiTestRunning] = useState(false)
+  const [apiTestResult, setApiTestResult] = useState<Record<string, unknown> | null>(null)
   const [backfillResult, setBackfillResult] = useState<{ usersRead: number; predictionsRead: number; matchesRead: number; summariesWritten: number } | null>(null)
 
   useEffect(() => {
@@ -63,6 +65,29 @@ export function SyncPanel() {
       toast.error(error instanceof Error ? error.message : 'Reconstruirea statisticilor a esuat.')
     } finally {
       setBackfillRunning(false)
+    }
+  }
+
+
+  async function handleTestApiFootball() {
+    const currentUser = auth.currentUser
+    if (!currentUser) { toast.error('Autentificarea este necesara.'); return }
+    setApiTestRunning(true)
+    setApiTestResult(null)
+    try {
+      const token = await currentUser.getIdToken()
+      const response = await fetch('/api/admin/test-api-football', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || 'Testul API-Football a esuat.')
+      setApiTestResult(payload)
+      toast.success('Test API-Football terminat. Nu s-a accesat Firestore.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Testul API-Football a esuat.')
+    } finally {
+      setApiTestRunning(false)
     }
   }
 
@@ -160,6 +185,25 @@ export function SyncPanel() {
             <RefreshCw className={running ? 'size-4 animate-spin' : 'size-4'} />
             {running ? 'Se sincronizează...' : 'Sincronizează acum'}
           </Button>
+        </CardContent>
+      </Card>
+
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Test furnizor alternativ: API-Football</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Verifica disponibilitatea Champions League 2026/2027 si World Cup 2026 pe cheia gratuita. Testul face 4 cereri catre furnizor si nu citeste sau scrie nimic in Firestore.
+          </p>
+          <Button onClick={handleTestApiFootball} disabled={apiTestRunning} variant="outline" className="self-start">
+            <RadioTower className={apiTestRunning ? 'size-4 animate-pulse' : 'size-4'} />
+            {apiTestRunning ? 'Se verifica furnizorul...' : 'Testeaza API-Football gratuit'}
+          </Button>
+          {apiTestResult ? (
+            <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted p-3 text-xs">{JSON.stringify(apiTestResult, null, 2)}</pre>
+          ) : null}
         </CardContent>
       </Card>
 
