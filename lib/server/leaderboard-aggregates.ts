@@ -184,7 +184,6 @@ export async function rebuildEditionLeaderboardSummaries(editionId: string) {
   let batch = db.batch()
   let operations = 0
   let written = 0
-  const results: Array<{ userId: string; points: number; exact: number; correct1x2: number; played: number }> = []
   for (const userDoc of usersSnap.docs) {
     const userId = userDoc.id
     const user = userDoc.data()
@@ -211,7 +210,6 @@ export async function rebuildEditionLeaderboardSummaries(editionId: string) {
     batch.set(ref, { userId, editionId, ...totals, stages, rebuiltAt: Date.now(), source: 'full-backfill' })
     operations++
     written++
-    results.push({ userId, ...totals })
     if (operations === 450) {
       await batch.commit()
       batch = db.batch()
@@ -219,5 +217,5 @@ export async function rebuildEditionLeaderboardSummaries(editionId: string) {
     }
   }
   if (operations) await batch.commit()
-  return { editionId, usersRead: usersSnap.size, predictionsRead: predictionsSnap.size, matchesRead: matchesSnap.size, summariesWritten: written, results }
+  return { editionId, usersRead: usersSnap.size, predictionsRead: predictionsSnap.size, matchesRead: matchesSnap.size, summariesWritten: written }
 }
