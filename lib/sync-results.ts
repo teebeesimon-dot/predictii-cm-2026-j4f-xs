@@ -2,10 +2,9 @@
 // și actualizează DOAR câmpurile homeScore/awayScore în Firestore pentru
 // meciurile la care scorul s-a schimbat.
 //
-// De ce e suficient: clasamentele, statisticile și premiile sunt calculate
-// „live" din scorurile meciurilor (computeStandings / scorePrediction sunt
-// funcții pure). Deci în clipa în care scorul unui meci se schimbă în Firestore,
-// toate aceste pagini se recalculează automat la următorul refresh de date.
+// După modificarea scorurilor, statisticile agregate ale edițiilor afectate
+// sunt reconstruite server-side, astfel încât clasamentele să nu mai descarce
+// colecția completă de pronosticuri.
 
 import {
   collection,
