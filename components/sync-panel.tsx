@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSWRConfig } from 'swr'
+import { useEdition } from '@/components/edition-provider'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ function formatTime(ts: number | null): string {
 // Panou de administrare pentru actualizarea automată a rezultatelor.
 export function SyncPanel() {
   const { mutate } = useSWRConfig()
+  const { editionId } = useEdition()
   const [status, setStatus] = useState<SyncStatus | null>(null)
   const [running, setRunning] = useState(false)
   const [lastResult, setLastResult] = useState<SyncResult | null>(null)
@@ -52,7 +54,7 @@ export function SyncPanel() {
           // Reîmprospătează datele ca toate paginile să reflecte noile scoruri.
           await Promise.all([
             mutate('matches'),
-            mutate(['leaderboard-summaries', 'wc-2026']),
+            mutate(['leaderboard-summaries', editionId]),
           ])
         } else {
           toast.info('Niciun scor nou de actualizat.')
