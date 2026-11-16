@@ -6,6 +6,7 @@ import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
 import { useMatches, useUsers, useAllPredictions, useGroups, useLeaderboardSummaries } from '@/lib/hooks'
 import { useEdition } from '@/components/edition-provider'
+import { auth } from '@/lib/firebase'
 import {
   computeStandings,
   computePositionHistory,
@@ -46,7 +47,7 @@ function StandingsContent() {
       ? stageParam
       : 'general'
 
-  const useAggregates = Boolean(user?.authUid)
+  const useAggregates = Boolean(auth.currentUser)
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const [activeTab, setActiveTab] = useState(initialTab)
