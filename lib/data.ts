@@ -638,15 +638,24 @@ export async function updateMatchResult(
   homeScore: number | null,
   awayScore: number | null,
 ): Promise<void> {
-  // Când adminul introduce/corectează un scor, îl marcăm ca override manual ca
-  // sincronizarea automată să nu îl mai suprascrie. La ștergerea scorului
-  // (null) eliberăm flag-ul, lăsând sincronizarea să preia din nou.
-  const scoreOverride = homeScore !== null && awayScore !== null
-  await updateDoc(doc(db, 'matches', matchId), {
-    homeScore,
-    awayScore,
-    scoreOverride,
+  // Rezultatele introduse manual sunt validate si scrise server-side.
+  const firebaseUser = auth.currentUser
+  if (!firebaseUser) {
+    throw new Error('Autentificarea Firebase este necesara pentru modificarea rezultatelor.')
+  }
+  const token = await firebaseUser.getIdToken()
+  const response = await fetch('/api/admin/update-match-result', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ matchId, homeScore, awayScore }),
   })
+  const result = (await response.json().catch(() => ({}))) as { error?: string }
+  if (!response.ok) {
+    throw new Error(result.error || 'Nu am putut actualiza rezultatul meciului.')
+  }
 }
 
 export async function updateMatch(matchId: string, data: Partial<Match>): Promise<void> {
