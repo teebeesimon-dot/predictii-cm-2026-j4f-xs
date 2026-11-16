@@ -14,6 +14,7 @@ import {
 } from '@/lib/data'
 import { useEdition } from '@/components/edition-provider'
 import type { AppUser } from '@/lib/types'
+import { auth } from '@/lib/firebase'
 
 // Datele Firestore sunt reîmprospătate explicit după scrieri și după AutoSync.
 // Nu revalidăm la fiecare focus/reconnect: pe mobil asta genera în rafală trei
@@ -58,12 +59,47 @@ export function useUsers(refreshMs?: number) {
   })
 }
 
-export function useAllPredictions(refreshMs?: number) {
+export function useAllPredictions(refreshMs?: number, enabled = true) {
   const { editionId } = useEdition()
-  return useSWR(['predictions', editionId], () => getAllPredictions(editionId), {
+  return useSWR(enabled ? ['predictions', editionId] : null, () => getAllPredictions(editionId), {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     refreshInterval: refreshMs ?? 0,
+    refreshWhenHidden: false,
+    dedupingInterval: DATA_DEDUPE_MS,
+  })
+}
+
+
+export interface LeaderboardSummary {
+  id: string
+  userId: string
+  editionId: string
+  points: number
+  exact: number
+  correct1x2: number
+  played: number
+  stages?: Record<string, { points: number; exact: number; correct1x2: number; played: number }>
+}
+
+async function fetchLeaderboardSummaries(editionId: string): Promise<LeaderboardSummary[]> {
+  const currentUser = auth.currentUser
+  if (!currentUser) throw new Error('Autentificarea este necesara pentru clasamente.')
+  const token = await currentUser.getIdToken()
+  const response = await fetch(`/api/leaderboard-summaries?editionId=${encodeURIComponent(editionId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Nu am putut incarca statisticile clasamentului.')
+  return (payload.summaries ?? []) as LeaderboardSummary[]
+}
+
+export function useLeaderboardSummaries() {
+  const { editionId } = useEdition()
+  return useSWR(['leaderboard-summaries', editionId], () => fetchLeaderboardSummaries(editionId), {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     refreshWhenHidden: false,
     dedupingInterval: DATA_DEDUPE_MS,
   })
