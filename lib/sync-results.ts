@@ -158,6 +158,29 @@ export async function runResultsSync(
         })
       }
       await batch.commit()
+
+      // Rezultatul oficial s-a schimbat: refacem statisticile doar pentru
+      // participantii afectati de fiecare meci. Daca rebuild-ul punctual esueaza,
+      // incercam o reconstructie completa a editiei pentru a nu lasa clasamentul
+      // in urma fata de scorurile deja salvate.
+      const { rebuildMatchLeaderboardSummaries, rebuildEditionLeaderboardSummaries } =
+        await import('@/lib/server/leaderboard-aggregates')
+      const editionByMatch = new Map(
+        firestoreMatches.map((match) => [match.id, match.editionId ?? DEFAULT_EDITION_ID]),
+      )
+      const failedEditions = new Set<string>()
+      for (const change of changes) {
+        const editionId = editionByMatch.get(change.matchId) ?? DEFAULT_EDITION_ID
+        try {
+          await rebuildMatchLeaderboardSummaries(change.matchId, editionId)
+        } catch (error) {
+          console.error('[sync-results] match summary rebuild failed', change.matchId, error)
+          failedEditions.add(editionId)
+        }
+      }
+      for (const editionId of failedEditions) {
+        await rebuildEditionLeaderboardSummaries(editionId)
+      }
     }
 
     const message =
