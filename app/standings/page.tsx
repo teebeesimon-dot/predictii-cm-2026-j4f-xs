@@ -77,10 +77,6 @@ function StandingsContent() {
 
   function rowsFor(stage?: StageId) {
     if (!ready) return []
-    const relevantMatches = matches.filter((m) =>
-      m.homeScore !== null && m.awayScore !== null &&
-      (stage === undefined || m.stage === stage),
-    )
     const rows = users
       .filter((u) => !isDedicatedAdmin(u) && !isViewOnly(u))
       .filter((u) => hasEditionAccess(u, editionId))
@@ -106,7 +102,6 @@ function StandingsContent() {
       if (lastPoints === null || row.points !== lastPoints) { lastPoints = row.points; lastRank = rank }
       return { ...row, rank }
     })
-    void relevantMatches
     return filterStandingRowsByGroups(ranked, groups, selectedGroupIds)
   }
 
