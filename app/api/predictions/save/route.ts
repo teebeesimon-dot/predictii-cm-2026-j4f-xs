@@ -85,7 +85,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, predictionId, editionId, summaryUpdated })
 
-    return NextResponse.json({ ok: true, predictionId, editionId })
   } catch (error) {
     console.error('[predictions/save] failed', error)
     return NextResponse.json({ error: 'Eroare la salvarea pronosticului.' }, { status: 500 })
