@@ -16,6 +16,7 @@ import {
   limit,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
+import { mutate } from 'swr'
 import type {
   AppUser,
   Match,
@@ -237,10 +238,11 @@ export async function savePrediction(
       },
       body: JSON.stringify({ matchId, homeScore, awayScore }),
     })
-    const result = (await response.json().catch(() => ({}))) as { error?: string }
+    const result = (await response.json().catch(() => ({}))) as { error?: string; editionId?: string }
     if (!response.ok) {
       throw new Error(result.error || 'Nu am putut salva pronosticul.')
     }
+    if (result.editionId) await mutate(['leaderboard-summaries', result.editionId])
     return
   }
 
@@ -298,10 +300,11 @@ export async function adminSetPrediction(
       userId, matchId, homeScore, awayScore, allowAfterKickoff,
     }),
   })
-  const result = (await response.json().catch(() => ({}))) as { error?: string }
+  const result = (await response.json().catch(() => ({}))) as { error?: string; editionId?: string }
   if (!response.ok) {
     throw new Error(result.error || 'Nu am putut salva pronosticul administrativ.')
   }
+  if (result.editionId) await mutate(['leaderboard-summaries', result.editionId])
 }
 
 export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
@@ -652,10 +655,11 @@ export async function updateMatchResult(
     },
     body: JSON.stringify({ matchId, homeScore, awayScore }),
   })
-  const result = (await response.json().catch(() => ({}))) as { error?: string }
+  const result = (await response.json().catch(() => ({}))) as { error?: string; editionId?: string }
   if (!response.ok) {
     throw new Error(result.error || 'Nu am putut actualiza rezultatul meciului.')
   }
+  if (result.editionId) await mutate(['leaderboard-summaries', result.editionId])
 }
 
 export async function updateMatch(matchId: string, data: Partial<Match>): Promise<void> {
