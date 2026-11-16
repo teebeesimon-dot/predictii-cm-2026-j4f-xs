@@ -101,7 +101,7 @@ export function useLeaderboardSummaries(enabled = true) {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     refreshWhenHidden: false,
-    dedupingInterval: DATA_DEDUPE_MS,
+    dedupingInterval: 1000,
   })
 }
 
