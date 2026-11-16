@@ -79,6 +79,7 @@ export interface LeaderboardSummary {
   exact: number
   correct1x2: number
   played: number
+  predictionsCount?: number
   stages?: Record<string, { points: number; exact: number; correct1x2: number; played: number }>
 }
 
