@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/app-shell'
 import { useAuth } from '@/components/auth-provider'
@@ -51,8 +51,28 @@ function StandingsContent() {
   const { data: users, isLoading: l1 } = useUsers()
   const { data: matches, isLoading: l2 } = useMatches()
   const [activeTab, setActiveTab] = useState(initialTab)
+  const [hasLiveMatchWindow, setHasLiveMatchWindow] = useState(false)
+
+  // Actualizeaza local starea ferestrei live; nu face citiri de retea.
+  // Fereastra este aceeasi folosita de AutoSync: 5 min inainte pana la 3 ore dupa start.
+  useEffect(() => {
+    if (!matches?.length) {
+      setHasLiveMatchWindow(false)
+      return
+    }
+    const updateWindow = () => {
+      const now = Date.now()
+      setHasLiveMatchWindow(matches.some((match) => {
+        const kickoff = new Date(match.kickoff).getTime()
+        return Number.isFinite(kickoff) && now >= kickoff - 5 * 60 * 1000 && now <= kickoff + 3 * 60 * 60 * 1000
+      }))
+    }
+    updateWindow()
+    const timer = window.setInterval(updateWindow, 30 * 1000)
+    return () => window.clearInterval(timer)
+  }, [matches])
   const { data: predictions, isLoading: l3 } = useAllPredictions(undefined, activeTab === 'evolution' || !useAggregates)
-  const { data: summaries, isLoading: l4 } = useLeaderboardSummaries(useAggregates)
+  const { data: summaries, isLoading: l4 } = useLeaderboardSummaries(useAggregates, hasLiveMatchWindow ? 30 * 1000 : 0)
   const { data: groups = [] } = useGroups()
 
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
