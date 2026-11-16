@@ -162,18 +162,26 @@ export async function runResultsSync(
       // participantii afectati de fiecare meci. Daca rebuild-ul punctual esueaza,
       // incercam o reconstructie completa a editiei pentru a nu lasa clasamentul
       // in urma fata de scorurile deja salvate.
-      const { rebuildEditionLeaderboardSummaries } =
-        await import('@/lib/server/leaderboard-aggregates')
-      const affectedEditions = new Set(
-        changes.map((change) => {
-          const match = firestoreMatches.find((item) => item.id === change.matchId)
-          return match?.editionId ?? DEFAULT_EDITION_ID
-        }),
-      )
-      // Recalculam o singura data fiecare editie, nu o data pentru fiecare meci.
-      // Astfel un sync cu mai multe rezultate nu repeta aceleasi citiri de pronosticuri.
-      for (const editionId of affectedEditions) {
-        await rebuildEditionLeaderboardSummaries(editionId)
+      const {
+        rebuildAffectedLeaderboardSummaries,
+        rebuildEditionLeaderboardSummaries,
+      } = await import('@/lib/server/leaderboard-aggregates')
+      const affectedMatches = changes.map((change) => {
+        const match = firestoreMatches.find((item) => item.id === change.matchId)
+        return {
+          matchId: change.matchId,
+          editionId: match?.editionId ?? DEFAULT_EDITION_ID,
+        }
+      })
+      const affectedEditions = new Set(affectedMatches.map((item) => item.editionId))
+      try {
+        await rebuildAffectedLeaderboardSummaries(affectedMatches)
+      } catch (error) {
+        console.error('[sync-results] targeted summary rebuild failed', error)
+        // Fallback-ul complet este mai costisitor, dar păstrează corectitudinea.
+        for (const editionId of affectedEditions) {
+          await rebuildEditionLeaderboardSummaries(editionId)
+        }
       }
     }
 
