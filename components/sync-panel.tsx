@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSWRConfig } from 'swr'
 import { useEdition } from '@/components/edition-provider'
+import { auth } from '@/lib/firebase'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,8 @@ export function SyncPanel() {
   const [status, setStatus] = useState<SyncStatus | null>(null)
   const [running, setRunning] = useState(false)
   const [lastResult, setLastResult] = useState<SyncResult | null>(null)
+  const [backfillRunning, setBackfillRunning] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{ usersRead: number; predictionsRead: number; matchesRead: number; summariesWritten: number } | null>(null)
 
   useEffect(() => {
     let active = true
@@ -38,6 +41,30 @@ export function SyncPanel() {
       active = false
     }
   }, [])
+
+  async function handleRebuildSummaries() {
+    const currentUser = auth.currentUser
+    if (!currentUser) { toast.error('Autentificarea este necesara.'); return }
+    setBackfillRunning(true)
+    setBackfillResult(null)
+    try {
+      const token = await currentUser.getIdToken()
+      const response = await fetch('/api/admin/rebuild-leaderboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ editionId }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || 'Reconstruirea statisticilor a esuat.')
+      setBackfillResult(payload)
+      await mutate(['leaderboard-summaries', editionId])
+      toast.success(`Statistici reconstruite: ${payload.summariesWritten ?? 0} participanti.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Reconstruirea statisticilor a esuat.')
+    } finally {
+      setBackfillRunning(false)
+    }
+  }
 
   async function handleSyncNow() {
     setRunning(true)
@@ -133,6 +160,27 @@ export function SyncPanel() {
             <RefreshCw className={running ? 'size-4 animate-spin' : 'size-4'} />
             {running ? 'Se sincronizează...' : 'Sincronizează acum'}
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Inițializare statistici clasament</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Rulează o singură dată pentru ediția selectată. Citește pronosticurile existente și creează statisticile agregate folosite de clasamente. Nu șterge și nu modifică pronosticurile.
+          </p>
+          <Button onClick={handleRebuildSummaries} disabled={backfillRunning} variant="outline" className="self-start">
+            <RefreshCw className={backfillRunning ? 'size-4 animate-spin' : 'size-4'} />
+            {backfillRunning ? 'Se reconstruiesc statisticile...' : 'Reconstruiește statisticile ediției'}
+          </Button>
+          {backfillResult ? (
+            <div className="rounded-lg border border-border p-3 text-sm">
+              <p className="font-medium">Reconstrucție finalizată</p>
+              <p className="text-muted-foreground">Utilizatori citiți: {backfillResult.usersRead} · Pronosticuri citite: {backfillResult.predictionsRead} · Meciuri citite: {backfillResult.matchesRead} · Statistici scrise: {backfillResult.summariesWritten}</p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
