@@ -95,9 +95,9 @@ async function fetchLeaderboardSummaries(editionId: string): Promise<Leaderboard
   return (payload.summaries ?? []) as LeaderboardSummary[]
 }
 
-export function useLeaderboardSummaries() {
+export function useLeaderboardSummaries(enabled = true) {
   const { editionId } = useEdition()
-  return useSWR(['leaderboard-summaries', editionId], () => fetchLeaderboardSummaries(editionId), {
+  return useSWR(enabled ? ['leaderboard-summaries', editionId] : null, () => fetchLeaderboardSummaries(editionId), {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     refreshWhenHidden: false,
