@@ -108,9 +108,10 @@ export interface AppUser {
   // Jucător ascuns din clasamente pentru ceilalți participanți. Rămâne vizibil
   // în pagina „Colegii" și se vede pe sine (plus adminii îl văd) în clasamente.
   hideFromStandings?: boolean
-  // Acces per ediție (cheie = editionId). La edițiile noi nimeni nu are acces
-  // până când adminul nu bifează explicit. Ediția World Cup 2026 (cea existentă)
-  // este accesibilă implicit tuturor (vezi hasEditionAccess).
+  // Acces per ediție (cheie = editionId). Conturile noi primesc false pentru
+  // toate edițiile existente; edițiile viitoare sunt inaccesibile implicit.
+  // Conturile vechi fără acest câmp păstrează compatibilitatea cu accesul legacy
+  // la World Cup 2026 (vezi hasEditionAccess).
   access?: Record<string, boolean>
   // Token-uri Firebase Cloud Messaging pentru dispozitivele acestui utilizator
   // (Android/iOS prin Capacitor). Un user poate avea mai multe dispozitive.
@@ -256,8 +257,9 @@ export interface UserPreferences {
 export const DEFAULT_EDITION_ID = 'wc-2026'
 
 // Determină dacă un utilizator are acces la o ediție. Adminii au mereu acces.
-// Ediția existentă (wc-2026) e accesibilă tuturor dacă nu e blocată explicit.
-// Edițiile noi necesită bifare explicită (access[editionId] === true).
+// Conturile noi sunt create cu acces false pentru toate edițiile. Pentru
+// compatibilitate, conturile vechi fără câmpul access păstrează accesul legacy
+// la World Cup 2026; orice ediție nouă necesită acordare explicită.
 export function hasEditionAccess(
   u: Pick<AppUser, 'isAdmin' | 'role' | 'access'>,
   editionId: string,
