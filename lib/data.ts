@@ -16,7 +16,6 @@ import {
   limit,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
-import { mutate } from 'swr'
 import type {
   AppUser,
   Match,
@@ -242,7 +241,6 @@ export async function savePrediction(
     if (!response.ok) {
       throw new Error(result.error || 'Nu am putut salva pronosticul.')
     }
-    if (result.editionId) await mutate(['leaderboard-summaries', result.editionId])
     return
   }
 
@@ -304,7 +302,6 @@ export async function adminSetPrediction(
   if (!response.ok) {
     throw new Error(result.error || 'Nu am putut salva pronosticul administrativ.')
   }
-  if (result.editionId) await mutate(['leaderboard-summaries', result.editionId])
 }
 
 export async function createMatch(data: Omit<Match, 'id'>): Promise<void> {
