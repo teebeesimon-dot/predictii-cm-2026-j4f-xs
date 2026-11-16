@@ -134,6 +134,11 @@ function StandingsContent() {
 
       <Card>
         <CardContent className="p-4 sm:p-6">
+          {!loading && useAggregates && summaries?.length === 0 && user?.isAdmin ? (
+            <p className="mb-4 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+              Statisticile agregate nu au fost initializate pentru aceasta editie. Intra in Administrare, apoi Sincronizare si ruleaza „Reconstruieste statisticile editiei”.
+            </p>
+          ) : null}
           {loading || !ready ? (
             <Skeleton className="h-64 w-full" />
           ) : (
