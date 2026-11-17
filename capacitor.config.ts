@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
     },
   },
   server: {
-    url: 'https://predictii-cm-2026-j4f.vercel.app',
+    url: 'https://skupa-62490t25a-tiberiu-simon-s-projects.vercel.app',
     cleartext: false
   }
 };
