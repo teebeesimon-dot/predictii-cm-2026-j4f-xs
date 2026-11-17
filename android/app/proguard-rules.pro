@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Facebook authentication is not enabled in capacitor.config.ts.
+# The Firebase Authentication Capacitor plugin contains optional Facebook
+# handler references; suppress warnings for that unused optional provider.
+-dontwarn com.facebook.**
