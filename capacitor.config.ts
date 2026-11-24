@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const appHost = 'skupa-git-v0-secure-admin-endpoints-tiberiu-simon-s-projects.vercel.app';
+
 const config: CapacitorConfig = {
   appId: 'ro.just4fun.predictii',
   appName: 'SKUPA',
@@ -10,9 +12,12 @@ const config: CapacitorConfig = {
     },
   },
   server: {
-    url: 'https://skupa-62490t25a-tiberiu-simon-s-projects.vercel.app',
-    cleartext: false
-  }
+    // Alias stabil pentru ramura de Closed Testing, nu URL-ul unei singure
+    // implementari Vercel care poate deveni vechi dupa urmatoarele deploy-uri.
+    url: `https://${appHost}`,
+    cleartext: false,
+    allowNavigation: [appHost],
+  },
 };
 
 export default config;
